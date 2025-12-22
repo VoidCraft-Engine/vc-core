@@ -1,6 +1,8 @@
 //! Provides [`HashSet`] based on [hashbrown]'s implementation.
-//! Unlike [`hashbrown::HashSet`], [`HashSet`] defaults to [`FixedHasher`]
-//! instead of [`RandomState`](crate::hash::RandomState).
+//!
+//! Unlike [`hashbrown::HashSet`], [`HashSet`] defaults to [`FixedHashState`]
+//! instead of `RandomState`.
+//!
 //! This provides determinism by default with an acceptable compromise to denial
 //! of service resistance in the context of a game engine.
 use core::{
@@ -22,11 +24,6 @@ pub use hb::{
     Difference, Drain, ExtractIf, Intersection, IntoIter, Iter, OccupiedEntry, SymmetricDifference,
     Union, VacantEntry,
 };
-
-/// re-export [`hashbrown::HashSet`](::hashbrown::HashSet)
-pub mod hashbrown {
-    pub use ::hashbrown::hash_set::HashSet;
-}
 
 /// Shortcut for [`Entry`](hb::Entry) with [`FixedHashState`] as the default hashing provider.
 pub type Entry<'a, T, S = FixedHashState> = hb::Entry<'a, T, S>;

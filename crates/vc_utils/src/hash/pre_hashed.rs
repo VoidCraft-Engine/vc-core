@@ -86,14 +86,14 @@ impl<V: Hash + Eq + PartialEq + Clone, S: BuildHasher + Default> Clone for Hashe
 
 impl<V: Hash + Eq + PartialEq + Clone + Copy, S: BuildHasher + Default> Copy for Hashed<V, S> {}
 
-/// A [`HashMap`] pre-configured to use [`Hashed`] keys and [`PassHash`] passthrough hashing.
+/// A [`HashMap`] pre-configured to use [`Hashed`] keys and [`NoOpHashState`] passthrough hashing.
 /// Iteration order only depends on the order of insertions and deletions.
 pub type PreHashMap<K, V> = HashMap<Hashed<K>, V, NoOpHashState>;
 
 impl<K: Hash + Eq + PartialEq + Clone, V> PreHashMap<K, V> {
     /// Create a empty [`PreHashMap`]
     ///
-    /// Use `empty` instead of `new` to avoid duplicate name.
+    /// Use `empty` instead of `new` to avoid duplicate.
     #[inline]
     pub const fn empty() -> Self {
         Self::with_hasher(NoOpHashState)

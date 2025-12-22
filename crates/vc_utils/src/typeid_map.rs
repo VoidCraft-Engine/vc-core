@@ -4,12 +4,14 @@ use crate::hash::{HashMap, NoOpHashState, hash_map::Entry};
 
 /// A specialized hashmap type with Key of [`TypeId`]
 /// Iteration order only depends on the order of insertions and deletions.
+///
+/// We chose `HashMap` over `BTreeMap`, assuming it would have better performance — though this hasn’t been tested.
 pub type TypeIdMap<V> = HashMap<TypeId, V, NoOpHashState>;
 
 impl<V> TypeIdMap<V> {
     /// Create a empty [`TypeIdMap`]
     ///
-    /// Use `empty` instead of `new` to avoid duplicate name.
+    /// Use `empty` instead of `new` to avoid duplicate.
     #[inline]
     pub const fn empty() -> Self {
         Self::with_hasher(NoOpHashState)

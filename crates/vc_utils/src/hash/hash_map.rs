@@ -1,6 +1,8 @@
 //! Provides [`HashMap`] based on [hashbrown]'s implementation.
-//! Unlike [`hashbrown::HashMap`], [`HashMap`] defaults to [`FixedHasher`]
-//! instead of [`RandomState`].
+//!
+//! Unlike [`hashbrown::HashMap`], [`HashMap`] defaults to [`FixedHashState`]
+//! instead of `RandomState`.
+//!
 //! This provides determinism by default with an acceptable compromise to denial
 //! of service resistance in the context of a game engine.
 
@@ -778,7 +780,10 @@ where
         self.0.shrink_to_fit();
     }
 
-    /// 削减容量到不低于目标的值
+    /// Shrinks the capacity of the map with a lower limit.
+    ///
+    /// It will drop down no lower than the supplied limit while maintaining the internal rules
+    /// and possibly leaving some space in accordance with the resize policy.
     #[inline]
     pub fn shrink_to(&mut self, min_capacity: usize) {
         self.0.shrink_to(min_capacity);

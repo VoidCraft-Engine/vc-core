@@ -5,7 +5,7 @@ use core::{
 
 use foldhash::fast::{FixedState, FoldHasher};
 
-/// A fixed hash seed(randomly generated)
+/// A fixed hash seed (randomly generated).
 ///
 /// Internally, `with_seed` will also XOR with another fixed seed once to obtain the final fixed seed.
 const FIXED_HASH_STATE: FixedState = FixedState::with_seed(0x95EE04C4F326B271);
@@ -13,7 +13,7 @@ const FIXED_HASH_STATE: FixedState = FixedState::with_seed(0x95EE04C4F326B271);
 /// See [`foldhash::fast::FoldHasher`]
 pub type FixedHasher = FoldHasher<'static>;
 
-/// ### Fixed Hash State based upon a random but fixed seed.
+/// Fixed Hash State based upon a random but fixed seed.
 ///
 /// Internally used [`foldhash::fast::FixedState`], but changed the fixed seed.
 #[derive(Copy, Clone, Default, Debug)]
@@ -28,7 +28,7 @@ impl BuildHasher for FixedHashState {
     }
 }
 
-/// ### A no-op hash that only works on `u64`s.
+/// A no-op hash that only works on `u64`s.
 ///
 /// See [`NoOpHashState`]
 #[derive(Copy, Clone, Default, Debug)]
@@ -55,9 +55,9 @@ impl Hasher for NoOpHasher {
     }
 }
 
-/// ### A fixed hasher without any additional operations.
+/// A fixed hasher without any additional operations.
 ///
-/// Only storing one `u64` and assigning values directly when `writa_u64` (recommended to only use this method).
+/// Only storing one `u64` and assigning values directly by `writa_u64` (recommended to only use this method).
 ///
 /// Other method will call `write`, which will add the input bytes in reverse order to `u64`, and make it rotate left.
 /// Ensure that the results of `write_u64(1234)` and `write_i32(1234)` are the same **if only called once**.
