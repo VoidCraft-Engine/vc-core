@@ -1,0 +1,61 @@
+[package]
+name = "vc_os"
+version = "0.0.1"
+edition = "2024"
+
+[features]
+default = ["std"]
+
+std = [
+  "vc_cfg/std",
+  "wasm-bindgen-futures?/std",
+  "js-sys?/std",
+  "wasm-bindgen?/std",
+  "portable-atomic/std",
+  "critical-section?/std",
+]
+
+web = [
+  "std",
+  "dep:web-time",
+  "dep:wasm-bindgen-futures",
+  "dep:js-sys",
+  "dep:wasm-bindgen",
+]
+
+critical-section = ["dep:critical-section", "portable-atomic/critical-section"]
+
+[dependencies]
+
+vc_cfg = { path = "../vc_cfg", default-features = false }
+
+critical-section = { version = "1.2.0", default-features = false, optional = true }
+
+# We cannot enable this dependency only when the std feature is disabled. 
+# However, you don't need to worry — this library is very small and adds almost no extra overhead.
+spin = { version = "0.10.0", default-features = false, features = [
+  "mutex",
+  "spin_mutex",
+  "rwlock",
+  "once",
+  "lazy",
+  "barrier",
+] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-time = { version = "1.1", default-features = false, optional = true }
+wasm-bindgen-futures = { version = "0.4", default-features = false, optional = true }
+js-sys = { version = "0.3", default-features = false, optional = true }
+wasm-bindgen = { version = "0.2", default-features = false, optional = true }
+
+[target.'cfg(not(all(target_has_atomic = "8", target_has_atomic = "16", target_has_atomic = "32", target_has_atomic = "64")))'.dependencies]
+portable-atomic = { version = "1", default-features = false, features = [ "fallback" ] }
+
+# We currently do not support platforms without atomic pointers.
+
+[lints]
+workspace = true
+
+[package.metadata.docs.rs]
+rustdoc-args = ["-Zunstable-options", "--generate-link-to-definition"]
+all-features = true

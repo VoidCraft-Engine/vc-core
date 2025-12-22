@@ -26,6 +26,11 @@
 //! - [`enabled`]: Indicates compilation options that are enabled.
 //! - [`switch`]: Blocks similar to 'switch'.
 //! - [`define_alias`]: Define aliases for compilation options.
+//!
+//! [`disabled`]: crate::disabled
+//! [`enabled`]: crate::enabled
+//! [`switch`]: crate::switch
+//! [`define_alias`]: crate::define_alias
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![no_std]
 
