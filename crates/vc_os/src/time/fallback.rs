@@ -174,7 +174,7 @@ fn unset_getter() -> Duration {
             // SAFETY: standard technique for getting a nanosecond counter of aarch64
             let nanos = unsafe {
                 let mut ticks: u64;
-                core::arch::asm!("mrs {}, cntvct_el0", out(reg) ticks);
+                core::arch::asm!("mrs {}, cntvc_el0", out(reg) ticks);
                 ticks
             };
             Duration::from_nanos(nanos)

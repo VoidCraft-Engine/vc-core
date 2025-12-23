@@ -91,16 +91,6 @@ impl<V: Hash + Eq + PartialEq + Clone + Copy, S: BuildHasher + Default> Copy for
 pub type PreHashMap<K, V> = HashMap<Hashed<K>, V, NoOpHashState>;
 
 impl<K: Hash + Eq + PartialEq + Clone, V> PreHashMap<K, V> {
-    /// Create a empty [`PreHashMap`]
-    ///
-    /// Use `empty` instead of `new` to avoid duplicate.
-    #[inline]
-    pub const fn empty() -> Self {
-        Self::with_hasher(NoOpHashState)
-    }
-}
-
-impl<K: Hash + Eq + PartialEq + Clone, V> PreHashMap<K, V> {
     /// Tries to get or insert the value for the given `key` using the pre-computed hash first.
     /// If the [`PreHashMap`] does not already contain the `key`, it will clone it and insert
     /// the value returned by `func`.

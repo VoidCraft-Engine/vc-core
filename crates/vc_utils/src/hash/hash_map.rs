@@ -13,7 +13,7 @@ use core::{
 };
 
 // Fixed hasher builder
-use crate::hash::FixedHashState;
+use crate::hash::{FixedHashState, NoOpHashState};
 
 use ::hashbrown::{Equivalent, TryReserveError, hash_map as hb};
 
@@ -81,6 +81,20 @@ impl<K, V> HashMap<K, V, FixedHashState> {
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         Self::with_capacity_and_hasher(capacity, FixedHashState)
+    }
+}
+
+impl<K, V> HashMap<K, V, NoOpHashState> {
+    /// Create a empty [`HashMap`] with [`NoOpHashState`].
+    #[inline]
+    pub const fn new_no_op() -> Self {
+        Self::with_hasher(NoOpHashState)
+    }
+
+    /// Create a empty [`HashMap`] with specific capacity and [`NoOpHashState`].
+    #[inline]
+    pub fn with_capacity_no_op(capacity: usize) -> Self {
+        Self::with_capacity_and_hasher(capacity, NoOpHashState)
     }
 }
 

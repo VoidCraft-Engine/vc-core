@@ -9,14 +9,6 @@ use crate::hash::{HashMap, NoOpHashState, hash_map::Entry};
 pub type TypeIdMap<V> = HashMap<TypeId, V, NoOpHashState>;
 
 impl<V> TypeIdMap<V> {
-    /// Create a empty [`TypeIdMap`]
-    ///
-    /// Use `empty` instead of `new` to avoid duplicate.
-    #[inline]
-    pub const fn empty() -> Self {
-        Self::with_hasher(NoOpHashState)
-    }
-
     /// Inserts a value for the type `T`.
     #[inline(always)]
     pub fn insert_type<T: ?Sized + 'static>(&mut self, v: V) -> Option<V> {
