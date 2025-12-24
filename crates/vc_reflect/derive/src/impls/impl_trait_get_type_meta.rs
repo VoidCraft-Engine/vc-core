@@ -20,9 +20,12 @@ pub(crate) fn impl_trait_get_type_meta<'a>(
 
     let outer_ = Ident::new("__outer", Span::call_site());
 
+    let mut trait_counter = 1usize;
+
     // We can only add `TypeTraitFromReflect` when using the default `FromReflect` implementation.
     // If it is uniformly added, there may be issues with mismatched generic constraints.
     let insert_from_reflect = if meta.attrs().impl_switchs.impl_from_reflect {
+        trait_counter += 1;
         let type_trait_from_reflect_ = crate::path::type_trait_from_reflect_(vc_reflect_path);
         quote! {
             #type_meta_::insert_trait::<#type_trait_from_reflect_>(&mut #outer_, #from_type_::<Self>::from_type());
@@ -33,6 +36,7 @@ pub(crate) fn impl_trait_get_type_meta<'a>(
 
     let insert_default = match meta.attrs().avail_traits.default {
         Some(span) => {
+            trait_counter += 1;
             let type_trait_default_ = crate::path::type_trait_default_(vc_reflect_path);
             quote_spanned! { span =>
                 #type_meta_::insert_trait::<#type_trait_default_>(&mut #outer_, #from_type_::<Self>::from_type());
@@ -43,6 +47,7 @@ pub(crate) fn impl_trait_get_type_meta<'a>(
 
     let insert_serialize = match meta.attrs().avail_traits.serialize {
         Some(span) => {
+            trait_counter += 1;
             let type_trait_serialize_ = crate::path::type_trait_serialize_(vc_reflect_path);
             quote_spanned! { span =>
                 #type_meta_::insert_trait::<#type_trait_serialize_>(&mut #outer_, #from_type_::<Self>::from_type());
@@ -53,6 +58,7 @@ pub(crate) fn impl_trait_get_type_meta<'a>(
 
     let insert_deserialize = match meta.attrs().avail_traits.deserialize {
         Some(span) => {
+            trait_counter += 1;
             let type_trait_deserialize_ = crate::path::type_trait_deserialize_(vc_reflect_path);
             quote_spanned! { span =>
                 #type_meta_::insert_trait::<#type_trait_deserialize_>(&mut #outer_, #from_type_::<Self>::from_type());
@@ -60,6 +66,8 @@ pub(crate) fn impl_trait_get_type_meta<'a>(
         }
         None => crate::utils::empty(),
     };
+
+    trait_counter += meta.attrs().extra_type_trait.len();
 
     let insert_extra_traits = meta.attrs().extra_type_trait.iter().map(|extra_path| {
         let span = extra_path.span();
@@ -74,14 +82,13 @@ pub(crate) fn impl_trait_get_type_meta<'a>(
     quote! {
         impl #impl_generics #get_type_meta_ for #real_ident #ty_generics #where_clause {
             fn get_type_meta() -> #type_meta_ {
-                let mut #outer_ = #type_meta_::of::<Self>();
+                let mut #outer_ = #type_meta_::with_capacity::<Self>(#trait_counter);
                 #type_meta_::insert_trait::<#type_trait_from_ptr>(&mut #outer_, #from_type_::<Self>::from_type());
                 #insert_from_reflect
                 #insert_default
                 #insert_serialize
                 #insert_deserialize
                 #(#insert_extra_traits)*
-                #type_meta_::shrink_trait_table(&mut #outer_);
                 #outer_
             }
 

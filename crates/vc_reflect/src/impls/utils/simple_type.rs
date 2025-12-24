@@ -23,9 +23,9 @@ macro_rules! impl_simple_type_reflect {
                 Ok(())
             } else {
                 Err($crate::ops::ApplyError::MismatchedTypes {
-                    from_type: ::alloc::borrow::Cow::Owned(::alloc::borrow::ToOwned::to_owned(
+                    from_type: ::alloc::borrow::Cow::Borrowed(
                         $crate::info::DynamicTypePath::reflect_type_path(value),
-                    )),
+                    ),
                     to_type: ::alloc::borrow::Cow::Borrowed(
                         <Self as $crate::info::TypePath>::type_path(),
                     ),

@@ -70,7 +70,7 @@ pub enum ReflectOwned {
 
 macro_rules! impl_kind_fn {
     () => {
-        /// Returns the "kind" of this reflected type without any information.
+        /// Returns the [`ReflectKind`] of this reflected type without any information.
         pub const fn kind(&self) -> ReflectKind {
             match self {
                 Self::Struct(_) => ReflectKind::Struct,

@@ -20,7 +20,7 @@ use core::any::{Any, TypeId};
 ///
 /// # Implementation
 ///
-/// ## Using [`#[derive(`Reflect`)]`](crate::derive::Reflect)
+/// ## Use [`#[derive(`Reflect`)]`](crate::derive::Reflect)
 ///
 /// ```
 /// use vc_reflect::derive::Reflect;
@@ -54,7 +54,7 @@ use core::any::{Any, TypeId};
 /// struct TypePathOnly;
 /// ```
 ///
-/// ## Usint [`impl_type_path!`](crate::derive::impl_type_path)
+/// ## Use [`impl_type_path!`](crate::derive::impl_type_path)
 ///
 /// ```ignore
 /// // impl for primitive type.
@@ -129,11 +129,6 @@ use core::any::{Any, TypeId};
 /// [`module_path`]: TypePath::module_path
 /// [`GenericTypePathCell`]: crate::impls::GenericTypePathCell
 pub trait TypePath: 'static {
-    /// A standard string representing anonymous types.
-    ///
-    /// At present, we have not used it anywhere.
-    const ANONYMOUS: &'static str = "_";
-
     /// Returns the fully qualified path with generics of the underlying type.
     ///
     /// This is the complete identifier of a type,
@@ -169,42 +164,42 @@ pub trait DynamicTypePath {
     /// Returns the fully qualified path with generics of the underlying type.
     ///
     /// See [`TypePath::type_path`].
-    fn reflect_type_path(&self) -> &str;
+    fn reflect_type_path(&self) -> &'static str;
 
     /// Returns a short, pretty-print enabled path to the type.
     ///
     /// See [`TypePath::type_name`].
-    fn reflect_type_name(&self) -> &str;
+    fn reflect_type_name(&self) -> &'static str;
 
     /// Returns the short name of the type, without generics.
     ///
     /// See [`TypePath::type_ident`].
-    fn reflect_type_ident(&self) -> &str;
+    fn reflect_type_ident(&self) -> &'static str;
 
     /// Optional module path where the type is defined.
     ///
     /// See [`TypePath::module_path`].
-    fn reflect_module_path(&self) -> Option<&str>;
+    fn reflect_module_path(&self) -> Option<&'static str>;
 }
 
 impl<T: TypePath> DynamicTypePath for T {
     #[inline]
-    fn reflect_type_path(&self) -> &str {
+    fn reflect_type_path(&self) -> &'static str {
         Self::type_path()
     }
 
     #[inline]
-    fn reflect_type_name(&self) -> &str {
+    fn reflect_type_name(&self) -> &'static str {
         Self::type_name()
     }
 
     #[inline]
-    fn reflect_type_ident(&self) -> &str {
+    fn reflect_type_ident(&self) -> &'static str {
         Self::type_ident()
     }
 
     #[inline]
-    fn reflect_module_path(&self) -> Option<&str> {
+    fn reflect_module_path(&self) -> Option<&'static str> {
         Self::module_path()
     }
 }

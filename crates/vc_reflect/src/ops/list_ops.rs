@@ -86,18 +86,6 @@ impl DynamicList {
 
         self.list_info = list_info;
     }
-
-    /// Appends a [`Reflect`] trait object to the list.
-    #[inline]
-    pub fn push_box(&mut self, value: Box<dyn Reflect>) {
-        self.values.push(value);
-    }
-
-    /// Appends a typed value to the list.
-    #[inline]
-    pub fn push<T: Reflect>(&mut self, value: T) {
-        self.values.push(Box::new(value));
-    }
 }
 
 impl Reflect for DynamicList {
@@ -245,6 +233,12 @@ pub trait List: Reflect {
     /// - Panics if input type incompatible, for non-dynamic types.
     fn insert(&mut self, index: usize, element: Box<dyn Reflect>);
 
+    /// Try appends an element to the _back_ of the list.
+    ///
+    /// Return Err if `index > len` or value type incompatible.
+    fn try_insert(&mut self, index: usize, value: Box<dyn Reflect>)
+    -> Result<(), Box<dyn Reflect>>;
+
     /// Removes and returns the element at position `index` within the list,
     /// shifting all elements before it towards the front of the list.
     ///
@@ -257,6 +251,11 @@ pub trait List: Reflect {
     /// # Panics
     /// - Panics if input type incompatible, for non-dynamic types.
     fn push(&mut self, value: Box<dyn Reflect>);
+
+    /// Try appends an element to the _back_ of the list.
+    ///
+    /// Return Err if value type incompatible.
+    fn try_push(&mut self, value: Box<dyn Reflect>) -> Result<(), Box<dyn Reflect>>;
 
     /// Removes the _back_ element from the list and returns it, or [`None`] if it is empty.
     fn pop(&mut self) -> Option<Box<dyn Reflect>>;
@@ -357,6 +356,19 @@ impl List for DynamicList {
         self.values.insert(index, element);
     }
 
+    fn try_insert(
+        &mut self,
+        index: usize,
+        value: Box<dyn Reflect>,
+    ) -> Result<(), Box<dyn Reflect>> {
+        if index <= self.values.len() {
+            self.values.insert(index, value);
+            Ok(())
+        } else {
+            Err(value)
+        }
+    }
+
     #[inline]
     fn remove(&mut self, index: usize) -> Box<dyn Reflect> {
         self.values.remove(index)
@@ -364,7 +376,13 @@ impl List for DynamicList {
 
     #[inline]
     fn push(&mut self, value: Box<dyn Reflect>) {
-        DynamicList::push_box(self, value);
+        self.values.push(value);
+    }
+
+    #[inline]
+    fn try_push(&mut self, value: Box<dyn Reflect>) -> Result<(), Box<dyn Reflect>> {
+        self.values.push(value);
+        Ok(())
     }
 
     #[inline]

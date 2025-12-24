@@ -237,8 +237,8 @@ pub trait Array: Reflect {
     ///
     /// If it is a dynamic type, it will return `None`.
     ///
-    /// If it is not a dynamic type and the returned value is not `None` or `ArrayInfo`, it will panic.
-    /// (If you want to implement dynamic types yourself, please return None.)
+    /// If you want to implement dynamic types yourself, please return None.
+    /// Otherwise, return `Some(_)` alwayss.
     #[inline]
     fn reflect_array_info(&self) -> Option<&'static ArrayInfo> {
         self.reflect_type_info().as_array().ok()

@@ -193,7 +193,7 @@ impl DynamicEnum {
             VariantKind::Tuple => {
                 let mut data = DynamicTuple::new();
                 for field in value.iter_fields() {
-                    data.insert_boxed(field.value().to_dynamic());
+                    data.insert(field.value().to_dynamic());
                 }
                 DynamicEnum::new_with_index(
                     value.variant_index(),
@@ -205,7 +205,7 @@ impl DynamicEnum {
                 let mut data = DynamicStruct::new();
                 for field in value.iter_fields() {
                     let name = field.name().unwrap();
-                    data.insert_boxed(name.to_owned(), field.value().to_dynamic());
+                    data.insert(name.to_owned(), field.value().to_dynamic());
                 }
                 DynamicEnum::new_with_index(
                     value.variant_index(),
@@ -250,14 +250,14 @@ impl Reflect for DynamicEnum {
                 VariantKind::Tuple => {
                     let mut dyn_tuple = DynamicTuple::new();
                     for y_field in y.iter_fields() {
-                        dyn_tuple.insert_boxed(y_field.value().to_dynamic());
+                        dyn_tuple.insert(y_field.value().to_dynamic());
                     }
                     DynamicVariant::Tuple(dyn_tuple)
                 }
                 VariantKind::Struct => {
                     let mut dyn_struct = DynamicStruct::new();
                     for y_field in y.iter_fields() {
-                        dyn_struct.insert_boxed(
+                        dyn_struct.insert(
                             y_field.name().unwrap().to_owned(),
                             y_field.value().to_dynamic(),
                         );

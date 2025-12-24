@@ -199,6 +199,41 @@ pub fn derive_full_reflect(input: TokenStream) -> TokenStream {
     impls::match_reflect_impls(ast, ImplSourceKind::DeriveLocalType)
 }
 
+/// A macro that only implements `TypePath` for local type.
+///
+/// ## Example
+///
+/// ```rust, ignore
+/// // default implementation
+/// #[derive(TypePath)]
+/// struct A;
+///
+/// // custom implementation
+/// #[derive(TypePath)]
+/// #[reflect(type_path = "crate_name::foo::B")]
+/// struct B;
+///
+/// // support generics
+/// #[derive(TypePath)]
+/// #[reflect(type_path = "crate_name::foo::C")]
+/// struct C<T>(T);
+/// ```
+#[proc_macro_derive(TypePath, attributes(reflect))]
+pub fn derive_type_path(input: TokenStream) -> TokenStream {
+    let ast: DeriveInput = parse_macro_input!(input as DeriveInput);
+
+    let type_attributes = match TypeAttributes::parse_attrs(&ast.attrs) {
+        Ok(v) => v,
+        Err(err) => return err.into_compile_error().into(),
+    };
+
+    let type_parser =
+        TypeParser::new_local(&ast.ident, type_attributes.type_path.clone(), &ast.generics);
+
+    let meta = ReflectMeta::new(type_attributes, type_parser);
+    impls::impl_trait_type_path(&meta).into()
+}
+
 /// Implements reflection for foreign types; it requires full type information and access to fields.
 /// Because of the orphan rule, this is typically used inside the reflection crate itself.
 ///
@@ -274,7 +309,7 @@ pub fn impl_reflect_opaque(input: TokenStream) -> TokenStream {
     .into()
 }
 
-/// A macro that only implements `TypePath`.
+/// A macro that only implements `TypePath` for foreign type.
 ///
 /// Paths starting with `::` cannot be used for primitive types.
 /// The specified path must resolve to the target type and be accessible from the crate where the macro is invoked.

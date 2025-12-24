@@ -127,7 +127,7 @@ where
         Self::retain(self, move |k, v| f(k, v));
     }
 
-    fn insert_boxed(
+    fn insert(
         &mut self,
         key: Box<dyn Reflect>,
         value: Box<dyn Reflect>,
@@ -144,8 +144,24 @@ where
                 value.reflect_type_path()
             )
         });
-        self.insert(key, value)
-            .map(|old_val| Box::new(old_val) as Box<dyn Reflect>)
+
+        Self::insert(self, key, value).map(|old_val| Box::new(old_val) as Box<dyn Reflect>)
+    }
+
+    fn try_insert(
+        &mut self,
+        key: Box<dyn Reflect>,
+        value: Box<dyn Reflect>,
+    ) -> Result<Option<Box<dyn Reflect>>, (Box<dyn Reflect>, Box<dyn Reflect>)> {
+        let key = match K::take_from_reflect(key) {
+            Ok(k) => k,
+            Err(e) => return Err((e, value)),
+        };
+        let value = match V::take_from_reflect(value) {
+            Ok(v) => v,
+            Err(e) => return Err((Box::new(key), e)),
+        };
+        Ok(Self::insert(self, key, value).map(|old_val| Box::new(old_val).into_reflect()))
     }
 
     fn remove(&mut self, key: &dyn Reflect) -> Option<Box<dyn Reflect>> {

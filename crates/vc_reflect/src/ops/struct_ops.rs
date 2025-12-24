@@ -97,7 +97,7 @@ impl DynamicStruct {
     /// Inserts a field named `name` with value `value` into the struct.
     ///
     /// If the field already exists, it is overwritten.
-    pub fn insert_boxed(&mut self, name: impl Into<Cow<'static, str>>, value: Box<dyn Reflect>) {
+    pub fn insert(&mut self, name: impl Into<Cow<'static, str>>, value: Box<dyn Reflect>) {
         let name: Cow<'static, str> = name.into();
         if let Some(index) = self.field_indices.get(&name) {
             self.fields[*index] = value;
@@ -107,14 +107,6 @@ impl DynamicStruct {
                 .insert(name.clone(), self.fields.len() - 1);
             self.field_names.push(name);
         }
-    }
-
-    /// Inserts a field named `name` with the typed value `value` into the struct.
-    ///
-    /// If the field already exists, it is overwritten.
-    #[inline]
-    pub fn insert<'a, T: Reflect>(&mut self, name: impl Into<Cow<'static, str>>, value: T) {
-        self.insert_boxed(name, Box::new(value));
     }
 
     /// Gets the index of the field with the given name.
@@ -181,7 +173,7 @@ impl<'a, N: Into<Cow<'static, str>>> FromIterator<(N, Box<dyn Reflect>)> for Dyn
     fn from_iter<T: IntoIterator<Item = (N, Box<dyn Reflect>)>>(fields: T) -> Self {
         let mut dynamic_struct = DynamicStruct::new();
         for (name, value) in fields.into_iter() {
-            dynamic_struct.insert_boxed(name, value);
+            dynamic_struct.insert(name, value);
         }
         dynamic_struct
     }
@@ -275,7 +267,7 @@ pub trait Struct: Reflect {
         let mut dynamic_struct = DynamicStruct::with_capacity(self.field_len());
         dynamic_struct.set_type_info(self.represented_type_info());
         for (i, val) in self.iter_fields().enumerate() {
-            dynamic_struct.insert_boxed(self.name_at(i).unwrap().to_owned(), val.to_dynamic());
+            dynamic_struct.insert(self.name_at(i).unwrap().to_owned(), val.to_dynamic());
         }
         dynamic_struct
     }

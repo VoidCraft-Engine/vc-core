@@ -86,7 +86,6 @@ impl<T: FromReflect + Typed + Ord + Eq> Set for BTreeSet<T> {
         Self::len(self)
     }
 
-    #[inline]
     fn iter(&self) -> Box<dyn Iterator<Item = &dyn Reflect> + '_> {
         Box::new(Self::iter(self).map(|v| v as &dyn Reflect))
     }
@@ -103,14 +102,22 @@ impl<T: FromReflect + Typed + Ord + Eq> Set for BTreeSet<T> {
         Self::retain(self, |v| f(v));
     }
 
-    fn insert_boxed(&mut self, value: Box<dyn Reflect>) -> bool {
+    fn insert(&mut self, value: Box<dyn Reflect>) -> bool {
         let value = T::take_from_reflect(value).unwrap_or_else(|value| {
             panic!(
                 "Attempted to insert invalid value of type {}.",
                 value.reflect_type_path()
             )
         });
-        self.insert(value)
+        Self::insert(self, value)
+    }
+
+    fn try_insert(&mut self, value: Box<dyn Reflect>) -> Result<bool, Box<dyn Reflect>> {
+        let value = match T::take_from_reflect(value) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        Ok(Self::insert(self, value))
     }
 
     fn remove(&mut self, value: &dyn Reflect) -> bool {

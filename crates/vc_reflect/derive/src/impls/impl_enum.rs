@@ -360,7 +360,7 @@ fn get_enum_to_dynamic_impl(meta: &ReflectMeta) -> TokenStream {
     quote! {
         #[inline]
         fn to_dynamic(&self) -> #macro_utils_::Box<dyn #reflect_> {
-            #macro_utils_::Box::new( #enum_::to_dynamic_enum(self) )
+            #macro_utils_::Box::new(<Self as #enum_>::to_dynamic_enum(self) )
         }
     }
 }

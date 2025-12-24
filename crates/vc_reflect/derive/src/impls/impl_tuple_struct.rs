@@ -142,7 +142,7 @@ fn impl_trait_tuple_struct(info: &ReflectStruct) -> TokenStream {
             fn to_dynamic_tuple_struct(&self) -> #dynamic_tuple_struct_ {
                 let mut dynamic = #dynamic_tuple_struct_::with_capacity(#tuple_struct_::field_len(self));
                 dynamic.set_type_info(#reflect_::represented_type_info(self));
-                #(dynamic.insert_boxed(#reflect_::to_dynamic(#fields_ref));)*
+                #(dynamic.insert(#reflect_::to_dynamic(#fields_ref));)*
                 dynamic
             }
         }
@@ -179,7 +179,7 @@ fn get_tuple_struct_to_dynamic_impl(meta: &ReflectMeta) -> TokenStream {
     quote! {
         #[inline]
         fn to_dynamic(&self) -> #macro_utils_::Box<dyn #reflect_> {
-            #macro_utils_::Box::new( #tuple_struct_::to_dynamic_tuple_struct(self) )
+            #macro_utils_::Box::new(<Self as #tuple_struct_>::to_dynamic_tuple_struct(self) )
         }
     }
 }

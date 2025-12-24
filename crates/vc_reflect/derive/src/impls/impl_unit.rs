@@ -92,14 +92,14 @@ fn get_unit_try_apply_impl(meta: &ReflectMeta) -> proc_macro2::TokenStream {
     let err = quote! {
         #ResultFP::Err(
             #apply_error_::MismatchedTypes {
-                from_type: #macro_utils_::Cow::Owned(#macro_utils_::ToOwned::to_owned(#dynamic_type_path_::reflect_type_path(__input))),
+                from_type: #macro_utils_::Cow::Borrowed(#dynamic_type_path_::reflect_type_path(__input)),
                 to_type: #macro_utils_::Cow::Borrowed(<Self as #type_path_>::type_path()),
             }
         )
     };
 
-    if let Some(span) = meta.attrs().avail_traits.clone {
-        quote_spanned! { span =>
+    if meta.attrs().avail_traits.clone.is_some() {
+        quote! {
             fn try_apply(&mut self, __input: &dyn #reflect_) -> #ResultFP<(), #apply_error_> {
                 if let #OptionFP::Some(__input) = <dyn #reflect_>::downcast_ref::<Self>(__input) {
                     *self = #CloneFP::clone(__input);
@@ -127,8 +127,8 @@ fn get_unit_to_dynamic_impl(meta: &ReflectMeta) -> proc_macro2::TokenStream {
     let macro_utils_ = crate::path::macro_utils_(vc_reflect_path);
     let reflect_ = crate::path::reflect_(vc_reflect_path);
 
-    if let Some(span) = meta.attrs().avail_traits.clone {
-        quote_spanned! { span =>
+    if meta.attrs().avail_traits.clone.is_some() {
+        quote! {
             #[inline]
             fn to_dynamic(&self) -> #macro_utils_::Box<dyn #reflect_> {
                 #macro_utils_::Box::new(<Self as #CloneFP>::clone(self))

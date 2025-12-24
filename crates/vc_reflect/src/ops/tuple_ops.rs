@@ -89,16 +89,8 @@ impl DynamicTuple {
 
     /// Appends an element with value `value` to the tuple.
     #[inline]
-    pub fn insert_boxed(&mut self, value: Box<dyn Reflect>) {
-        self.tuple_info = None;
+    pub fn insert(&mut self, value: Box<dyn Reflect>) {
         self.fields.push(value);
-    }
-
-    /// Appends a typed element with value `value` to the tuple.
-    #[inline]
-    pub fn insert<T: Reflect>(&mut self, value: T) {
-        self.tuple_info = None;
-        self.fields.push(Box::new(value));
     }
 }
 

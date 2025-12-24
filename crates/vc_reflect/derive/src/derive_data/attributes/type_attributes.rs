@@ -50,7 +50,7 @@ pub(crate) struct TypeAttributes {
     pub auto_register: Option<Span>,
     /// `#[reflect(type_path = "...")]`
     pub type_path: Option<Path>,
-    /// See: [`ReflectDocs`]
+    /// `#[reflect(doc = "...")]` or `#[doc = "..."]`
     pub docs: ReflectDocs,
     /// `#[reflect(type_trait = (...))]`
     pub extra_type_trait: Vec<Path>,

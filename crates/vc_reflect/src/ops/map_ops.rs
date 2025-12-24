@@ -85,12 +85,6 @@ impl DynamicMap {
         self.map_info = map_info;
     }
 
-    /// Inserts a typed key-value pair into the map.
-    #[inline]
-    pub fn insert<K: Reflect, V: Reflect>(&mut self, key: K, value: V) {
-        self.insert_boxed(Box::new(key), Box::new(value));
-    }
-
     fn internal_hash(value: &dyn Reflect) -> u64 {
         value.reflect_hash().unwrap_or_else(|| {
             panic!(
@@ -168,7 +162,7 @@ impl FromIterator<(Box<dyn Reflect>, Box<dyn Reflect>)> for DynamicMap {
     fn from_iter<I: IntoIterator<Item = (Box<dyn Reflect>, Box<dyn Reflect>)>>(items: I) -> Self {
         let mut this = DynamicMap::new();
         for (key, value) in items.into_iter() {
-            this.insert_boxed(key, value);
+            this.insert(key, value);
         }
         this
     }
@@ -178,7 +172,7 @@ impl<K: Reflect, V: Reflect> FromIterator<(K, V)> for DynamicMap {
     fn from_iter<I: IntoIterator<Item = (K, V)>>(items: I) -> Self {
         let mut this = DynamicMap::new();
         for (key, value) in items.into_iter() {
-            this.insert(key, value);
+            this.insert(Box::new(key), Box::new(value));
         }
         this
     }
@@ -236,7 +230,7 @@ impl<'a> IntoIterator for &'a DynamicMap {
 /// use std::collections::BTreeMap;
 ///
 /// let foo: &mut dyn Map = &mut BTreeMap::<u32, bool>::new();
-/// foo.insert_boxed(Box::new(123_u32), Box::new(true));
+/// foo.insert(Box::new(123_u32), Box::new(true));
 /// assert_eq!(foo.len(), 1);
 ///
 /// let field: &dyn Reflect = foo.get(&123_u32).unwrap();
@@ -296,9 +290,9 @@ pub trait Map: Reflect {
                     "`Reflect::reflect_clone` should return the same type: {}",
                     value.reflect_type_path(),
                 );
-                map.insert_boxed(k, value.to_dynamic());
+                map.insert(k, value.to_dynamic());
             } else {
-                map.insert_boxed(key.to_dynamic(), value.to_dynamic());
+                map.insert(key.to_dynamic(), value.to_dynamic());
             }
         }
         map
@@ -308,11 +302,26 @@ pub trait Map: Reflect {
     ///
     /// If the map did not have this key present, `None` is returned.
     /// If the map did have this key present, the value is updated, and the old value is returned.
-    fn insert_boxed(
+    ///
+    /// # Panics
+    ///
+    /// May Panics if type incompatible.
+    fn insert(
         &mut self,
         key: Box<dyn Reflect>,
         value: Box<dyn Reflect>,
     ) -> Option<Box<dyn Reflect>>;
+
+    /// Try insert key values.
+    ///
+    /// If type incompatible, return  `Err((K, V))`.
+    ///
+    /// Use for `try_apply` implementation, should not panics.
+    fn try_insert(
+        &mut self,
+        key: Box<dyn Reflect>,
+        value: Box<dyn Reflect>,
+    ) -> Result<Option<Box<dyn Reflect>>, (Box<dyn Reflect>, Box<dyn Reflect>)>;
 
     /// Removes an entry from the map.
     ///
@@ -378,12 +387,12 @@ impl Map for DynamicMap {
             .retain(move |(key, value)| f(&**key, &mut **value));
     }
 
-    fn insert_boxed(
+    fn insert(
         &mut self,
         key: Box<dyn Reflect>,
         value: Box<dyn Reflect>,
     ) -> Option<Box<dyn Reflect>> {
-        assert_eq!(
+        debug_assert_eq!(
             key.reflect_partial_eq(&*key),
             Some(true),
             "keys inserted in `Map`-like types are expected to reflect `PartialEq`"
@@ -402,6 +411,15 @@ impl Map for DynamicMap {
                 None
             }
         }
+    }
+
+    #[inline]
+    fn try_insert(
+        &mut self,
+        key: Box<dyn Reflect>,
+        value: Box<dyn Reflect>,
+    ) -> Result<Option<Box<dyn Reflect>>, (Box<dyn Reflect>, Box<dyn Reflect>)> {
+        Ok(Map::insert(self, key, value))
     }
 
     fn remove(&mut self, key: &dyn Reflect) -> Option<Box<dyn Reflect>> {

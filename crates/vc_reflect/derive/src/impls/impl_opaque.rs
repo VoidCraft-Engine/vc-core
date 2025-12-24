@@ -101,7 +101,7 @@ fn get_opaque_try_apply_impl(meta: &ReflectMeta) -> TokenStream {
 
                 #ResultFP::Err(
                     #apply_error_::MismatchedTypes {
-                        from_type: #macro_utils_::Cow::Owned(#macro_utils_::ToOwned::to_owned(#dynamic_type_path_::reflect_type_path(__input))),
+                        from_type: #macro_utils_::Cow::Borrowed(#dynamic_type_path_::reflect_type_path(__input)),
                         to_type: #macro_utils_::Cow::Borrowed(<Self as #type_path_>::type_path()),
                     }
                 )
@@ -186,7 +186,7 @@ fn get_opaque_clone_impl(meta: &ReflectMeta) -> TokenStream {
         quote_spanned! { span =>
             #[inline]
             fn reflect_clone(&self) -> #ResultFP<#macro_utils_::Box<dyn #reflect_>, #reflect_clone_error_> {
-                #ResultFP::Ok(#macro_utils_::Box::new(<Self as #CloneFP>::clone(self)) as #macro_utils_::Box<dyn #reflect_>)
+                #ResultFP::Ok(#macro_utils_::Box::new(<Self as #CloneFP>::clone(self)))
             }
         }
     } else {
@@ -234,6 +234,7 @@ fn impl_opaque_from_reflect(meta: &ReflectMeta) -> TokenStream {
 
     quote! {
         impl #impl_generics #from_reflect_ for #real_ident #ty_generics #where_clause  {
+            #[inline]
             fn from_reflect(#input_: &dyn #reflect_) -> #OptionFP<Self> {
                 #clone_tokens
 

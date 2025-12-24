@@ -24,6 +24,17 @@ use crate::{
 /// [crate-level documentation]: crate
 pub trait Reflect: DynamicTypePath + DynamicTyped + Send + Sync + Any {
     /// Casts this type to a fully-reflected value.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use vc_reflect::Reflect;
+    ///
+    /// let x = 32;
+    /// let r: &dyn Reflect = x.as_reflect();
+    /// // Equal to this:
+    /// // let r: &dyn Reflect = &x;
+    /// ```
     #[inline(always)]
     fn as_reflect(&self) -> &dyn Reflect
     where
@@ -33,6 +44,17 @@ pub trait Reflect: DynamicTypePath + DynamicTyped + Send + Sync + Any {
     }
 
     /// Casts this type to a mutable, fully-reflected value.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use vc_reflect::Reflect;
+    ///
+    /// let mut x = 32;
+    /// let r: &mut dyn Reflect = x.as_reflect_mut();
+    /// // Equal to this:
+    /// // let r: &mut dyn Reflect = &mut x;
+    /// ```
     #[inline(always)]
     fn as_reflect_mut(&mut self) -> &mut dyn Reflect
     where
@@ -42,6 +64,17 @@ pub trait Reflect: DynamicTypePath + DynamicTyped + Send + Sync + Any {
     }
 
     /// Casts this type to a boxed, fully-reflected value.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use vc_reflect::Reflect;
+    ///
+    /// let mut x = Box::new(32);
+    /// let r: Box<dyn Reflect> = x.into_reflect();
+    /// // Equal to this:
+    /// // let r: Box<dyn Reflect> = x as Box<dyn Reflect>;
+    /// ```
     #[inline(always)]
     fn into_reflect(self: Box<Self>) -> Box<dyn Reflect>
     where
@@ -52,12 +85,23 @@ pub trait Reflect: DynamicTypePath + DynamicTyped + Send + Sync + Any {
 
     /// Return the [`TypeId`] of underlying type.
     ///
-    /// Used to replace [`Any::type_id`].
-    ///
-    /// When you use `Box<dyn Reflect>::type_id`, it will return
+    /// When you call `Box<dyn Reflect>::type_id`, it will return
     /// the [`TypeId`] of the entire container, instead of `dyn Reflect`.
     ///
     /// This is prone to errors, so we provide this method.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use vc_reflect::Reflect;
+    /// use core::any::Any;
+    ///
+    /// let mut x: Box<dyn Reflect> = Box::new(32_i32).into_reflect();
+    ///
+    /// assert!(x.type_id() != TypeId::of::<i32>());
+    /// assert!((*x).type_id() == TypeId::of::<i32>());
+    /// assert!(x.ty_id() == TypeId::of::<i32>());
+    /// ```
     #[inline]
     fn ty_id(&self) -> TypeId {
         TypeId::of::<Self>()
@@ -124,7 +168,7 @@ pub trait Reflect: DynamicTypePath + DynamicTyped + Send + Sync + Any {
     /// # Example
     ///
     /// ```
-    /// # use bevy_reflect::{PartialReflect};
+    /// # use vc_reflect::Reflect;
     /// let value = (1, true, 3.14);
     /// let dynamic_value = value.to_dynamic();
     /// assert!(dynamic_value.is_dynamic())
@@ -160,79 +204,51 @@ pub trait Reflect: DynamicTypePath + DynamicTyped + Send + Sync + Any {
 
     /// Try applies a reflected value to this value.
     ///
-    /// See applyment rules in [`Reflect::apply`].
-    /// This is it's internal implementation, it won't panic.
+    /// # Apply Rules
+    ///
+    /// If `self.ty_id` == `value.ty_id`:
+    ///
+    /// - If the type support `Clone`, try `downcast_ref` + [`Clone::clone`] + assignment.
+    /// - Otherwise, try [`Reflect::reflect_clone`] + `Reflect::take` + assignment.
+    ///
+    /// Otherwise, call following method, depend on [`ReflectKind`]:
+    ///
+    /// - [`crate::impls::array_try_apply`]
+    /// - [`crate::impls::list_try_apply`]
+    /// - [`crate::impls::struct_try_apply`]
+    /// - [`crate::impls::tuple_struct_try_apply`]
+    /// - [`crate::impls::tuple_try_apply`]
+    /// - [`crate::impls::enum_try_apply`]
+    /// - [`crate::impls::set_try_apply`]
+    /// - [`crate::impls::map_try_apply`]
+    ///
+    /// The only special kind is `Enum`, the same type but different variant
+    /// cannot `try_apply` through `enum_try_apply` directly,
+    /// The default implementation may depend on [`FromReflect`](crate::FromReflect).
+    ///
+    /// # Fail Reason
+    /// - Defferent [`ReflectKind`].
+    /// - Defferent Item/Field size in `Array`, `Tuple`, `TupleStruct` and `Enum`'s tuple variant.
+    /// - Incompatible type in any try_apply.
+    /// - Opaque type but do not support `Clone` or reflect clone.
     ///
     /// # Handling Errors
     ///
     /// This function may leave `self` in a partially mutated state if a error was encountered on the way.
     /// consider maintaining a cloned instance of this data you can switch to if a error is encountered.
-    fn try_apply(&mut self, _value: &dyn Reflect) -> Result<(), ApplyError>;
+    fn try_apply(&mut self, value: &dyn Reflect) -> Result<(), ApplyError>;
 
     /// Applies a reflected value to this value.
     ///
-    /// If `Self` implements a reflection subtrait, the semantics of this method
-    /// depend on the specific trait:
+    /// This function is similar to `try_apply(..).unwrap()`.
     ///
-    /// - **Primitive types**: If the type implements [`Clone`] and `value` has the
-    ///   same type as `Self`, `value` is cloned and assigned to `self`.
+    /// See more infomation in [`Reflect::try_apply`] .
     ///
-    /// - **[`Struct`], [`TupleStruct`]**: Each field in `value`
-    ///   is applied to the corresponding field in `self`. Fields present in only one
-    ///   of the structs are ignored, allowing application between types with different
-    ///   field counts.
-    ///
-    /// - **[`Tuple`], [`Array`]**: The lengths of `self` and `value` must
-    ///   match. Each element in `value` is then applied to the corresponding element in `self`.
-    ///
-    /// - **[`Enum`]**: The variant of `self` is changed to match the variant of `value`.
-    ///   Corresponding fields of the matching variant are then applied from `value` to `self`.
-    ///   Fields present in only one variant are ignored.
-    ///
-    /// - **[`List`]**: Elements in `value` are applied to corresponding positions
-    ///   in `self`. Up to `self.len()` elements are overwritten; any additional elements
-    ///   in `value` are appended to `self`.
-    ///
-    /// - **[`Map`]**: For each key in `value`, the associated value is applied to
-    ///   the value for the same key in `self`. Keys present in `value` but not in `self`
-    ///   are inserted. Keys present in `self` but not in `value` are removed.
-    ///
-    /// - **[`Set`]**: Elements present in `value` but not in `self` are inserted.
-    ///   Elements present in `self` but not in `value` are removed.
-    ///
-    /// - **Opaque types**: If `Self` doesn't implement any reflection subtrait, `value` is
-    ///   downcast to `Self`, cloned, and assigned to `self`.
-    ///
-    /// ## Implementation Notes
-    ///
-    /// When manually implementing `Reflect` for container types, use these helper functions
-    /// to ensure correct semantics:
-    /// - For [`List`]: [`list_try_apply`]
-    /// - For [`Map`]: [`map_try_apply`]
-    /// - For [`Set`]: [`set_try_apply`]
-    ///
-    /// Derived implementations will not work correctly for these types, as they default
-    /// to struct/tuple/enum semantics.
-    ///
-    /// ## Panics
-    ///
-    /// Derived implementations panic when:
-    /// - `value` is not the same reflection kind as `Self` (e.g., applying a `Struct` to a `List`)
-    /// - Corresponding fields/elements have incompatible types
-    /// - Downcasting fails for opaque types
-    /// - Array/Tuple lengths don't match
-    ///
-    /// [`Struct`]: crate::ops::Struct
-    /// [`TupleStruct`]: crate::ops::TupleStruct
-    /// [`Tuple`]: crate::ops::Tuple
-    /// [`Enum`]: crate::ops::Enum
-    /// [`List`]: crate::ops::List
-    /// [`Array`]: crate::ops::Array
-    /// [`Map`]: crate::ops::Map
-    /// [`Set`]: crate::ops::Set
-    /// [`list_try_apply`]: crate::impls::list_try_apply
-    /// [`map_try_apply`]: crate::impls::map_try_apply
-    /// [`set_try_apply`]: crate::impls::set_try_apply
+    /// # Panics
+    /// - Defferent [`ReflectKind`].
+    /// - Defferent Item/Field size in `Array`, `Tuple`, `TupleStruct` and `Enum`'s tuple variant.
+    /// - Incompatible type in any try_apply.
+    /// - Opaque type but do not support `Clone` or reflect clone.
     #[inline]
     fn apply(&mut self, value: &dyn Reflect) {
         Reflect::try_apply(self, value).unwrap();
@@ -284,6 +300,16 @@ pub trait Reflect: DynamicTypePath + DynamicTyped + Send + Sync + Any {
     /// However, for composite types, this performs a field-by-field comparison
     /// using `reflect_partial_eq`, which may not be efficient.
     ///
+    /// See:
+    /// - [`crate::impls::array_partial_eq`]
+    /// - [`crate::impls::list_partial_eq`]
+    /// - [`crate::impls::struct_partial_eq`]
+    /// - [`crate::impls::tuple_struct_partial_eq`]
+    /// - [`crate::impls::tuple_partial_eq`]
+    /// - [`crate::impls::enum_partial_eq`]
+    /// - [`crate::impls::set_partial_eq`]
+    /// - [`crate::impls::map_partial_eq`]
+    ///
     /// If the type implements [`PartialEq`], consider marking it with the
     /// `#[reflect(partial_eq)]` attribute. When this attribute is present,
     /// the function uses the type's own implementation instead, and types that
@@ -313,6 +339,16 @@ pub trait Reflect: DynamicTypePath + DynamicTyped + Send + Sync + Any {
     /// For composite types, however, this performs a field-by-field hash using
     /// `reflect_hash`, which may be inefficient.
     ///
+    /// See:
+    /// - [`crate::impls::array_hash`]
+    /// - [`crate::impls::list_hash`]
+    /// - [`crate::impls::struct_hash`]
+    /// - [`crate::impls::tuple_struct_hash`]
+    /// - [`crate::impls::tuple_hash`]
+    /// - [`crate::impls::enum_hash`]
+    /// - [`crate::impls::set_hash`]
+    /// - [`crate::impls::map_hash`]
+    ///
     /// If the type implements [`Hash`](core::hash::Hash), consider annotating it with the
     /// `#[reflect(hash)]` attribute to make this function use the type's
     /// own implementation instead.
@@ -335,22 +371,44 @@ pub trait Reflect: DynamicTypePath + DynamicTyped + Send + Sync + Any {
     /// (e.g. [`List`], [`Map`]), will default to the format: `"Opaque(type_path)"`,
     /// where `type_path` is the [type path] of the underlying type.
     ///
+    /// For opaque type, this function will write `"Opaque(type_path)"` by default.
+    ///
+    /// For other type, see:
+    /// - [`crate::impls::array_debug`]
+    /// - [`crate::impls::list_debug`]
+    /// - [`crate::impls::struct_debug`]
+    /// - [`crate::impls::tuple_struct_debug`]
+    /// - [`crate::impls::tuple_debug`]
+    /// - [`crate::impls::enum_debug`]
+    /// - [`crate::impls::set_debug`]
+    /// - [`crate::impls::map_debug`]
+    ///
+    /// If the type implements [`Debug`](core::fmt::Debug), consider annotating it with the
+    /// `#[reflect(debug)]` attribute to make this function use the type's
+    /// own implementation instead.
+    ///
+    /// ```
+    /// use vc_reflect::derive::Reflect;
+    ///
+    /// #[derive(Reflect, Debug)]
+    /// #[reflect(debug)]
+    /// struct A { /* ... */ }
+    /// ```
+    ///
     /// [`List`]: crate::ops::List
     /// [`Map`]: crate::ops::Map
     /// [type path]: TypePath::type_path
     fn reflect_debug(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         use crate::impls;
         match self.reflect_ref() {
-            ReflectRef::Struct(dyn_struct) => impls::struct_debug(dyn_struct, f),
-            ReflectRef::TupleStruct(dyn_tuple_struct) => {
-                impls::tuple_struct_debug(dyn_tuple_struct, f)
-            }
-            ReflectRef::Tuple(dyn_tuple) => impls::tuple_debug(dyn_tuple, f),
-            ReflectRef::List(dyn_list) => impls::list_debug(dyn_list, f),
-            ReflectRef::Array(dyn_array) => impls::array_debug(dyn_array, f),
-            ReflectRef::Map(dyn_map) => impls::map_debug(dyn_map, f),
-            ReflectRef::Set(dyn_set) => impls::set_debug(dyn_set, f),
-            ReflectRef::Enum(dyn_enum) => impls::enum_debug(dyn_enum, f),
+            ReflectRef::Struct(data) => impls::struct_debug(data, f),
+            ReflectRef::TupleStruct(data) => impls::tuple_struct_debug(data, f),
+            ReflectRef::Tuple(data) => impls::tuple_debug(data, f),
+            ReflectRef::List(data) => impls::list_debug(data, f),
+            ReflectRef::Array(data) => impls::array_debug(data, f),
+            ReflectRef::Map(data) => impls::map_debug(data, f),
+            ReflectRef::Set(data) => impls::set_debug(data, f),
+            ReflectRef::Enum(data) => impls::enum_debug(data, f),
             ReflectRef::Opaque(_) => write!(f, "Opaque({})", self.reflect_type_path()),
         }
     }

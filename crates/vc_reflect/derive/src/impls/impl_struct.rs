@@ -177,7 +177,7 @@ fn impl_trait_struct(info: &ReflectStruct) -> TokenStream {
             fn to_dynamic_struct(&self) -> #dynamic_struct_ {
                 let mut dynamic = #dynamic_struct_::with_capacity(#struct_::field_len(self));
                 dynamic.set_type_info(#reflect_::represented_type_info(self));
-                #(dynamic.insert_boxed(#field_names, #reflect_::to_dynamic(#fields_ref));)*
+                #(dynamic.insert(#field_names, #reflect_::to_dynamic(#fields_ref));)*
                 dynamic
             }
         }
@@ -214,7 +214,7 @@ fn get_struct_to_dynamic_impl(meta: &ReflectMeta) -> TokenStream {
     quote! {
         #[inline]
         fn to_dynamic(&self) -> #macro_utils_::Box<dyn #reflect_> {
-            #macro_utils_::Box::new( #struct_::to_dynamic_struct(self) )
+            #macro_utils_::Box::new(<Self as #struct_>::to_dynamic_struct(self) )
         }
     }
 }

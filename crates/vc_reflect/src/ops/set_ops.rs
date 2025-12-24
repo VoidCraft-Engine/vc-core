@@ -88,12 +88,6 @@ impl DynamicSet {
         self.set_info = set_info;
     }
 
-    /// Inserts a typed value into the set.
-    #[inline]
-    pub fn insert<V: Reflect>(&mut self, value: V) {
-        self.insert_boxed(Box::new(value));
-    }
-
     fn internal_hash(value: &dyn Reflect) -> u64 {
         value.reflect_hash().unwrap_or_else(|| {
             panic!(
@@ -170,7 +164,7 @@ impl FromIterator<Box<dyn Reflect>> for DynamicSet {
         let mut this = DynamicSet::new();
 
         for value in values {
-            this.insert_boxed(value);
+            this.insert(value);
         }
 
         this
@@ -182,7 +176,7 @@ impl<T: Reflect> FromIterator<T> for DynamicSet {
         let mut this = DynamicSet::new();
 
         for value in values {
-            this.insert(value);
+            this.insert(Box::new(value));
         }
 
         this
@@ -239,7 +233,7 @@ impl<'a> IntoIterator for &'a DynamicSet {
 /// use std::collections::BTreeSet;
 ///
 /// let foo: &mut dyn Set = &mut BTreeSet::<u32>::new();
-/// foo.insert_boxed(Box::new(123_u32));
+/// foo.insert(Box::new(123_u32));
 /// assert_eq!(foo.len(), 1);
 ///
 /// let field: &dyn Reflect = foo.get(&123_u32).unwrap();
@@ -295,9 +289,9 @@ pub trait Set: Reflect {
                     "`Reflect::reflect_clone` should return the same type: {}",
                     value.reflect_type_path(),
                 );
-                set.insert_boxed(v);
+                set.insert(v);
             } else {
-                set.insert_boxed(value.to_dynamic());
+                set.insert(value.to_dynamic());
             }
         }
         set
@@ -307,7 +301,18 @@ pub trait Set: Reflect {
     ///
     /// If the set did not have this value present, `true` is returned.
     /// If the set did have this value present, `false` is returned.
-    fn insert_boxed(&mut self, value: Box<dyn Reflect>) -> bool;
+    ///
+    /// # Panics
+    ///
+    /// May Panics if type incompatible.
+    fn insert(&mut self, value: Box<dyn Reflect>) -> bool;
+
+    /// Try insert key values.
+    ///
+    /// If type incompatible, return  `Err(V)`.
+    ///
+    /// Use for `try_apply` implementation, should not panics.
+    fn try_insert(&mut self, value: Box<dyn Reflect>) -> Result<bool, Box<dyn Reflect>>;
 
     /// Removes a value from the set.
     ///
@@ -367,8 +372,8 @@ impl Set for DynamicSet {
         self.hash_table.retain(move |value| f(&**value));
     }
 
-    fn insert_boxed(&mut self, value: Box<dyn Reflect>) -> bool {
-        assert_eq!(
+    fn insert(&mut self, value: Box<dyn Reflect>) -> bool {
+        debug_assert_eq!(
             value.reflect_partial_eq(&*value),
             Some(true),
             "Values inserted in `Set` like types are expected to reflect `PartialEq`"
@@ -390,6 +395,11 @@ impl Set for DynamicSet {
                 true
             }
         }
+    }
+
+    #[inline]
+    fn try_insert(&mut self, value: Box<dyn Reflect>) -> Result<bool, Box<dyn Reflect>> {
+        Ok(Set::insert(self, value))
     }
 
     #[inline]

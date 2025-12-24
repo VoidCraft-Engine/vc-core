@@ -1,3 +1,5 @@
+#![expect(unsafe_code, reason = "Cast pointers to references is unsafe.")]
+
 use core::any::TypeId;
 use vc_ptr::{Ptr, PtrMut};
 
@@ -10,7 +12,6 @@ pub struct TypeTraitFromPtr {
     from_ptr_mut: unsafe fn(PtrMut) -> &mut dyn Reflect,
 }
 
-#[expect(unsafe_code, reason = "Cast pointers to references is unsafe.")]
 impl TypeTraitFromPtr {
     /// Returns the [`TypeId`] that the [`TypeTraitFromPtr`] was constructed for.
     pub fn ty_id(&self) -> TypeId {
@@ -64,7 +65,6 @@ impl TypeTraitFromPtr {
     }
 }
 
-#[expect(unsafe_code, reason = "Cast pointers to references is unsafe.")]
 impl<T: Typed + Reflect> FromType<T> for TypeTraitFromPtr {
     fn from_type() -> Self {
         TypeTraitFromPtr {

@@ -1,22 +1,31 @@
-use crate::Reflect;
+use crate::{Reflect, ops::ReflectRef};
 use alloc::boxed::Box;
 
 /// A trait that enables types to be dynamically constructed from reflected data.
 ///
-/// Types that support `Reflect` should also implement this trait.
+/// It's recommended to use the [derive macro] rather than manually implementing this trait.
 ///
-/// ## Warning
+/// `FromReflect` allows dynamic proxy types, like [`DynamicStruct`], to be used to generate
+/// their concrete counterparts.
+/// It can also be used to partially or fully clone a type (depending on whether it has
+/// ignored fields or not).
 ///
-/// The implementation of `FromReflect` cannot rely on its own [`Reflect::try_apply`] or [`Reflect::apply`]。
-/// The reason is that the Enum `try_apply` relies on its own `FromReflect` and needs to avoid self looping.
+/// In some cases, this trait may even be required.
+/// Deriving [`Reflect`] on an enum requires all its fields to implement `FromReflect`.
+/// Additionally, some complex types like `Vec<T>` require that their element types
+/// implement this trait.
+/// The reason for such requirements is that some operations require new data to be constructed,
+/// such as swapping to a new variant or pushing data to a homogeneous list.
 ///
-/// However, it is possible to rely on the `try_apply` of the subfield,
-/// and in this case, type transformation usually does not have a dead loop.
+/// See the [crate-level documentation] to see how this trait can be used.
 ///
-/// There is no loop problem with the implementation of types other than enumeration,
-/// but it is recommended to treat them equally.
-///
-/// It is usually recommended to use independent implementations for both.
+/// [derive macro]: crate::FromReflect
+/// [`DynamicStruct`]: crate::ops::DynamicStruct
+/// [crate-level documentation]: crate
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` does not implement `FromReflect` so cannot be created through reflection",
+    note = "consider annotating `{Self}` with `#[derive(Reflect)]`"
+)]
 pub trait FromReflect: Reflect + Sized {
     /// Constructs a concrete instance of `Self` from a reflected value.
     fn from_reflect(reflect: &dyn Reflect) -> Option<Self>;
@@ -37,82 +46,82 @@ pub trait FromReflect: Reflect + Sized {
     }
 }
 
-// impl FromReflect for crate::ops::DynamicStruct {
-//     fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
-//         if let ReflectRef::Struct(val) = reflect.reflect_ref() {
-//             Some(val.to_dynamic_struct())
-//         } else {
-//             None
-//         }
-//     }
-// }
+impl FromReflect for crate::ops::DynamicStruct {
+    fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
+        if let ReflectRef::Struct(val) = reflect.reflect_ref() {
+            Some(val.to_dynamic_struct())
+        } else {
+            None
+        }
+    }
+}
 
-// impl FromReflect for crate::ops::DynamicTupleStruct {
-//     fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
-//         if let ReflectRef::TupleStruct(val) = reflect.reflect_ref() {
-//             Some(val.to_dynamic_tuple_struct())
-//         } else {
-//             None
-//         }
-//     }
-// }
+impl FromReflect for crate::ops::DynamicTupleStruct {
+    fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
+        if let ReflectRef::TupleStruct(val) = reflect.reflect_ref() {
+            Some(val.to_dynamic_tuple_struct())
+        } else {
+            None
+        }
+    }
+}
 
-// impl FromReflect for crate::ops::DynamicTuple {
-//     fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
-//         if let ReflectRef::Tuple(val) = reflect.reflect_ref() {
-//             Some(val.to_dynamic_tuple())
-//         } else {
-//             None
-//         }
-//     }
-// }
+impl FromReflect for crate::ops::DynamicTuple {
+    fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
+        if let ReflectRef::Tuple(val) = reflect.reflect_ref() {
+            Some(val.to_dynamic_tuple())
+        } else {
+            None
+        }
+    }
+}
 
-// impl FromReflect for crate::ops::DynamicArray {
-//     fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
-//         if let ReflectRef::Array(val) = reflect.reflect_ref() {
-//             Some(val.to_dynamic_array())
-//         } else {
-//             None
-//         }
-//     }
-// }
+impl FromReflect for crate::ops::DynamicArray {
+    fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
+        if let ReflectRef::Array(val) = reflect.reflect_ref() {
+            Some(val.to_dynamic_array())
+        } else {
+            None
+        }
+    }
+}
 
-// impl FromReflect for crate::ops::DynamicList {
-//     fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
-//         if let ReflectRef::List(val) = reflect.reflect_ref() {
-//             Some(val.to_dynamic_list())
-//         } else {
-//             None
-//         }
-//     }
-// }
+impl FromReflect for crate::ops::DynamicList {
+    fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
+        if let ReflectRef::List(val) = reflect.reflect_ref() {
+            Some(val.to_dynamic_list())
+        } else {
+            None
+        }
+    }
+}
 
-// impl FromReflect for crate::ops::DynamicMap {
-//     fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
-//         if let ReflectRef::Map(val) = reflect.reflect_ref() {
-//             Some(val.to_dynamic_map())
-//         } else {
-//             None
-//         }
-//     }
-// }
+impl FromReflect for crate::ops::DynamicMap {
+    fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
+        if let ReflectRef::Map(val) = reflect.reflect_ref() {
+            Some(val.to_dynamic_map())
+        } else {
+            None
+        }
+    }
+}
 
-// impl FromReflect for crate::ops::DynamicSet {
-//     fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
-//         if let ReflectRef::Set(val) = reflect.reflect_ref() {
-//             Some(val.to_dynamic_set())
-//         } else {
-//             None
-//         }
-//     }
-// }
+impl FromReflect for crate::ops::DynamicSet {
+    fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
+        if let ReflectRef::Set(val) = reflect.reflect_ref() {
+            Some(val.to_dynamic_set())
+        } else {
+            None
+        }
+    }
+}
 
-// impl FromReflect for crate::ops::DynamicEnum {
-//     fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
-//         if let ReflectRef::Enum(val) = reflect.reflect_ref() {
-//             Some(val.to_dynamic_enum())
-//         } else {
-//             None
-//         }
-//     }
-// }
+impl FromReflect for crate::ops::DynamicEnum {
+    fn from_reflect(reflect: &dyn Reflect) -> Option<Self> {
+        if let ReflectRef::Enum(val) = reflect.reflect_ref() {
+            Some(val.to_dynamic_enum())
+        } else {
+            None
+        }
+    }
+}
