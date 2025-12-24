@@ -10,6 +10,12 @@ use crate::info::{
 };
 
 /// Represents the kind/form of an enum variant.
+///
+/// # Kinds
+///
+/// - `A` -> Unit
+/// - `A()` and `A(..)` -> Tuple
+/// - `A{}` and `A{..}` -> Struct
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum VariantKind {
     Struct,
@@ -27,7 +33,7 @@ impl fmt::Display for VariantKind {
     }
 }
 
-/// Metadata for struct style enum variants.
+/// Infomation for struct style enum variants.
 ///
 /// # Examples
 ///
@@ -53,9 +59,8 @@ impl fmt::Display for VariantKind {
 #[derive(Clone, Debug)]
 pub struct StructVariantInfo {
     name: &'static str,
-    fields: Box<[NamedField]>,
+    fields: HashMap<&'static str, NamedField>,
     field_names: Box<[&'static str]>,
-    field_indices: HashMap<&'static str, usize>,
     // Use `Option` to avoid allocating when there are no custom attributes.
     custom_attributes: Option<Arc<CustomAttributes>>,
     #[cfg(feature = "reflect_docs")]
@@ -68,20 +73,16 @@ impl StructVariantInfo {
     impl_with_custom_attributes!(custom_attributes);
 
     /// Create a new [`StructVariantInfo`].
+    ///
+    /// The order of internal fields is fixed, depends on the input order.
     pub fn new(name: &'static str, fields: &[NamedField]) -> Self {
-        let field_indices = fields
-            .iter()
-            .enumerate()
-            .map(|(index, field)| (field.name(), index))
-            .collect();
-
         let field_names = fields.iter().map(NamedField::name).collect();
+        let fields = fields.iter().map(|v| (v.name(), v.clone())).collect();
 
         Self {
             name,
-            fields: fields.to_vec().into_boxed_slice(),
+            fields: fields,
             field_names,
-            field_indices,
             custom_attributes: None,
             #[cfg(feature = "reflect_docs")]
             docs: None,
@@ -100,30 +101,28 @@ impl StructVariantInfo {
         &self.field_names
     }
 
-    /// Returns the field with the given `name`, if present.
-    #[inline]
+    /// Returns the [`NamedField`] for the given `name`, if present.
     pub fn field(&self, name: &str) -> Option<&NamedField> {
-        self.field_indices
-            .get(name)
-            .map(|index| &self.fields[*index])
+        self.fields.get(name)
     }
 
-    /// Returns the field at the given index, if present.
-    #[inline]
+    /// Returns the [`NamedField`] at the given index, if present.
     pub fn field_at(&self, index: usize) -> Option<&NamedField> {
-        self.fields.get(index)
+        self.fields.get(self.field_names.get(index)?)
     }
 
-    /// Returns the index of the field with the given `name`, if present.
-    #[inline]
+    /// Returns the index for the given field `name`, if present.
+    ///
+    /// This is O(N) complexity.
     pub fn index_of(&self, name: &str) -> Option<usize> {
-        self.field_indices.get(name).copied()
+        self.field_names.iter().position(|s| *s == name)
     }
 
-    /// Returns an iterator over the fields of this variant in declaration order.
-    #[inline]
-    pub fn iter(&self) -> core::slice::Iter<'_, NamedField> {
-        self.fields.iter()
+    /// Returns an iterator over the fields in **declaration order**.
+    pub fn iter(&self) -> impl Iterator<Item = &NamedField> {
+        self.field_names
+            .iter()
+            .map(|name| self.fields.get(name).unwrap())
     }
 
     /// Returns the total number of fields in this variant.
@@ -133,7 +132,7 @@ impl StructVariantInfo {
     }
 }
 
-/// Metadata for tuple style enum variants.
+/// Infomation for tuple style enum variants.
 ///
 /// # Examples
 ///
@@ -193,9 +192,9 @@ impl TupleVariantInfo {
         self.fields.get(index)
     }
 
-    /// Iterate over the fields of this variant.
+    /// Returns an iterator over the fields in **declaration order**.
     #[inline]
-    pub fn iter(&self) -> core::slice::Iter<'_, UnnamedField> {
+    pub fn iter(&self) -> impl Iterator<Item = &UnnamedField> {
         self.fields.iter()
     }
 
@@ -206,7 +205,7 @@ impl TupleVariantInfo {
     }
 }
 
-/// Metadata for unit enum variants.
+/// Infomation for unit enum variants.
 ///
 /// # Examples
 ///
@@ -281,6 +280,31 @@ impl fmt::Display for VariantKindError {
 impl error::Error for VariantKindError {}
 
 /// Container for compile-time enum variant info.
+///
+/// # Examples
+///
+/// ```
+/// use vc_reflect::{derive::Reflect, info::{Typed, VariantKind}};
+///
+/// #[derive(Reflect)]
+/// enum MyEnum {
+///   A,
+///   B(),
+///   #[reflect(@10_i32)]
+///   C{},
+///   Other{ /* ... */ },
+/// }
+///
+/// let enum_info = MyEnum::type_info().as_enum().unwrap();
+///
+/// let a = enum_info.variant("A").unwrap();
+/// let b = enum_info.variant("B").unwrap();
+/// let c = enum_info.variant("C").unwrap();
+///
+/// assert_eq!(a.name(), "A");
+/// assert_eq!(b.variant_kind(), VariantKind::Tuple);
+/// assert_eq!(c.get_attribute::<i32>(), Some(&10_i32));
+/// ```
 #[derive(Clone, Debug)]
 pub enum VariantInfo {
     /// See [`StructVariantInfo`].
@@ -310,6 +334,7 @@ impl VariantInfo {
     impl_cast_fn!(as_tuple_variant: Tuple => TupleVariantInfo);
     impl_cast_fn!(as_unit_variant: Unit => UnitVariantInfo);
 
+    /// Returns the attribute of type T, if present.
     pub fn custom_attributes(&self) -> &CustomAttributes {
         match self {
             Self::Struct(info) => info.custom_attributes(),
@@ -329,9 +354,13 @@ impl VariantInfo {
         }
     }
 
-    /// Returns the [kind] of this variant.
+    /// Returns the [`VariantKind`] of this variant.
     ///
-    /// [kind]: VariantKind
+    /// # Kinds
+    ///
+    /// - `A` -> Unit
+    /// - `A()` and `A(..)` -> Tuple
+    /// - `A{}` and `A{..}` -> Struct
     pub const fn variant_kind(&self) -> VariantKind {
         match self {
             Self::Struct(_) => VariantKind::Struct,
@@ -344,6 +373,8 @@ impl VariantInfo {
     ///
     /// If `reflect_docs` feature is not enabled, this function always return `None`.
     /// So you can use this without worrying about compilation options.
+    ///
+    /// See examples in [`TypeInfo`](crate::info::TypeInfo) .
     #[cfg_attr(not(feature = "reflect_docs"), inline(always))]
     pub const fn docs(&self) -> Option<&str> {
         #[cfg(not(feature = "reflect_docs"))]

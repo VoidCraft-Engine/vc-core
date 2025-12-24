@@ -1,3 +1,5 @@
+//! Provide some utilities for implementing reflection traits.
+
 mod cell;
 pub use cell::{GenericTypeInfoCell, GenericTypePathCell, NonGenericTypeInfoCell};
 

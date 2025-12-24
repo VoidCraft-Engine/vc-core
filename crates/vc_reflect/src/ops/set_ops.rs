@@ -5,7 +5,7 @@ use crate::{
     ops::{ApplyError, ReflectCloneError},
     reflection::impl_reflect_cast_fn,
 };
-use alloc::{boxed::Box, format, vec::Vec};
+use alloc::{boxed::Box, vec::Vec};
 use core::fmt;
 use vc_utils::hash::{HashTable, hash_table};
 
@@ -95,23 +95,11 @@ impl DynamicSet {
     }
 
     fn internal_hash(value: &dyn Reflect) -> u64 {
-        value.reflect_hash().expect(&{
-            let type_path = (value).reflect_type_path();
-            if !value.is_dynamic() {
-                format!(
-                    "the given value of type `{}` does not support hashing",
-                    type_path
-                )
-            } else {
-                match value.represented_type_info() {
-                    None => format!("the dynamic type `{}` does not support hashing", type_path),
-                    Some(target) => format!(
-                        "the dynamic type `{}` (target: `{}`) does not support hashing",
-                        type_path,
-                        target.type_path(),
-                    ),
-                }
-            }
+        value.reflect_hash().unwrap_or_else(|| {
+            panic!(
+                "the given value of type `{}` does not support reflect hashing",
+                value.reflect_type_path(),
+            );
         })
     }
 
@@ -227,7 +215,7 @@ impl<'a> IntoIterator for &'a DynamicSet {
 /// A trait used to power [set-like] operations via [reflection].
 ///
 /// Sets contain zero or more entries of a fixed type, and correspond to types
-/// like [`HashSet`] and [`BTreeSet`].
+/// like `HashSet` and [`BTreeSet`].
 /// The order of these entries is not guaranteed by this trait.
 ///
 /// # Hashing and equality
@@ -258,7 +246,6 @@ impl<'a> IntoIterator for &'a DynamicSet {
 /// assert_eq!(field.downcast_ref::<u32>(), Some(&123_u32));
 /// ```
 ///
-/// [`HashSet`]: std::collections::HashSet
 /// [`BTreeSet`]: alloc::collections::BTreeSet
 /// [set-like]: https://doc.rust-lang.org/stable/std/collections/struct.HashSet.html
 /// [reflection]: crate
@@ -291,11 +278,27 @@ pub trait Set: Reflect {
     fn retain(&mut self, f: &mut dyn FnMut(&dyn Reflect) -> bool);
 
     /// Creates a new [`DynamicSet`] from this set.
+    ///
+    /// Usually, `to_dynamic_map` recursively converts all data to a dynamic type,
+    /// except for 'Opaque'. But for Set values, converting them to dynamic types
+    /// is not a good idea, may cause changes in the result of hash and eq.
+    ///
+    /// Therefore,  we choose to directly clone them if feasible.
     fn to_dynamic_set(&self) -> DynamicSet {
         let mut set = DynamicSet::with_capacity(self.len());
         set.set_type_info(self.represented_type_info());
         for value in self.iter() {
-            set.insert_boxed(value.to_dynamic());
+            if let Ok(v) = value.reflect_clone() {
+                debug_assert_eq!(
+                    v.ty_id(),
+                    value.ty_id(),
+                    "`Reflect::reflect_clone` should return the same type: {}",
+                    value.reflect_type_path(),
+                );
+                set.insert_boxed(v);
+            } else {
+                set.insert_boxed(value.to_dynamic());
+            }
         }
         set
     }

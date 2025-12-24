@@ -1,3 +1,5 @@
+//! Provide interfaces for data operation.
+
 mod apply_error;
 mod array_ops;
 mod clone_error;
@@ -11,15 +13,15 @@ mod tuple_ops;
 mod tuple_struct_ops;
 mod variant_ops;
 
-pub use apply_error::*;
-pub use array_ops::*;
-pub use clone_error::*;
-pub use enum_ops::*;
-pub use kind::*;
-pub use list_ops::*;
-pub use map_ops::*;
-pub use set_ops::*;
-pub use struct_ops::*;
-pub use tuple_ops::*;
-pub use tuple_struct_ops::*;
-pub use variant_ops::*;
+pub use apply_error::ApplyError;
+pub use array_ops::{Array, ArrayItemIter, DynamicArray};
+pub use clone_error::ReflectCloneError;
+pub use enum_ops::{DynamicEnum, Enum};
+pub use kind::{ReflectMut, ReflectOwned, ReflectRef};
+pub use list_ops::{DynamicList, List, ListItemIter};
+pub use map_ops::{DynamicMap, Map};
+pub use set_ops::{DynamicSet, Set};
+pub use struct_ops::{DynamicStruct, Struct, StructFieldIter};
+pub use tuple_ops::{DynamicTuple, Tuple, TupleFieldIter};
+pub use tuple_struct_ops::{DynamicTupleStruct, TupleStruct, TupleStructFieldIter};
+pub use variant_ops::{DynamicVariant, VariantField, VariantFieldIter};

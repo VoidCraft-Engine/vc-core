@@ -1,16 +1,36 @@
 use alloc::borrow::Cow;
-use core::fmt;
+use core::{
+    any::{Any, TypeId},
+    fmt,
+};
 use vc_os::sync::Arc;
 
 use crate::info::{
-    CustomAttributes, Type, TypeInfo, Typed, impl_custom_attributes_fn, impl_docs_fn, impl_type_fn,
+    CustomAttributes, TypeInfo, Typed, impl_custom_attributes_fn, impl_docs_fn,
     impl_with_custom_attributes,
 };
 
-/// Information for a named (struct) field.
+/// Information for a named (struct) field, size = 40.
+///
+/// # Examples
+///
+/// ```
+/// use vc_reflect::{derive::Reflect, info::Typed};
+///
+/// #[derive(Reflect)]
+/// struct Foo {
+///     field_a: f32,
+/// }
+///
+/// let info = Foo::type_info().as_struct().unwrap();
+/// let field_info = info.field_at(0).unwrap();
+///
+/// assert!(field_info.type_is::<f32>());
+/// assert_eq!(field_info.name(), "field_a");
+/// ```
 #[derive(Clone, Debug)]
 pub struct NamedField {
-    ty: Type,
+    ty_id: TypeId,
     name: &'static str,
     // `TypeInfo` is created on first access; using a function pointer delays it.
     type_info: fn() -> &'static TypeInfo,
@@ -22,7 +42,6 @@ pub struct NamedField {
 
 impl NamedField {
     impl_docs_fn!(docs);
-    impl_type_fn!(ty);
     impl_custom_attributes_fn!(custom_attributes);
     impl_with_custom_attributes!(custom_attributes);
 
@@ -32,11 +51,23 @@ impl NamedField {
         Self {
             name,
             type_info: T::type_info,
-            ty: Type::of::<T>(),
+            ty_id: TypeId::of::<T>(),
             custom_attributes: None,
             #[cfg(feature = "reflect_docs")]
             docs: None,
         }
+    }
+
+    /// Returns the `TypeId`.
+    #[inline]
+    pub const fn ty_id(&self) -> TypeId {
+        self.ty_id
+    }
+
+    /// Check if the given type matches this one.
+    #[inline]
+    pub fn type_is<T: Any>(&self) -> bool {
+        self.ty_id == TypeId::of::<T>()
     }
 
     /// Returns the field name.
@@ -52,10 +83,25 @@ impl NamedField {
     }
 }
 
-/// Information for an unnamed (tuple) field.
+/// Information for an unnamed (tuple) field, size = 40.
+///
+/// # Examples
+///
+/// ```
+/// use vc_reflect::{derive::Reflect, info::Typed};
+///
+/// #[derive(Reflect)]
+/// struct Foo(f32);
+///
+/// let info = Foo::type_info().as_tuple_struct().unwrap();
+/// let field_info = info.field_at(0).unwrap();
+///
+/// assert!(field_info.type_is::<f32>());
+/// assert_eq!(field_info.index(), 0);
+/// ```
 #[derive(Clone, Debug)]
 pub struct UnnamedField {
-    ty: Type,
+    ty_id: TypeId,
     index: usize,
     // `TypeInfo` is created on first access; using a function pointer delays it.
     type_info: fn() -> &'static TypeInfo,
@@ -67,7 +113,6 @@ pub struct UnnamedField {
 
 impl UnnamedField {
     impl_docs_fn!(docs);
-    impl_type_fn!(ty);
     impl_custom_attributes_fn!(custom_attributes);
     impl_with_custom_attributes!(custom_attributes);
 
@@ -77,11 +122,23 @@ impl UnnamedField {
         Self {
             index,
             type_info: T::type_info,
-            ty: Type::of::<T>(),
+            ty_id: TypeId::of::<T>(),
             custom_attributes: None,
             #[cfg(feature = "reflect_docs")]
             docs: None,
         }
+    }
+
+    /// Returns the `TypeId`.
+    #[inline]
+    pub const fn ty_id(&self) -> TypeId {
+        self.ty_id
+    }
+
+    /// Check if the given type matches this one.
+    #[inline]
+    pub fn type_is<T: Any>(&self) -> bool {
+        self.ty_id == TypeId::of::<T>()
     }
 
     /// Returns the field index (position in the tuple struct).

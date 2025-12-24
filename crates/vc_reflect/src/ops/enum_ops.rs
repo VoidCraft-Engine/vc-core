@@ -175,7 +175,6 @@ impl DynamicEnum {
     /// Create a [`DynamicEnum`] from an existing one.
     ///
     /// This is functionally the same as [`DynamicEnum::from_ref`] except it takes an owned value.
-    #[inline]
     pub fn from<TEnum: Enum>(value: TEnum) -> Self {
         // copy value instead of referencing
         Self::from_ref(&value)
@@ -315,7 +314,7 @@ impl fmt::Debug for DynamicEnum {
 /// > The [`Enum`] trait represents an enum _as one of its variants_.
 /// > It does not represent the entire enum since that's not true to how enums work.
 ///
-/// Variants come in a few [flavors](VariantType):
+/// Variants come in a few [flavors](VariantKind):
 ///
 /// | Variant Type | Syntax                         |
 /// | ------------ | ------------------------------ |
@@ -382,7 +381,7 @@ impl fmt::Debug for DynamicEnum {
 pub trait Enum: Reflect {
     /// Returns a reference to the value of the field (in the current variant) with the given name.
     ///
-    /// For non-[`VariantType::Struct`] variants, this should return `None`.
+    /// For non-[`VariantKind::Struct`] variants, this should return `None`.
     fn field(&self, name: &str) -> Option<&dyn Reflect>;
 
     /// Returns a reference to the value of the field (in the current variant) at the given index.
@@ -390,7 +389,7 @@ pub trait Enum: Reflect {
 
     /// Returns a mutable reference to the value of the field (in the current variant) with the given name.
     ///
-    /// For non-[`VariantType::Struct`] variants, this should return `None`.
+    /// For non-[`VariantKind::Struct`] variants, this should return `None`.
     fn field_mut(&mut self, name: &str) -> Option<&mut dyn Reflect>;
 
     /// Returns a mutable reference to the value of the field (in the current variant) at the given index.
@@ -398,12 +397,12 @@ pub trait Enum: Reflect {
 
     /// Returns the index of the field (in the current variant) with the given name.
     ///
-    /// For non-[`VariantType::Struct`] variants, this should return `None`.
+    /// For non-[`VariantKind::Struct`] variants, this should return `None`.
     fn index_of(&self, name: &str) -> Option<usize>;
 
     /// Returns the name of the field (in the current variant) with the given index.
     ///
-    /// For non-[`VariantType::Struct`] variants, this should return `None`.
+    /// For non-[`VariantKind::Struct`] variants, this should return `None`.
     fn name_at(&self, index: usize) -> Option<&str>;
 
     /// Returns an iterator over the values of the current variant's fields.
@@ -513,6 +512,7 @@ impl Enum for DynamicEnum {
         VariantFieldIter::new(self)
     }
 
+    #[inline]
     fn field_len(&self) -> usize {
         match &self.variant {
             DynamicVariant::Unit => 0,

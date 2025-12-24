@@ -1,10 +1,13 @@
 /// Implements `docs` and `with_docs` helpers.
 macro_rules! impl_docs_fn {
     ($field:ident) => {
-        /// Returns the docs, if present.
+        /// Returns the documentation string for the type, if `reflect_docs` is
+        /// enabled and docs are present.
         ///
         /// If `reflect_docs` feature is not enabled, this function always return `None`.
         /// So you can use this without worrying about compilation options.
+        ///
+        /// See examples in [`TypeInfo::docs`](crate::info::TypeInfo::docs) .
         #[inline(always)]
         pub const fn docs(&self) -> Option<&'static str> {
             #[cfg(not(feature = "reflect_docs"))]

@@ -9,7 +9,7 @@ pub struct TypeTraitFromReflect {
 }
 
 impl TypeTraitFromReflect {
-    /// Call T's [`PartialReflect`]
+    /// Call T's [`Reflect`]
     ///
     /// [`TypeTraitFromReflect`] does not have a type flag,
     /// but the functions used internally are type specific.

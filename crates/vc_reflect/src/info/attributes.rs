@@ -18,15 +18,23 @@ use crate::Reflect;
 /// # use vc_reflect::{derive::Reflect, info::{Typed, TypeInfo}};
 ///
 /// #[derive(Reflect)]
+/// #[reflect(@false)]
 /// struct Slider {
-///   #[reflect(@10.0f32)]
-///   value: f32
+///     #[reflect(@10.0f32)]
+///     value: f32,
+///     name: String,
 /// }
 ///
 /// let info = <Slider as Typed>::type_info().as_struct().unwrap();
+/// assert!(info.has_attribute::<bool>());
 ///
-/// let val = info.field("value").unwrap().get_attribute::<f32>().unwrap();
-/// assert_eq!(10.0f32, *val);
+/// let field = info.field("value").unwrap();
+/// assert!(!field.has_attribute::<i32>());
+/// assert_eq!(*field.get_attribute::<f32>().unwrap(), 10.0f32);
+///
+/// let field = info.field("name").unwrap();
+/// let attrs = field.custom_attributes();
+/// assert!(attrs.is_empty());
 /// ```
 ///
 /// [`Reflect` derive macro]: crate::derive::Reflect

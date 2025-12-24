@@ -5,9 +5,10 @@ use crate::{
     ops::Tuple,
 };
 
-/// A container for compile-time unnamed struct info.
+/// A container for compile-time unnamed struct info, size = 80 (exclude `docs`).
 ///
-/// At present, `TupleInfo` does not have `CustomAttributes`, which can save memory.
+/// At present, `ListInfo` does not have `CustomAttributes`.
+/// If necessary, it may be added in the future.
 ///
 /// # Examples
 ///
@@ -33,6 +34,8 @@ impl TupleInfo {
     impl_generic_fn!(generics);
 
     /// Create a new [`TupleInfo`].
+    ///
+    /// The order of internal fields is fixed, depends on the input order.
     #[inline]
     pub fn new<T: Tuple + TypePath>(fields: &[UnnamedField]) -> Self {
         Self {
@@ -50,9 +53,9 @@ impl TupleInfo {
         self.fields.get(index)
     }
 
-    /// Returns an iterator over the fields in declaration order.
+    /// Returns an iterator over the fields in **declaration order**.
     #[inline]
-    pub fn iter(&self) -> core::slice::Iter<'_, UnnamedField> {
+    pub fn iter(&self) -> impl Iterator<Item = &UnnamedField> {
         self.fields.iter()
     }
 

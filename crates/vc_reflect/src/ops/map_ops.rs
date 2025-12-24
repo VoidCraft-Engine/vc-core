@@ -5,7 +5,7 @@ use crate::{
     ops::{ApplyError, ReflectCloneError},
     reflection::impl_reflect_cast_fn,
 };
-use alloc::{boxed::Box, format, vec::Vec};
+use alloc::{boxed::Box, vec::Vec};
 use core::fmt;
 use vc_utils::hash::{HashTable, hash_table};
 
@@ -92,23 +92,11 @@ impl DynamicMap {
     }
 
     fn internal_hash(value: &dyn Reflect) -> u64 {
-        value.reflect_hash().expect(&{
-            let type_path = (value).reflect_type_path();
-            if !value.is_dynamic() {
-                format!(
-                    "the given value of type `{}` does not support hashing",
-                    type_path
-                )
-            } else {
-                match value.represented_type_info() {
-                    None => format!("the dynamic type `{}` does not support hashing", type_path),
-                    Some(target) => format!(
-                        "the dynamic type `{}` (target: `{}`) does not support hashing",
-                        type_path,
-                        target.type_path(),
-                    ),
-                }
-            }
+        value.reflect_hash().unwrap_or_else(|| {
+            panic!(
+                "the given value of type `{}` does not support reflect hashing",
+                value.reflect_type_path(),
+            );
         })
     }
 
@@ -224,7 +212,7 @@ impl<'a> IntoIterator for &'a DynamicMap {
 /// A trait used to power [map-like] operations via [reflection].
 ///
 /// Maps contain zero or more entries of a key and its associated value,
-/// and correspond to types like [`HashMap`] and [`BTreeMap`].
+/// and correspond to types like `HashMap` and [`BTreeMap`].
 /// The order of these entries is not guaranteed by this trait.
 ///
 /// # Hashing and equality
@@ -255,7 +243,6 @@ impl<'a> IntoIterator for &'a DynamicMap {
 /// assert_eq!(field.downcast_ref::<bool>(), Some(&true));
 /// ```
 ///
-/// [`HashMap`]: std::collections::HashMap
 /// [`BTreeMap`]: alloc::collections::BTreeMap
 /// [map-like]: https://doc.rust-lang.org/book/ch08-03-hash-maps.html
 /// [reflection]: crate
@@ -306,7 +293,8 @@ pub trait Map: Reflect {
                 debug_assert_eq!(
                     k.ty_id(),
                     key.ty_id(),
-                    "`Reflect::reflect_clone` should return the same type"
+                    "`Reflect::reflect_clone` should return the same type: {}",
+                    value.reflect_type_path(),
                 );
                 map.insert_boxed(k, value.to_dynamic());
             } else {

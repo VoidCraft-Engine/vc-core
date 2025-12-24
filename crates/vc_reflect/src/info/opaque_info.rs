@@ -13,6 +13,8 @@ use crate::{
 ///
 /// "Opaque" means the type's internal representation is not exposed — for
 /// example primitive types like `u64` or heap-backed types like `String`.
+///
+/// size = 72 (exclude `docs`).
 #[derive(Debug, Clone)]
 pub struct OpaqueInfo {
     ty: Type,

@@ -1,3 +1,5 @@
+use core::any::{Any, TypeId};
+
 use crate::{
     Reflect,
     info::{
@@ -6,7 +8,7 @@ use crate::{
     ops::Array,
 };
 
-/// A container for compile-time array info, size = 128 (exclude `docs`).
+/// A container for compile-time array info, size = 96 (exclude `docs`).
 ///
 /// At present, `ArrayInfo` does not have `CustomAttributes`, which can save memory.
 ///
@@ -27,10 +29,11 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct ArrayInfo {
     ty: Type,
-    item_ty: Type,
+    generics: Generics,
+    // Cache `TypeId` for deserialization.
+    item_id: TypeId,
     // `TypeInfo` is created on the first visit, use function pointers to delay it.
     item_info: fn() -> &'static TypeInfo,
-    generics: Generics,
     capacity: usize,
     #[cfg(feature = "reflect_docs")]
     docs: Option<&'static str>,
@@ -58,7 +61,7 @@ impl ArrayInfo {
         Self {
             ty: Type::of::<TArray>(),
             generics: Generics::new(),
-            item_ty: Type::of::<TItem>(),
+            item_id: TypeId::of::<TItem>(),
             item_info: TItem::type_info,
             capacity,
             #[cfg(feature = "reflect_docs")]
@@ -72,10 +75,16 @@ impl ArrayInfo {
         self.capacity
     }
 
-    /// Returns the [`Type`] of an array item.
+    /// Returns the [`TypeId`] of an array item.
     #[inline]
-    pub const fn item_ty(&self) -> Type {
-        self.item_ty
+    pub const fn item_id(&self) -> TypeId {
+        self.item_id
+    }
+
+    /// Returns return if the item type is `T`.
+    #[inline]
+    pub fn item_is<T: Any>(&self) -> bool {
+        self.item_id == TypeId::of::<T>()
     }
 
     /// Returns the [`TypeInfo`] of array items.

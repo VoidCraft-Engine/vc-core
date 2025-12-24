@@ -116,7 +116,7 @@ impl TypeRegistry {
     /// The function will will check if `TypeMeta.ty_id()` exists.  
     /// - If key [`TypeId`] has already exist, the function will do nothing and return `false`.
     /// - If the key [`TypeId`] does not exist, the function will insert value and return `true`.
-    pub fn try_add_type_traits(&mut self, type_meta: TypeMeta) -> bool {
+    pub fn try_add_type_meta(&mut self, type_meta: TypeMeta) -> bool {
         self.register_internal(type_meta.ty_id(), || type_meta)
     }
 
@@ -127,7 +127,7 @@ impl TypeRegistry {
     ///   But full_path and type_name table will not be modified.  
     /// - If the key [`TypeId`] does not exist, the value will be inserted.
     ///   And type path will be inserted to full_path and type_name table.
-    pub fn insert_type_traits(&mut self, type_meta: TypeMeta) {
+    pub fn insert_type_meta(&mut self, type_meta: TypeMeta) {
         use vc_utils::hash::hash_map::Entry;
         match self.type_meta_table.entry(type_meta.type_info().ty_id()) {
             Entry::Occupied(mut entry) => {

@@ -173,13 +173,13 @@ macro_rules! impl_reflect_tuple {
 
         impl GetTypeMeta for () {
             fn get_type_meta() -> TypeMeta {
-                let mut type_traits = TypeMeta::with_capacity::<Self>(5);
-                type_traits.insert_trait::<TypeTraitDefault>(FromType::<Self>::from_type());
-                type_traits.insert_trait::<TypeTraitFromPtr>(FromType::<Self>::from_type());
-                type_traits.insert_trait::<TypeTraitFromReflect>(FromType::<Self>::from_type());
-                type_traits.insert_trait::<TypeTraitSerialize>(FromType::<Self>::from_type());
-                type_traits.insert_trait::<TypeTraitDeserialize>(FromType::<Self>::from_type());
-                type_traits
+                let mut type_meta = TypeMeta::with_capacity::<Self>(5);
+                type_meta.insert_trait::<TypeTraitDefault>(FromType::<Self>::from_type());
+                type_meta.insert_trait::<TypeTraitFromPtr>(FromType::<Self>::from_type());
+                type_meta.insert_trait::<TypeTraitFromReflect>(FromType::<Self>::from_type());
+                type_meta.insert_trait::<TypeTraitSerialize>(FromType::<Self>::from_type());
+                type_meta.insert_trait::<TypeTraitDeserialize>(FromType::<Self>::from_type());
+                type_meta
             }
         }
 

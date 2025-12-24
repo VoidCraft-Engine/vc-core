@@ -14,13 +14,18 @@ members = [
 ]
 
 [features]
-default = [ "std" ]
+default = [ "std", "auto_register" ]
 
 std = [
     "vc_cfg/std",
     "vc_os/std",
     "vc_utils/std",
+    "vc_reflect/std",
 ]
+
+auto_register = [ "vc_reflect/auto_register" ]
+
+reflect_docs = [ "vc_reflect/reflect_docs" ]
 
 rayon = [ "vc_utils/rayon" ]
 
@@ -33,6 +38,7 @@ vc_ptr = { path = "./crates/vc_ptr", default-features = false }
 vc_cfg = { path = "./crates/vc_cfg", default-features = false }
 vc_utils = { path = "./crates/vc_utils", default-features = false }
 vc_os = { path = "./crates/vc_os", default-features = false }
+vc_reflect = { path = "./crates/vc_reflect", default-features = false }
 
 [workspace.lints.clippy]
 needless_lifetimes = "allow"

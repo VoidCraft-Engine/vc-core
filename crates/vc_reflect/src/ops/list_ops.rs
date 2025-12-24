@@ -241,7 +241,8 @@ pub trait List: Reflect {
     /// shifting all elements after it towards the back of the list.
     ///
     /// # Panics
-    /// Panics if `index > len`.
+    /// - Panics if `index > len`.
+    /// - Panics if input type incompatible, for non-dynamic types.
     fn insert(&mut self, index: usize, element: Box<dyn Reflect>);
 
     /// Removes and returns the element at position `index` within the list,
@@ -252,6 +253,9 @@ pub trait List: Reflect {
     fn remove(&mut self, index: usize) -> Box<dyn Reflect>;
 
     /// Appends an element to the _back_ of the list.
+    ///
+    /// # Panics
+    /// - Panics if input type incompatible, for non-dynamic types.
     fn push(&mut self, value: Box<dyn Reflect>);
 
     /// Removes the _back_ element from the list and returns it, or [`None`] if it is empty.

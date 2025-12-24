@@ -6,13 +6,13 @@ use crate::{info::DynamicTypePath, registry::TypeRegistry};
 
 /// A trait used to type-erase type metadata.
 ///
-/// `TypeTrait` can be registered to the [`TypeRegistry`] and stored on a type's [`TypeTraits`].
+/// `TypeTrait` can be registered to the [`TypeRegistry`] and stored on a type's [`TypeMeta`](crate::registry::TypeMeta).
 ///
 /// While type trait is often generated using the [`#[reflect_trait]`](crate::derive::reflect_trait) macro,
 /// almost any type that implements [`Clone`] can be considered "type trait".
 /// This is because it has a blanket implementation over all `T` where `T: Clone + Send + Sync + 'static`.
 ///
-/// See the [crate-level documentation] for more information on type_trait and type_traits.
+/// See the [crate-level documentation] for more information on type_trait and type_meta.
 ///
 /// [`TypeRegistry`]: crate::registry::TypeRegistry
 /// [crate-level documentation]: crate

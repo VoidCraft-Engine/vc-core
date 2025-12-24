@@ -1,4 +1,4 @@
-use alloc::boxed::Box;
+use core::any::{Any, TypeId};
 
 use crate::{
     Reflect,
@@ -8,7 +8,7 @@ use crate::{
     ops::Map,
 };
 
-/// A container for compile-time map-like info, size = 96 (exclude `docs`).
+/// A container for compile-time map-like info, size = 112 (exclude `docs`).
 ///
 /// At present, `MapInfo` does not have `CustomAttributes`, which can save memory.
 ///
@@ -16,20 +16,23 @@ use crate::{
 ///
 /// ```rust
 /// # use vc_reflect::info::{Typed, Type};
+/// # use core::any::TypeId;
 /// use std::collections::BTreeMap;
 ///
 /// let info = <BTreeMap<String, i32> as Typed>::type_info().as_map().unwrap();
 ///
-/// assert_eq!(info.key_ty(), Type::of::<String>());
-/// assert_eq!(info.value_ty(), Type::of::<i32>());
+/// assert_eq!(info.key_id(), TypeId::of::<String>());
+/// assert_eq!(info.value_id(), TypeId::of::<i32>());
 /// ```
 #[derive(Clone, Debug)]
 pub struct MapInfo {
     ty: Type,
     generics: Generics,
-    // Use box to reduce struct size. Otherwise, this struct
-    // causes `TypeInfo` to be too large, which is wasteful for other types.
-    kv_ty: Box<(Type, Type)>,
+    // Cache type_id for deserialization.
+    // We don't have cache `Type` because it's too large.
+    // But you can obtain `Type` through `TypeInfo`.
+    key_id: TypeId,
+    value_id: TypeId,
     // `TypeInfo` is created on first access; use function pointers to delay it.
     key_info: fn() -> &'static TypeInfo,
     value_info: fn() -> &'static TypeInfo,
@@ -44,11 +47,13 @@ impl MapInfo {
 
     /// Create a new [`MapInfo`].
     #[inline]
-    pub fn new<TMap: Map + TypePath, TKey: Reflect + Typed, TValue: Reflect + Typed>() -> Self {
+    pub const fn new<TMap: Map + TypePath, TKey: Reflect + Typed, TValue: Reflect + Typed>() -> Self
+    {
         Self {
             ty: Type::of::<TMap>(),
             generics: Generics::new(),
-            kv_ty: Box::new((Type::of::<TKey>(), Type::of::<TValue>())),
+            key_id: TypeId::of::<TKey>(),
+            value_id: TypeId::of::<TValue>(),
             key_info: TKey::type_info,
             value_info: TValue::type_info,
             #[cfg(feature = "reflect_docs")]
@@ -58,14 +63,26 @@ impl MapInfo {
 
     /// Returns the [`Type`] of the key.
     #[inline]
-    pub const fn key_ty(&self) -> Type {
-        self.kv_ty.0
+    pub const fn key_id(&self) -> TypeId {
+        self.key_id
+    }
+
+    /// Returns return if the key type is `T`.
+    #[inline]
+    pub fn key_is<T: Any>(&self) -> bool {
+        self.key_id == TypeId::of::<T>()
     }
 
     /// Returns the [`Type`] of the value.
     #[inline]
-    pub const fn value_ty(&self) -> Type {
-        self.kv_ty.1
+    pub const fn value_id(&self) -> TypeId {
+        self.value_id
+    }
+
+    /// Returns return if the value type is `T`.
+    #[inline]
+    pub fn value_is<T: Any>(&self) -> bool {
+        self.value_id == TypeId::of::<T>()
     }
 
     /// Returns the key's [`TypeInfo`].

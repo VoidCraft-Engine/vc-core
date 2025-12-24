@@ -1,3 +1,5 @@
+use core::any::{Any, TypeId};
+
 use crate::{
     Reflect,
     info::{
@@ -6,7 +8,7 @@ use crate::{
     ops::Set,
 };
 
-/// A container for compile-time set-like info.
+/// A container for compile-time set-like info, size = 88 (exclude `docs`).
 ///
 /// At present, `SetInfo` does not have `CustomAttributes`, which can save memory.
 ///
@@ -18,13 +20,13 @@ use crate::{
 ///
 /// let info = <BTreeSet<String> as Typed>::type_info().as_set().unwrap();
 ///
-/// assert_eq!(info.value_ty(), Type::of::<String>());
+/// assert!(info.value_is::<String>());
 /// ```
 #[derive(Clone, Debug)]
 pub struct SetInfo {
     ty: Type,
     generics: Generics,
-    value_ty: Type,
+    value_id: TypeId,
     // `TypeInfo` is created on first access; use a function pointer to delay it.
     value_info: fn() -> &'static TypeInfo,
     #[cfg(feature = "reflect_docs")]
@@ -42,7 +44,7 @@ impl SetInfo {
         Self {
             ty: Type::of::<TSet>(),
             generics: Generics::new(),
-            value_ty: Type::of::<TValue>(),
+            value_id: TypeId::of::<TValue>(),
             value_info: TValue::type_info,
             #[cfg(feature = "reflect_docs")]
             docs: None,
@@ -51,8 +53,14 @@ impl SetInfo {
 
     /// Returns the element [`Type`] of the set.
     #[inline]
-    pub const fn value_ty(&self) -> Type {
-        self.value_ty
+    pub const fn value_id(&self) -> TypeId {
+        self.value_id
+    }
+
+    /// Returns return if the value type is `T`.
+    #[inline]
+    pub fn value_is<T: Any>(&self) -> bool {
+        self.value_id == TypeId::of::<T>()
     }
 
     /// Returns the value element's [`TypeInfo`].

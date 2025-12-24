@@ -3,12 +3,31 @@ use core::{any::Any, ops::Deref};
 
 use crate::info::{ConstParamData, Type, TypePath, impl_type_fn};
 
-/// Information about generic type parameters.
+/// Information about generic type parameters, size = 64.
+///
+/// # Examples
+///
+/// ```
+/// use vc_reflect::{derive::Reflect, info::Typed};
+///
+/// #[derive(Reflect)]
+/// struct Foo<T = usize>(T);
+///
+/// let info = <Foo<i32>>::type_info().generics().get("T").unwrap();
+/// assert!(!info.is_const());
+///
+/// let info = info.as_type().unwrap();
+/// assert!(info.type_is::<i32>());
+///
+/// let default_type = info.default().unwrap();
+/// assert!(default_type.is::<usize>());
+/// ```
 #[derive(Clone, Debug)]
 pub struct TypeParamInfo {
     ty: Type,
     name: &'static str,
-    default: Option<Type>,
+    // reduce struct size
+    default: Option<fn() -> Type>,
 }
 
 impl TypeParamInfo {
@@ -30,38 +49,57 @@ impl TypeParamInfo {
         &self.name
     }
 
-    /// Returns the default type for this parameter, if present.
-    #[inline]
-    pub const fn default(&self) -> Option<&Type> {
-        self.default.as_ref()
-    }
-
     /// Set the default type for this parameter.
     #[inline]
     pub const fn with_default<T: TypePath + ?Sized>(mut self) -> Self {
-        self.default = Some(Type::of::<T>());
+        self.default = Some(Type::of::<T>);
         self
+    }
+
+    /// Returns the default type for this parameter, if present.
+    #[inline]
+    pub fn default(&self) -> Option<Type> {
+        self.default.map(|f| f())
     }
 }
 
-/// Information about a const generic parameter.
+/// Information about a const generic parameter, size = 64.
+///
+/// When a function is instantiated, the value of the const generic is fixed,
+/// so we provide value field, but there is no default value.
+///
+/// # Examples
+///
+/// ```
+/// use vc_reflect::{derive::Reflect, info::Typed};
+///
+/// #[derive(Reflect)]
+/// struct Foo<const N: usize>;
+///
+/// let info = <Foo<10>>::type_info().generics().get("N").unwrap();
+/// assert!(info.is_const());
+///
+/// let info = info.as_const().unwrap();
+/// assert!(info.type_is::<usize>());
+/// assert_eq!(info.value::<usize>(), Some(10usize));
+/// ```
 #[derive(Clone, Debug)]
 pub struct ConstParamInfo {
     ty: Type,
     name: &'static str,
-    default: Option<ConstParamData>,
+    value: Box<ConstParamData>,
 }
 
 impl ConstParamInfo {
     impl_type_fn!(ty);
 
-    /// Create a new [`ConstParamInfo`].
+    /// Create a new [`ConstParamInfo`] with the value of const generic param.
     #[inline]
-    pub const fn new<T: TypePath + Into<ConstParamData>>(name: &'static str) -> Self {
+    pub fn new<T: TypePath + Into<ConstParamData>>(name: &'static str, value: T) -> Self {
         Self {
             ty: Type::of::<T>(),
             name,
-            default: None,
+            value: Box::new(value.into()),
         }
     }
 
@@ -71,29 +109,32 @@ impl ConstParamInfo {
         &self.name
     }
 
-    /// Returns the default const value for this parameter, if present.
+    /// Returns the const value for this parameter, if the type is correct.
     #[inline]
-    pub const fn default(&self) -> Option<ConstParamData> {
-        self.default
-    }
-
-    /// Sets the default const value.
-    ///
-    /// # Panics
-    ///
-    /// Panics in debug builds if the provided value's type does not match the
-    /// parameter's expected type.
-    pub fn with_default<T: Any + Into<ConstParamData>>(mut self, default: T) -> Self {
-        #[cfg(debug_assertions)]
-        if !self.type_is::<T>() {
-            panic!("default const value has incorrect type for this parameter");
-        }
-        self.default = Some(default.into());
-        self
+    pub fn value<T: Any + TryFrom<ConstParamData>>(&self) -> Option<T> {
+        (*self.value).try_into().ok()
     }
 }
 
-/// A single generic parameter (either a type or a const).
+/// A single generic parameter (either a type or a const), size = 72.
+///
+/// # Examples
+///
+/// ```
+/// use vc_reflect::{derive::Reflect, info::Typed};
+///
+/// #[derive(Reflect)]
+/// struct Foo<T, const N: usize>([T; N]);
+///
+/// let info = <Foo<i32, 5>>::type_info().generics();
+///
+/// let type_info = info.get("T").unwrap();
+/// assert!(type_info.type_is::<i32>());
+/// assert!(!type_info.is_const());
+/// let const_info = info.get("N").unwrap();
+/// assert!(const_info.type_is::<usize>());
+/// assert!(const_info.is_const());
+/// ```
 #[derive(Clone, Debug)]
 pub enum GenericInfo {
     Type(TypeParamInfo),
@@ -101,14 +142,14 @@ pub enum GenericInfo {
 }
 
 impl From<TypeParamInfo> for GenericInfo {
-    #[inline]
+    #[inline(always)]
     fn from(value: TypeParamInfo) -> Self {
         Self::Type(value)
     }
 }
 
 impl From<ConstParamInfo> for GenericInfo {
-    #[inline]
+    #[inline(always)]
     fn from(value: ConstParamInfo) -> Self {
         Self::Const(value)
     }
@@ -119,6 +160,22 @@ impl GenericInfo {
         Self::Type(info) => info.ty(),
         Self::Const(info) => info.ty(),
     });
+
+    #[inline]
+    pub const fn as_type(&self) -> Option<&TypeParamInfo> {
+        match self {
+            GenericInfo::Type(info) => Some(info),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn as_const(&self) -> Option<&ConstParamInfo> {
+        match self {
+            GenericInfo::Const(info) => Some(info),
+            _ => None,
+        }
+    }
 
     /// Returns the parameter name.
     #[inline]
@@ -150,6 +207,63 @@ impl GenericInfo {
 ///
 /// If the type has no generics, this will be empty.
 ///
+/// # Examples
+///
+/// ## GenericInfo
+///
+/// ```
+/// use vc_reflect::{derive::Reflect, info::Typed};
+///
+/// #[derive(Reflect)]
+/// struct Foo<T, const N: usize>([T; N]);
+///
+/// let info = <Foo<i32, 5>>::type_info().generics();
+///
+/// let type_info = &info[0];
+/// assert!(!type_info.is_const());
+/// assert!(type_info.type_is::<i32>());
+/// assert_eq!(type_info.name(), "T");
+///
+/// let const_info = &info[1];
+/// assert!(const_info.is_const());
+/// assert!(const_info.type_is::<usize>());
+/// assert_eq!(const_info.name(), "N");
+/// ```
+///
+/// ## TypeParamInfo
+///
+/// ```
+/// use vc_reflect::{derive::Reflect, info::Typed};
+///
+/// #[derive(Reflect)]
+/// struct Foo<T = usize>(T);
+///
+/// let info = <Foo<i32>>::type_info().generics().get("T").unwrap();
+/// assert!(!info.is_const());
+///
+/// let info = info.as_type().unwrap();
+/// assert!(info.type_is::<i32>());
+///
+/// let default_type = info.default().unwrap();
+/// assert!(default_type.is::<usize>());
+/// ```
+///
+/// ## ConstParamInfo
+///
+/// ```
+/// use vc_reflect::{derive::Reflect, info::Typed};
+///
+/// #[derive(Reflect)]
+/// struct Foo<const N: usize>;
+///
+/// let info = <Foo<10>>::type_info().generics().get("N").unwrap();
+/// assert!(info.is_const());
+///
+/// let info = info.as_const().unwrap();
+/// assert!(info.type_is::<usize>());
+/// assert_eq!(info.value::<usize>(), Some(10usize));
+/// ```
+///
 /// [`TypeInfo`]: vc_reflect::info::TypeInfo
 /// [`Typed::type_info`]: vc_reflect::info::Typed::type_info
 #[derive(Clone, Default, Debug)]
@@ -176,10 +290,8 @@ impl Generics {
         }
     }
 
+    /// Create a [`Generics`] from iterator.
     pub fn from_iter<I: IntoIterator<Item = GenericInfo>>(iter: I) -> Self {
-        // Typically this is constructed from a fixed-size array emitted by
-        // proc-macros; the resulting `Box<[]>` will be compact with minimal
-        // overhead.
         Self(Some(iter.into_iter().collect()))
     }
 }
@@ -214,6 +326,8 @@ macro_rules! impl_generic_fn {
     };
     ($self:ident => $expr:expr) => {
         /// Get generics from self based on expressions
+        ///
+        /// See [`Generics`](crate::info::Generics) .
         #[inline]
         pub const fn generics($self: &Self) -> &$crate::info::Generics {
             $expr

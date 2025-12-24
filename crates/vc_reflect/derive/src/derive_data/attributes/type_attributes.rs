@@ -53,7 +53,7 @@ pub(crate) struct TypeAttributes {
     /// See: [`ReflectDocs`]
     pub docs: ReflectDocs,
     /// `#[reflect(type_trait = (...))]`
-    pub extra_type_traits: Vec<Path>,
+    pub extra_type_trait: Vec<Path>,
 }
 
 impl TypeAttributes {
@@ -540,13 +540,13 @@ impl TypeAttributes {
         if let Expr::Tuple(tuple) = &pair.value {
             for elem in &tuple.elems {
                 if let Expr::Path(expr_path) = elem {
-                    self.extra_type_traits.push(expr_path.path.clone());
+                    self.extra_type_trait.push(expr_path.path.clone());
                 } else {
                     return Err(syn::Error::new(elem.span(), "Expected a path in tuple."));
                 }
             }
         } else if let Expr::Path(expr_path) = &pair.value {
-            self.extra_type_traits.push(expr_path.path.clone());
+            self.extra_type_trait.push(expr_path.path.clone());
         } else {
             return Err(syn::Error::new(
                 pair.value.span(),

@@ -73,14 +73,19 @@ impl<'a> ReflectMeta<'a> {
         let type_param_info_ = crate::path::type_param_info_(vc_reflect_path);
         let const_param_info_ = crate::path::const_param_info_(vc_reflect_path);
 
-        let generics = self.generics().params.iter().filter_map(|param| {
-            match param {
+        let generics = self
+            .generics()
+            .params
+            .iter()
+            .filter_map(|param| match param {
                 syn::GenericParam::Lifetime(_) => None,
                 syn::GenericParam::Type(type_param) => {
                     let ident = &type_param.ident;
                     let name = ident.to_string();
-                    let with_default = type_param.default.as_ref()
-                        .map(|default_ty|quote!(.with_default::<#default_ty>()));
+                    let with_default = type_param
+                        .default
+                        .as_ref()
+                        .map(|default_ty| quote!(.with_default::<#default_ty>()));
 
                     Some(quote! {
                         #generic_info_::Type(
@@ -90,26 +95,22 @@ impl<'a> ReflectMeta<'a> {
                             #with_default
                         )
                     })
-                },
+                }
                 syn::GenericParam::Const(const_param) => {
                     let ty = &const_param.ty;
+                    let ident = &const_param.ident;
                     let name = const_param.ident.to_string();
-                    let with_default = const_param.default.as_ref()
-                        .map(|default| quote!(.with_default(#default as #ty)) );
-                    // use `as` to ensure type correction.
 
                     Some(quote! {
-                        #[allow(clippy::unnecessary_cast, reason = "Const generics require explicit type hint.")]
                         #generic_info_::Const(
                             #const_param_info_::new::<#ty>(
-                                #name
+                                #name, #ident
                             )
-                            #with_default
                         )
                     })
-                },
-            }
-        }).collect::<Punctuated<_, Token![,]>>();
+                }
+            })
+            .collect::<Punctuated<_, Token![,]>>();
 
         if generics.is_empty() {
             return crate::utils::empty();

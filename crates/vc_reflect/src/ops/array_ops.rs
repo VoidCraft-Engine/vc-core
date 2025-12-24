@@ -143,7 +143,7 @@ impl<T: Reflect> FromIterator<T> for DynamicArray {
             array_info: None,
             values: values
                 .into_iter()
-                .map(|value| Box::new(value) as Box<dyn Reflect>)
+                .map(|value| Box::new(value).into_reflect())
                 .collect(),
         }
     }
@@ -321,7 +321,4 @@ impl Array for DynamicArray {
     fn represented_array_info(&self) -> Option<&'static ArrayInfo> {
         self.array_info?.as_array().ok()
     }
-
-    // `to_dynamic` needs to ensure that the new object is "completely dynamic" semantically, except for the Opaque type.
-    // Therefore, use the default implementation directly.
 }

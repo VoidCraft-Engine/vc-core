@@ -61,7 +61,7 @@ pub(crate) fn impl_trait_get_type_meta<'a>(
         None => crate::utils::empty(),
     };
 
-    let insert_extra_traits = meta.attrs().extra_type_traits.iter().map(|extra_path| {
+    let insert_extra_traits = meta.attrs().extra_type_trait.iter().map(|extra_path| {
         let span = extra_path.span();
         quote_spanned! { span =>
             #type_meta_::insert_trait::<#extra_path>(&mut #outer_, #from_type_::<Self>::from_type());

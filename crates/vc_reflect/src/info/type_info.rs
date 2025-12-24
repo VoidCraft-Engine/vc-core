@@ -82,6 +82,7 @@ impl error::Error for ReflectKindError {}
 /// it can be more performant. This is because those other methods may require attaining a lock on
 /// the static [`TypeInfo`], while the registry simply checks a map.
 ///
+/// [`TypeId`]: core::any::TypeId
 /// [type path]: crate::info::TypePath
 /// [`Typed::type_info`]: crate::info::Typed::type_info
 /// [`DynamicTyped::reflect_type_info`]: crate::info::DynamicTyped::reflect_type_info
@@ -103,6 +104,12 @@ pub enum TypeInfo {
 // Helper macro that implements type-safe accessor methods like `as_struct`.
 macro_rules! impl_cast_method {
     ($name:ident : $kind:ident => $info:ident) => {
+        /// Convert [`TypeInfo`] to specific type information.
+        ///
+        /// Then you can call some more specific methods.
+        ///
+        /// And methods such as `ty` and `custom_attributes` will also be more efficient,
+        /// without the need to determine the [type kind](ReflectKind).
         pub const fn $name(&self) -> Result<&$info, ReflectKindError> {
             match self {
                 Self::$kind(info) => Ok(info),
@@ -143,7 +150,16 @@ impl TypeInfo {
 
     crate::info::impl_type_fn!();
 
-    /// Returns the `ReflectKind` for this `TypeInfo` (a fast discriminator).
+    /// Returns the [`ReflectKind`] for this `TypeInfo` (a fast discriminator).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use vc_reflect::info::{Typed, ReflectKind};
+    ///
+    /// let info = i32::type_info();
+    /// assert_eq!(info.kind(), ReflectKind::Opaque);
+    /// ```
     pub const fn kind(&self) -> ReflectKind {
         match self {
             Self::Struct(_) => ReflectKind::Struct,
@@ -162,6 +178,8 @@ impl TypeInfo {
     ///
     /// Note: this is not inlined to avoid recursive inline expansion across
     /// `TypeInfo` variants.
+    ///
+    /// See examples in [`Generics`](crate::info::Generics) .
     pub const fn generics(&self) -> &Generics {
         match self {
             Self::Struct(info) => info.generics(),
@@ -180,6 +198,8 @@ impl TypeInfo {
     ///
     /// For kinds that do not support custom attributes this returns a shared
     /// empty reference (`CustomAttributes::EMPTY`).
+    ///
+    /// See examples in [`CustomAttributes`](crate::info::CustomAttributes) .
     pub fn custom_attributes(&self) -> &CustomAttributes {
         match self {
             Self::Struct(info) => info.custom_attributes(),
@@ -196,6 +216,67 @@ impl TypeInfo {
     ///
     /// If `reflect_docs` feature is not enabled, this function always return `None`.
     /// So you can use this without worrying about compilation options.
+    ///
+    ///
+    /// # Examples
+    ///
+    /// If `reflect_docs` feature is enabled, `Reflect` macro will collect
+    /// `#[doc = "..."]` attibutes, including `///` syntax.
+    ///
+    /// ```
+    /// # use vc_reflect::{derive::Reflect, info::Typed};
+    ///
+    /// /// This is type A.
+    /// #[derive(Reflect)]
+    /// struct A;
+    ///
+    /// let info = A::type_info();
+    ///
+    /// if let Some(docs) = info.docs() {
+    ///     println!("{docs}"); // "This is type A."
+    /// } else {
+    ///     println!("`reflect_docs` is disabled or document is empty.");
+    /// }
+    /// ```
+    ///
+    /// If you do not want to use standard documents (customization is required),
+    /// please use syntax `#[reflect(doc = "...")]`.
+    ///
+    /// ```
+    /// # use vc_reflect::{derive::Reflect, info::Typed};
+    ///
+    /// /// This is type A.
+    /// #[derive(Reflect)]
+    /// #[reflect(doc = "This is type B")]
+    /// struct A;
+    ///
+    /// let info = A::type_info();
+    ///
+    /// if let Some(docs) = info.docs() {
+    ///     println!("{docs}"); // "This is type B."
+    /// } else {
+    ///     println!("`reflect_docs` is disabled or document is empty.");
+    /// }
+    /// ```
+    ///
+    /// If you want to close the document when `reflect_docs` feature is enabled,
+    /// please use the `#[reflect(doc = false)]` tag.
+    ///
+    /// ```
+    /// # use vc_reflect::{derive::Reflect, info::Typed};
+    ///
+    /// /// This is type A.
+    /// #[derive(Reflect)]
+    /// #[reflect(doc = "This is type B")]
+    /// #[reflect(doc = false)]
+    /// struct A;
+    ///
+    /// let info = A::type_info();
+    ///
+    /// if let Some(docs) = info.docs() {
+    ///     unreachable!();
+    /// }
+    /// ```
     #[cfg_attr(not(feature = "reflect_docs"), inline(always))]
     pub const fn docs(&self) -> Option<&str> {
         #[cfg(not(feature = "reflect_docs"))]

@@ -1,3 +1,12 @@
+//! See following macros:
+//!
+//! - [`Reflect`]
+//! - [`impl_reflect`]
+//! - [`impl_reflect_opaque`]
+//! - [`impl_type_path`]
+//! - [`impl_auto_register`]
+//! - [`reflect_trait`]
+
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{DeriveInput, parse_macro_input};
@@ -123,6 +132,9 @@ mod utils;
 /// struct A { /* ... */ }
 /// ```
 ///
+/// Note that this macro has no effect on generic types,
+/// because we cannot know which specific types it will instantiate.
+///
 /// When the `auto_register` feature is not enabled this attribute is no-op.
 ///
 /// ## Custom GetTypeMeta
@@ -140,7 +152,7 @@ mod utils;
 ///
 /// ### Example
 ///
-/// ```
+/// ```rust, ignore
 /// #[derive(Reflect)]
 /// #[reflect(type_trait = TypeTraitPrint)]
 /// struct A;
@@ -158,7 +170,7 @@ mod utils;
 ///
 /// If you need to disable doc collection for a specific type, use `#[reflect(doc = false)]`.
 ///
-/// ```
+/// ```rust, ignore
 /// /// example doc comments
 /// #[derive(Reflect)]
 /// #[reflect(doc = false)]
@@ -168,7 +180,7 @@ mod utils;
 /// To provide custom docs instead of collecting `#[doc = "..."]`, use one or more
 /// `#[reflect(doc = "...")]` attributes, for example:
 ///
-/// ```
+/// ```rust, ignore
 /// /// default comments
 /// /// ...
 /// #[derive(Reflect)]
@@ -178,6 +190,7 @@ mod utils;
 /// ```
 ///
 /// When the macro detects `#[reflect(doc = "...")]`, it will stop collecting standard `#[doc = "..."]` documentation.
+///
 /// This attribute is a no-op when the `reflect_docs` feature is disabled.
 #[proc_macro_derive(Reflect, attributes(reflect))]
 pub fn derive_full_reflect(input: TokenStream) -> TokenStream {
@@ -269,10 +282,23 @@ pub fn impl_reflect_opaque(input: TokenStream) -> TokenStream {
 /// ## Example
 ///
 /// ```ignore
+/// // impl for primitive type.
 /// impl_type_path!(u64);
-/// impl_type_path!(::utils::One<T>);
+///
+/// // Implement for specified type.
 /// impl_type_path!(::alloc::string::String);
+/// // The prefix `::` will be removed by the macro, but it's required.
+/// // This indicates that this is a complete path.
+///
+/// // Generics are also supported.
+/// impl_type_path!(::utils::One<T>);
+///
+/// // Custom module path for specified type.
+/// // then, it's type_path is `core::time::Instant`
 /// impl_type_path!((in core::time) Instant);
+///
+/// // Custom module and ident for specified type.
+/// // then, it's type_path is `core::time::Ins`
 /// impl_type_path!((in core::time as Ins) Instant);
 /// ```
 ///

@@ -70,7 +70,8 @@ pub enum ReflectOwned {
 
 macro_rules! impl_kind_fn {
     () => {
-        pub fn kind(&self) -> ReflectKind {
+        /// Returns the "kind" of this reflected type without any information.
+        pub const fn kind(&self) -> ReflectKind {
             match self {
                 Self::Struct(_) => ReflectKind::Struct,
                 Self::TupleStruct(_) => ReflectKind::TupleStruct,
@@ -87,21 +88,9 @@ macro_rules! impl_kind_fn {
 }
 
 macro_rules! impl_cast_fn {
-    ($name:ident : Opaque => $retval:ty) => {
-        pub fn $name(self) -> Result<$retval, ReflectKindError> {
-            // Not Inline: Inline for dyn object is useless.
-            match self {
-                Self::Opaque(value) => Ok(value),
-                _ => Err(ReflectKindError {
-                    expected: ReflectKind::Opaque,
-                    received: self.kind(),
-                }),
-            }
-        }
-    };
     ($name:ident : $kind:ident => $retval:ty) => {
+        #[doc = concat!("Attempts a cast to a `", stringify!($kind), "` trait object.")]
         pub fn $name(self) -> Result<$retval, ReflectKindError> {
-            // Not Inline: Inline for dyn object is useless.
             match self {
                 Self::$kind(value) => Ok(value),
                 _ => Err(ReflectKindError {

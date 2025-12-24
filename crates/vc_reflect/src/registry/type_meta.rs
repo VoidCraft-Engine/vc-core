@@ -11,6 +11,32 @@ use crate::{
     registry::{TypeRegistry, TypeTrait},
 };
 
+/// Runtime storage for type metadata, registered into the [`TypeRegistry`].
+///
+/// This includes [`TypeInfo`] and the table of [`TypeTrait`].
+///
+/// An instance of `TypeMeta` can be created using the [`TypeMeta::of`] method,
+/// but is more often automatically generated using [`#[derive(Reflect)]`](crate::derive::Reflect)
+/// which itself generates an implementation of the [`GetTypeMeta`](crate::registry::GetTypeMeta) trait.
+///
+/// Along with the type's [`TypeInfo`],
+/// this struct also contains a type's registered [`TypeTrait`].
+///
+/// See the [crate-level documentation] for more information on type_meta.
+///
+/// # Example
+///
+/// ```
+/// # use vc_reflect::registry::{TypeMeta, TypeTraitDefault, FromType};
+/// let mut type_meta = TypeMeta::of::<Option<String>>();
+///
+/// assert_eq!("Option<String>", TypeMeta.type_name());
+///
+/// type_meta.insert::<TypeTraitDefault>(FromType::<Option<String>>::from_type());
+/// assert!(type_meta.contains::<TypeTraitDefault>());
+/// ```
+///
+/// [crate-level documentation]: crate
 pub struct TypeMeta {
     type_info: &'static TypeInfo,
     trait_table: TypeIdMap<Box<dyn TypeTrait>>,

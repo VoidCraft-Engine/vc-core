@@ -18,10 +18,116 @@ use core::any::{Any, TypeId};
 /// We did not provide A to reduce compilation time and the size of [`TypePathTable`].
 /// But we provide the [`TypePathTable::crate_name`] method to quickly parse it from module_path.
 ///
+/// # Implementation
+///
+/// ## Using [`#[derive(`Reflect`)]`](crate::derive::Reflect)
+///
+/// ```
+/// use vc_reflect::derive::Reflect;
+///
+/// // This type path will not change with compiler versions or recompiles,
+/// // although it will not be the same if the definition is moved.
+/// #[derive(Reflect)]
+/// struct NonStableTypePath;
+///
+/// // This type path will never change, even if the definition is moved.
+/// #[derive(Reflect)]
+/// #[reflect(type_path = "my_crate::foo::StableTypePath")]
+/// struct StableTypePath;
+///
+/// // Type paths can have any number of path segments.
+/// #[derive(Reflect)]
+/// #[reflect(type_path = "my_crate::foo::bar::baz")]
+/// struct DeeplyNestedStableTypePath;
+///
+/// // Generics are also supported, will be recognized by macro automatically.
+/// // Should not not manually mark.
+/// #[derive(Reflect)]
+/// #[reflect(type_path = "my_crate::foo::StableGenericTypePath")]
+/// struct StableGenericTypePath<T, const N: usize>([T; N]);
+///
+/// // All other trait can be disabled, only implementing TypePath.
+/// #[derive(Reflect)]
+/// #[reflect(Typed = false, Reflect = false)]
+/// #[reflect(FromReflect = false, GetTypeMeta = false)]
+/// #[reflect(Struct = false, TupleStruct = false, Enum = false)] // optional
+/// struct TypePathOnly;
+/// ```
+///
+/// ## Usint [`impl_type_path!`](crate::derive::impl_type_path)
+///
+/// ```ignore
+/// // impl for primitive type.
+/// impl_type_path!(u64);
+///
+/// // Implement for specified type.
+/// impl_type_path!(::alloc::string::String);
+/// // The prefix `::` will be removed by the macro, but it's required.
+/// // This indicates that it's a complete path.
+///
+/// // Generics are also supported.
+/// impl_type_path!(::utils::One<T>);
+///
+/// // Custom module path for specified type.
+/// // then, it's type_path is `core::time::Instant`
+/// impl_type_path!((in core::time) Instant);
+///
+/// // Custom module and ident for specified type.
+/// // then, it's type_path is `core::time::Ins`
+/// impl_type_path!((in core::time as Ins) Instant);
+/// ```
+///
+/// ## Manually
+///
+/// We guarantee that these names do not have the prefix `::`.
+/// Users should also ensure this when manually implementing it.
+///
+/// For non generic types, implementation is simple.
+///
+/// ```
+/// use vc_reflect::info::TypePath;
+///
+/// struct Foo;
+///
+/// impl TypePath for Foo {
+///     fn type_path() -> &'static str { "my_crate::foo::Foo" }
+///     fn type_name() -> &'static str { "Foo" }
+///     fn type_ident() -> &'static str { "Foo" }
+///     fn module_path() -> Option<&'static str> { Some("my_crate::foo") }
+/// }
+/// ```
+///
+/// For generic types, we provide [`GenericTypePathCell`] to simplify it.
+///
+/// ```
+/// use vc_reflect::info::TypePath;
+/// use vc_reflect::impls::{concat, GenericTypePathCell};
+///
+/// struct Foo<T>(T);
+///
+/// impl<T: TypePath> TypePath for Foo<T> {
+///     fn type_path() -> &'static str {
+///         static CELL: GenericTypePathCell = GenericTypePathCell::new();
+///         CELL.get_or_insert::<Self>(||{
+///             concat(&["my_crate::foo::Foo", "<", T::type_path(), ">"])
+///         })
+///     }
+///     fn type_name() -> &'static str {
+///         static CELL: GenericTypePathCell = GenericTypePathCell::new();
+///         CELL.get_or_insert::<Self>(||{
+///             concat(&["Foo", "<", T::type_name(), ">"])
+///         })
+///     }
+///     fn type_ident() -> &'static str { "Foo" }
+///     fn module_path() -> Option<&'static str> { Some("my_crate::foo") }
+/// }
+/// ```
+///
 /// [`type_path`]: TypePath::type_path
 /// [`type_name`]: TypePath::type_name
 /// [`type_ident`]: TypePath::type_ident
 /// [`module_path`]: TypePath::module_path
+/// [`GenericTypePathCell`]: crate::impls::GenericTypePathCell
 pub trait TypePath: 'static {
     /// A standard string representing anonymous types.
     ///
@@ -56,6 +162,9 @@ pub trait TypePath: 'static {
     }
 }
 
+/// Provides dynamic dispatch for types that implement [`TypePath`].
+///
+/// Auto impl for all types that implemented [`TypePath`].
 pub trait DynamicTypePath {
     /// Returns the fully qualified path with generics of the underlying type.
     ///
@@ -301,8 +410,6 @@ macro_rules! impl_type_fn {
         }
 
         /// Check if the given type matches this one.
-        ///
-        /// This only compares the `TypeId` of the types.
         #[inline]
         pub fn type_is<T: ::core::any::Any>(&self) -> bool {
             self.ty().id() == ::core::any::TypeId::of::<T>()

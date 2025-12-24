@@ -9,7 +9,7 @@ use crate::{
     ops::TupleStruct,
 };
 
-/// Information about tuple-struct types known at compile time.
+/// A container for compile-time tuple-struct info, size = 88 (exclude `docs`).
 ///
 /// # Examples
 ///
@@ -42,6 +42,8 @@ impl TupleStructInfo {
     impl_with_custom_attributes!(custom_attributes);
 
     /// Create a new [`TupleStructInfo`].
+    ///
+    /// The order of internal fields is fixed, depends on the input order.
     #[inline]
     pub fn new<T: TupleStruct + TypePath>(fields: &[UnnamedField]) -> Self {
         Self {
@@ -60,9 +62,9 @@ impl TupleStructInfo {
         self.fields.get(index)
     }
 
-    /// Returns an iterator over the fields in declaration order.
+    /// Returns an iterator over the fields in **declaration order**.
     #[inline]
-    pub fn iter(&self) -> core::slice::Iter<'_, UnnamedField> {
+    pub fn iter(&self) -> impl Iterator<Item = &UnnamedField> {
         self.fields.iter()
     }
 

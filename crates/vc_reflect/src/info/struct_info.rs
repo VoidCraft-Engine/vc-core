@@ -31,9 +31,8 @@ use crate::{
 pub struct StructInfo {
     ty: Type,
     generics: Generics,
-    fields: Box<[NamedField]>,
+    fields: HashMap<&'static str, NamedField>,
     field_names: Box<[&'static str]>,
-    field_indices: HashMap<&'static str, usize>,
     // Use `Option` to reduce unnecessary heap requests (when empty content).
     custom_attributes: Option<Arc<CustomAttributes>>,
     #[cfg(feature = "reflect_docs")]
@@ -48,25 +47,38 @@ impl StructInfo {
     impl_with_custom_attributes!(custom_attributes);
 
     /// Create a new [`StructInfo`].
+    ///
+    /// The order of internal fields is fixed, depends on the input order.
     pub fn new<T: Struct + TypePath>(fields: &[NamedField]) -> Self {
-        let field_indices = fields
-            .iter()
-            .enumerate()
-            .map(|(index, field)| (field.name(), index))
-            .collect();
-
         let field_names = fields.iter().map(NamedField::name).collect();
+        let fields = fields.iter().map(|v| (v.name(), v.clone())).collect();
 
         Self {
             ty: Type::of::<T>(),
             generics: Generics::new(),
-            fields: fields.to_vec().into_boxed_slice(),
+            fields,
             field_names,
-            field_indices,
             custom_attributes: None,
             #[cfg(feature = "reflect_docs")]
             docs: None,
         }
+    }
+
+    /// Returns the [`NamedField`] for the given `name`, if present.
+    pub fn field(&self, name: &str) -> Option<&NamedField> {
+        self.fields.get(name)
+    }
+
+    /// Returns the [`NamedField`] at the given index, if present.
+    pub fn field_at(&self, index: usize) -> Option<&NamedField> {
+        self.fields.get(self.field_names.get(index)?)
+    }
+
+    /// Returns an iterator over the fields in **declaration order**.
+    pub fn iter(&self) -> impl Iterator<Item = &NamedField> {
+        self.field_names
+            .iter()
+            .map(|name| self.fields.get(name).unwrap())
     }
 
     /// Returns the field names in declaration order.
@@ -75,30 +87,11 @@ impl StructInfo {
         &self.field_names
     }
 
-    /// Returns the [`NamedField`] for the given `name`, if present.
-    #[inline]
-    pub fn field(&self, name: &str) -> Option<&NamedField> {
-        self.field_indices
-            .get(name)
-            .map(|index| &self.fields[*index])
-    }
-
-    /// Returns the [`NamedField`] at the given index, if present.
-    #[inline]
-    pub fn field_at(&self, index: usize) -> Option<&NamedField> {
-        self.fields.get(index)
-    }
-
     /// Returns the index for the given field `name`, if present.
-    #[inline]
+    ///
+    /// This is O(N) complexity.
     pub fn index_of(&self, name: &str) -> Option<usize> {
-        self.field_indices.get(name).copied()
-    }
-
-    /// Returns an iterator over the fields in declaration order.
-    #[inline]
-    pub fn iter(&self) -> core::slice::Iter<'_, NamedField> {
-        self.fields.iter()
+        self.field_names.iter().position(|s| *s == name)
     }
 
     /// Returns the number of fields.

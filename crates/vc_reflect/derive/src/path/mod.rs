@@ -13,8 +13,10 @@ use quote::quote;
 /// we have to scan the builder's `cargo.toml`.
 ///
 /// 1. For crates that depend on `vc_reflect`, `::vc_reflect` is returned here`.
-/// 2. For crates that depend on `vct`, `::vct::reflect` is returned here`.
-/// 3. For other situations, `::vec_reflect` is returned here, but this may be incorrect.
+/// 2. For crates that depend on `voidcraft`, `::voidcraft::reflect` is returned here`.
+/// 3. For crates that depend on `vc_core`, `::vc_core::reflect` is returned here`.
+/// 4. For crates that depend on `vc`, `::vc::reflect` is returned here`.
+/// 5. For other situations, `::vc_reflect` is returned here, but this may be incorrect.
 ///
 /// The cost of this function is relatively high (accessing files, obtaining read-write lock permissions, querying content...),
 /// so the crate path is mainly obtained through parameter passing rather than reacquiring.

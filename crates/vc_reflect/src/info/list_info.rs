@@ -1,3 +1,5 @@
+use core::any::{Any, TypeId};
+
 use crate::{
     Reflect,
     info::{
@@ -6,9 +8,9 @@ use crate::{
     ops::List,
 };
 
-///  A container for compile-time list-like info, size = 120 (exclude `docs`).
+///  A container for compile-time list-like info, size = 88 (exclude `docs`).
 ///
-/// At present, `ListInfo` does not have `CustomAttributes`, which can save memory.
+/// At present, `ListInfo` does not have `CustomAttributes`.
 /// If necessary, it may be added in the future.
 ///
 /// # Examples
@@ -23,7 +25,7 @@ use crate::{
 pub struct ListInfo {
     ty: Type,
     generics: Generics,
-    item_ty: Type,
+    item_id: TypeId,
     // `TypeInfo` is created on the first visit, use function pointers to delay it.
     item_info: fn() -> &'static TypeInfo,
     #[cfg(feature = "reflect_docs")]
@@ -41,17 +43,23 @@ impl ListInfo {
         Self {
             ty: Type::of::<TList>(),
             generics: Generics::new(),
-            item_ty: Type::of::<TItem>(),
+            item_id: TypeId::of::<TItem>(),
             item_info: TItem::type_info,
             #[cfg(feature = "reflect_docs")]
             docs: None,
         }
     }
 
-    /// Returns the [`Type`] of list items.
+    /// Returns the [`TypeId`] of list items.
     #[inline]
-    pub const fn item_ty(&self) -> Type {
-        self.item_ty
+    pub const fn item_id(&self) -> TypeId {
+        self.item_id
+    }
+
+    /// Returns return if the item type is `T`.
+    #[inline]
+    pub fn item_is<T: Any>(&self) -> bool {
+        self.item_id == TypeId::of::<T>()
     }
 
     /// Returns the [`TypeInfo`] of list items.

@@ -1,3 +1,5 @@
+//! Provide compile-time type infomation implementations.
+
 mod array_info;
 mod attributes;
 mod const_param_data;

@@ -12,7 +12,7 @@ pub struct TypeTraitFromPtr {
 
 #[expect(unsafe_code, reason = "Cast pointers to references is unsafe.")]
 impl TypeTraitFromPtr {
-    /// Returns the [`TypeId`] that the [`ReflectFromPtr`] was constructed for.
+    /// Returns the [`TypeId`] that the [`TypeTraitFromPtr`] was constructed for.
     pub fn ty_id(&self) -> TypeId {
         self.ty_id
     }
@@ -21,8 +21,8 @@ impl TypeTraitFromPtr {
     ///
     /// # Safety
     ///
-    /// `val` must be a pointer to value of the type that the [`ReflectFromPtr`] was constructed for.
-    /// This can be verified by checking that the type id returned by [`ReflectFromPtr::type_id`] is the expected one.
+    /// `val` must be a pointer to value of the type that the [`TypeTraitFromPtr`] was constructed for.
+    /// This can be verified by checking that the type id returned by [`TypeTraitFromPtr::ty_id`] is the expected one.
     pub unsafe fn as_reflect<'a>(&self, val: Ptr<'a>) -> &'a dyn Reflect {
         // SAFETY: contract uphold by the caller.
         unsafe { (self.from_ptr)(val) }
@@ -32,32 +32,32 @@ impl TypeTraitFromPtr {
     ///
     /// # Safety
     ///
-    /// `val` must be a pointer to a value of the type that the [`ReflectFromPtr`] was constructed for
-    /// This can be verified by checking that the type id returned by [`ReflectFromPtr::type_id`] is the expected one.
+    /// `val` must be a pointer to a value of the type that the [`TypeTraitFromPtr`] was constructed for
+    /// This can be verified by checking that the type id returned by [`TypeTraitFromPtr::ty_id`] is the expected one.
     pub unsafe fn as_reflect_mut<'a>(&self, val: PtrMut<'a>) -> &'a mut dyn Reflect {
         // SAFETY: contract uphold by the caller.
         unsafe { (self.from_ptr_mut)(val) }
     }
 
     /// Get a function pointer to turn a `Ptr` into `&dyn Reflect` for
-    /// the type this [`ReflectFromPtr`] was constructed for.
+    /// the type this [`TypeTraitFromPtr`] was constructed for.
     ///
     /// # Safety
     ///
     /// When calling the unsafe function returned by this method you must ensure that:
-    /// - The input `Ptr` points to the `Reflect` type this `ReflectFromPtr`
+    /// - The input `Ptr` points to the `Reflect` type this `TypeTraitFromPtr`
     ///   was constructed for.
     pub fn from_ptr(&self) -> unsafe fn(Ptr) -> &dyn Reflect {
         self.from_ptr
     }
 
     /// Get a function pointer to turn a `PtrMut` into `&mut dyn Reflect` for
-    /// the type this [`ReflectFromPtr`] was constructed for.
+    /// the type this [`TypeTraitFromPtr`] was constructed for.
     ///
     /// # Safety
     ///
     /// When calling the unsafe function returned by this method you must ensure that:
-    /// - The input `PtrMut` points to the `Reflect` type this `ReflectFromPtr`
+    /// - The input `PtrMut` points to the `Reflect` type this `TypeTraitFromPtr`
     ///   was constructed for.
     pub fn from_ptr_mut(&self) -> unsafe fn(PtrMut) -> &mut dyn Reflect {
         self.from_ptr_mut
@@ -70,8 +70,8 @@ impl<T: Typed + Reflect> FromType<T> for TypeTraitFromPtr {
         TypeTraitFromPtr {
             ty_id: TypeId::of::<T>(),
             from_ptr: |ptr| {
-                // SAFETY: `from_ptr_mut` is either called in `ReflectFromPtr::as_reflect`
-                // or returned by `ReflectFromPtr::from_ptr`, both lay out the invariants
+                // SAFETY: `from_ptr_mut` is either called in `TypeTraitFromPtr::as_reflect`
+                // or returned by `TypeTraitFromPtr::from_ptr`, both lay out the invariants
                 // required by `deref`
                 unsafe { ptr.as_ref::<T>() as &dyn Reflect }
             },
