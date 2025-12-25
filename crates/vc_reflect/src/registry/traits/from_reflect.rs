@@ -22,7 +22,7 @@ impl TypeTraitFromReflect {
 impl<T: Typed + FromReflect> FromType<T> for TypeTraitFromReflect {
     fn from_type() -> Self {
         Self {
-            func: |param_1| T::from_reflect(param_1).map(|val| Box::new(val) as Box<dyn Reflect>),
+            func: |param_1| T::from_reflect(param_1).map(Reflect::into_boxed_reflect),
         }
     }
 }

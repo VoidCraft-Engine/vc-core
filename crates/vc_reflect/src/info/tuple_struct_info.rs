@@ -64,7 +64,7 @@ impl TupleStructInfo {
 
     /// Returns an iterator over the fields in **declaration order**.
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = &UnnamedField> {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &UnnamedField> {
         self.fields.iter()
     }
 

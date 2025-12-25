@@ -9,7 +9,6 @@ pub(crate) fn get_struct_clone_impl(info: &ReflectStruct) -> TokenStream {
     let meta = info.meta();
     let vc_reflect_path = meta.vc_reflect_path();
     let macro_utils_ = crate::path::macro_utils_(vc_reflect_path);
-    let macro_exports_ = crate::path::macro_exports_(vc_reflect_path);
     let reflect_ = crate::path::reflect_(vc_reflect_path);
     let reflect_clone_error_ = crate::path::reflect_clone_error_(vc_reflect_path);
     let type_path_ = crate::path::type_path_(vc_reflect_path);
@@ -29,7 +28,7 @@ pub(crate) fn get_struct_clone_impl(info: &ReflectStruct) -> TokenStream {
             let member = field.to_member();
 
             tokens.extend(quote! {
-                __new_value.#member = #macro_exports_::__reflect_clone_field::<#field_ty>(&self.#member)?;
+                __new_value.#member = #macro_utils_::__reflect_clone_field::<#field_ty>(&self.#member)?;
             });
         }
 
@@ -66,7 +65,7 @@ pub(crate) fn get_struct_clone_impl(info: &ReflectStruct) -> TokenStream {
             let member = field.to_member();
 
             tokens.extend(quote! {
-                #member: #macro_exports_::__reflect_clone_field::<#field_ty>(&self.#member)?,
+                #member: #macro_utils_::__reflect_clone_field::<#field_ty>(&self.#member)?,
             });
         }
 

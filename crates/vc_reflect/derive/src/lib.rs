@@ -1,6 +1,7 @@
 //! See following macros:
 //!
 //! - [`Reflect`]
+//! - [`TypePath`]
 //! - [`impl_reflect`]
 //! - [`impl_reflect_opaque`]
 //! - [`impl_type_path`]
@@ -23,7 +24,7 @@ mod derive_data;
 mod impls;
 mod utils;
 
-/// # Reflect Derive Macro
+/// # Derive Full Reflection
 ///
 /// `#[derive(Reflect)]` will implement the following traits:
 ///
@@ -135,7 +136,7 @@ mod utils;
 /// Note that this macro has no effect on generic types,
 /// because we cannot know which specific types it will instantiate.
 ///
-/// When the `auto_register` feature is not enabled this attribute is no-op.
+/// This attribute is a no-op when the `auto_register` feature is disabled.
 ///
 /// ## Custom GetTypeMeta
 ///
@@ -148,7 +149,7 @@ mod utils;
 /// - `TypeTraitDeserialize`: If `serde::Deserialize` is marked available with `#[reflect(deserialize)]`.
 ///
 /// But you can also add the TypeTrait with `#[reflect(type_trait = (...))]`,
-/// and they will be automatically registered during type registration.
+/// and they will be automatically inserted during `get_type_meta`.
 ///
 /// ### Example
 ///
@@ -199,7 +200,11 @@ pub fn derive_full_reflect(input: TokenStream) -> TokenStream {
     impls::match_reflect_impls(ast, ImplSourceKind::DeriveLocalType)
 }
 
-/// A macro that only implements `TypePath` for local type.
+/// # Derive TypePath Trait
+///
+/// This macro only implements `TypePath` trait,
+///
+/// The usage is similar to [`derive Reflect`](derive_full_reflect).
 ///
 /// ## Example
 ///
@@ -234,8 +239,12 @@ pub fn derive_type_path(input: TokenStream) -> TokenStream {
     impls::impl_trait_type_path(&meta).into()
 }
 
-/// Implements reflection for foreign types; it requires full type information and access to fields.
+/// Implements reflection for foreign types.
+///
+/// It requires full type information and access to fields.
 /// Because of the orphan rule, this is typically used inside the reflection crate itself.
+///
+/// The usage is similar to [`derive Reflect`](derive_full_reflect).
 ///
 /// ## Example
 ///
@@ -249,9 +258,7 @@ pub fn derive_type_path(input: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// This is almost no different from `#[derive(Reflect)]`.
-///
-/// See: [`derive Reflect`](derive_full_reflect)
+/// See more infomation in [`derive Reflect`](derive_full_reflect) .
 #[proc_macro]
 pub fn impl_reflect(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
@@ -268,7 +275,9 @@ pub(crate) enum ImplSourceKind {
     DeriveLocalType,
 }
 
-/// Simplified macro for `Opaque` types. Syntax: `(in module_path as alias_name) ident (..attrs..)`.
+/// Implements reflection for `Opaque` types.
+///
+/// Syntax: `(in module_path as alias_name) ident (..attrs..)`.
 ///
 /// ## Example
 ///
@@ -282,7 +291,7 @@ pub(crate) enum ImplSourceKind {
 ///
 /// This macro always implies `Opaque`, so `clone` is required.
 ///
-/// See: [`derive Reflect`](derive_full_reflect)
+/// See available attributes in [`derive Reflect`](derive_full_reflect) .
 #[proc_macro]
 pub fn impl_reflect_opaque(input: TokenStream) -> TokenStream {
     let ReflectOpaqueParser {
@@ -309,7 +318,9 @@ pub fn impl_reflect_opaque(input: TokenStream) -> TokenStream {
     .into()
 }
 
-/// A macro that only implements `TypePath` for foreign type.
+/// A macro that implements `TypePath` for foreign type.
+///
+/// Syntax: `(in module_path as alias_name) ident`.
 ///
 /// Paths starting with `::` cannot be used for primitive types.
 /// The specified path must resolve to the target type and be accessible from the crate where the macro is invoked.
@@ -367,7 +378,7 @@ pub fn impl_type_path(input: TokenStream) -> TokenStream {
 ///
 /// If the feature is not enabled, this macro will not do anything.
 ///
-/// The type must be concrete (no generic parameters).
+/// The type must be concrete (no uncertain generic parameters).
 ///
 /// ## Example
 ///
@@ -377,8 +388,7 @@ pub fn impl_type_path(input: TokenStream) -> TokenStream {
 /// impl_auto_register!(Vec<T: Clone>); // Error
 /// ```
 ///
-/// If the type contains the `auto_register` attribute,
-/// there is no need to use this macro, although it will not conflict.
+/// This will not conflict with `reflect(auto_register)` attribute.
 ///
 /// See: [`derive Reflect`](derive_full_reflect)
 #[proc_macro]
@@ -405,9 +415,11 @@ pub fn impl_auto_register(_input: TokenStream) -> TokenStream {
     }
 }
 
+/// Impl `TypeTrait` for specific trait with a new struct.
+///
 /// This macro will generate a `Reflect{trait_name}` struct, which implements `TypeTrait` and `TypePath`.
 ///
-/// For example, for `Clone`, this will generate `ReflectClone`.
+/// For example, for `Display`, this will generate `ReflectDisplay`.
 ///
 /// It only contains three methods internally:
 /// - `get`: cast `&dyn Reflect` to `&dyn {trait_name}`

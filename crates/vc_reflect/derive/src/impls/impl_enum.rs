@@ -306,7 +306,6 @@ fn get_enum_try_apply_impl(info: &ReflectEnum) -> TokenStream {
     let enum_ = crate::path::enum_(vc_reflect_path);
     let apply_error_ = crate::path::apply_error_(vc_reflect_path);
     let macro_utils_ = crate::path::macro_utils_(vc_reflect_path);
-    let type_path_ = crate::path::type_path_(vc_reflect_path);
     let from_reflect_ = crate::path::from_reflect_(vc_reflect_path);
     let enum_try_apply_ = crate::path::enum_try_apply_(vc_reflect_path);
 
@@ -339,9 +338,9 @@ fn get_enum_try_apply_impl(info: &ReflectEnum) -> TokenStream {
                 #from_reflect_tokens
 
                 return #ResultFP::Err(
-                    #apply_error_::UnknownVariant {
-                        enum_name: #macro_utils_::Cow::Borrowed(<Self as #type_path_>::type_path()),
-                        variant_name: #macro_utils_::Cow::Owned(#macro_utils_::ToOwned::to_owned(#enum_::variant_name(#input_))),
+                    #apply_error_::MismatchedVariant {
+                        from_variant:#macro_utils_::Cow::Owned(#enum_::variant_path(#input_)),
+                        to_variant: #macro_utils_::Cow::Owned(<Self as #enum_>::variant_path(self)),
                     }
                 );
             }
@@ -373,7 +372,6 @@ fn get_enum_clone_impl(info: &ReflectEnum) -> TokenStream {
     let macro_utils_ = crate::path::macro_utils_(vc_reflect_path);
     let reflect_ = crate::path::reflect_(vc_reflect_path);
     let reflect_clone_error_ = crate::path::reflect_clone_error_(vc_reflect_path);
-    let macro_exports_ = crate::path::macro_exports_(vc_reflect_path);
     let type_path_ = crate::path::type_path_(vc_reflect_path);
 
     if let Some(span) = meta.attrs().avail_traits.clone {
@@ -423,7 +421,7 @@ fn get_enum_clone_impl(info: &ReflectEnum) -> TokenStream {
                             #member: #accessor,
                         });
                         clone_tokens.extend(quote! {
-                            #member: #macro_exports_::__reflect_clone_field::<#field_ty>(#accessor)?,
+                            #member: #macro_utils_::__reflect_clone_field::<#field_ty>(#accessor)?,
                         });
                     }
                     match_tokens.extend(quote! {

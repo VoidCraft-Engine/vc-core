@@ -1,7 +1,6 @@
 use alloc::boxed::Box;
 use core::{error, fmt};
 use vc_os::sync::Arc;
-use vc_utils::hash::HashMap;
 
 use crate::info::{
     CustomAttributes, NamedField, UnnamedField,
@@ -59,7 +58,9 @@ impl fmt::Display for VariantKind {
 #[derive(Clone, Debug)]
 pub struct StructVariantInfo {
     name: &'static str,
-    fields: HashMap<&'static str, NamedField>,
+    // Usually, enum variants should not have too many fields.
+    // So we use box slice to reduce type size, including `VariantInfo` size.
+    fields: Box<[NamedField]>,
     field_names: Box<[&'static str]>,
     // Use `Option` to avoid allocating when there are no custom attributes.
     custom_attributes: Option<Arc<CustomAttributes>>,
@@ -76,13 +77,10 @@ impl StructVariantInfo {
     ///
     /// The order of internal fields is fixed, depends on the input order.
     pub fn new(name: &'static str, fields: &[NamedField]) -> Self {
-        let field_names = fields.iter().map(NamedField::name).collect();
-        let fields = fields.iter().map(|v| (v.name(), v.clone())).collect();
-
         Self {
             name,
-            fields: fields,
-            field_names,
+            fields: fields.to_vec().into_boxed_slice(),
+            field_names: fields.iter().map(NamedField::name).collect(),
             custom_attributes: None,
             #[cfg(feature = "reflect_docs")]
             docs: None,
@@ -103,26 +101,27 @@ impl StructVariantInfo {
 
     /// Returns the [`NamedField`] for the given `name`, if present.
     pub fn field(&self, name: &str) -> Option<&NamedField> {
-        self.fields.get(name)
+        self.fields.get(self.index_of(name)?)
     }
 
     /// Returns the [`NamedField`] at the given index, if present.
+    #[inline]
     pub fn field_at(&self, index: usize) -> Option<&NamedField> {
-        self.fields.get(self.field_names.get(index)?)
+        self.fields.get(index)
     }
 
     /// Returns the index for the given field `name`, if present.
     ///
     /// This is O(N) complexity.
+    #[inline]
     pub fn index_of(&self, name: &str) -> Option<usize> {
         self.field_names.iter().position(|s| *s == name)
     }
 
     /// Returns an iterator over the fields in **declaration order**.
-    pub fn iter(&self) -> impl Iterator<Item = &NamedField> {
-        self.field_names
-            .iter()
-            .map(|name| self.fields.get(name).unwrap())
+    #[inline]
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &NamedField> {
+        self.fields.iter()
     }
 
     /// Returns the total number of fields in this variant.
@@ -194,7 +193,7 @@ impl TupleVariantInfo {
 
     /// Returns an iterator over the fields in **declaration order**.
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = &UnnamedField> {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &UnnamedField> {
         self.fields.iter()
     }
 

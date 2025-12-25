@@ -1,6 +1,6 @@
 /// A container for [`ConstParamInfo`](crate::info::ConstParamInfo), used to reduce heap allocation.
 ///
-/// Usually users should not use this type directly.
+/// Internal type, users should not use this type directly.
 ///
 /// The only allowed types of const parameters are
 /// u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize, char and bool.

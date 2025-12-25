@@ -7,7 +7,7 @@ use vc_utils::TypeIdMap;
 
 use crate::{
     Reflect,
-    info::{TypeInfo, Typed},
+    info::{Type, TypeInfo, Typed},
     registry::{TypeRegistry, TypeTrait},
 };
 
@@ -36,6 +36,11 @@ use crate::{
 ///
 /// [crate-level documentation]: crate
 pub struct TypeMeta {
+    // Access `Type` from `TypeInfo` should judge once reflect kind.
+    // We cache the reference to reduce the cost of some methods.
+    //
+    // We temporarily believe that a little extra memory is worth it.
+    ty: &'static Type,
     type_info: &'static TypeInfo,
     trait_table: TypeIdMap<Box<dyn TypeTrait>>,
 }
@@ -54,86 +59,46 @@ impl TypeMeta {
     /// ```
     #[inline]
     pub fn of<T: Typed>() -> Self {
+        let type_info = T::type_info();
+        let ty = type_info.ty();
         Self {
+            ty,
+            type_info,
             trait_table: TypeIdMap::new_no_op(),
-            type_info: T::type_info(),
         }
     }
 
     /// Create a empty [`TypeMeta`] from a type with capacity.
     #[inline]
     pub fn with_capacity<T: Typed>(capacity: usize) -> Self {
+        let type_info = T::type_info();
+        let ty = type_info.ty();
         Self {
+            ty,
+            type_info,
             trait_table: TypeIdMap::with_capacity_no_op(capacity),
-            type_info: T::type_info(),
         }
     }
 
     /// Returns the [`TypeInfo`] .
     #[inline(always)]
-    pub fn type_info(&self) -> &'static TypeInfo {
+    pub const fn type_info(&self) -> &'static TypeInfo {
         self.type_info
     }
 
-    /// Returns the [`Type`](crate::info::Type) .
-    #[inline]
-    pub fn ty(&self) -> &'static crate::info::Type {
-        self.type_info.ty()
-    }
-
-    /// Returns the [`TypePathTable`](crate::info::TypePathTable).
-    #[inline]
-    pub fn type_path_table(&self) -> &'static crate::info::TypePathTable {
-        &self.type_info.ty().path_table()
-    }
-
-    /// Returns the [`TypeId`].
-    #[inline]
-    pub fn ty_id(&self) -> TypeId {
-        self.type_info.ty().id()
-    }
-
-    /// Check if the given type matches this one.
+    /// Returns the [`Type`] .
     ///
-    /// This only compares the `TypeId` of the types.
-    #[inline]
-    pub fn type_is<T: Any>(&self) -> bool {
-        self.type_info.ty().id() == TypeId::of::<T>()
+    /// Manually impl for static reference.
+    #[inline(always)]
+    pub const fn ty(&self) -> &'static Type {
+        self.ty
     }
 
-    /// Returns the type path.
-    #[inline]
-    pub fn type_path(&self) -> &'static str {
-        self.type_info.ty().path()
-    }
-
-    /// Returns the type name.
-    #[inline]
-    pub fn type_name(&self) -> &'static str {
-        self.type_info.ty().name()
-    }
-
-    /// Returns the type ident.
-    #[inline]
-    pub fn type_ident(&self) -> &'static str {
-        self.type_info.ty().ident()
-    }
-
-    /// Returns the module path.
-    #[inline]
-    pub fn module_path(&self) -> Option<&'static str> {
-        self.type_info.ty().module_path()
-    }
-
-    /// Returns the crate name.
-    #[inline]
-    pub fn crate_name(&self) -> Option<&'static str> {
-        self.type_info.ty().crate_name()
-    }
+    crate::info::impl_type_fn!();
 
     /// Returns the [`Generics`](crate::info::Generics) .
     #[inline]
-    pub fn generics(&self) -> &'static crate::info::Generics {
+    pub const fn generics(&self) -> &'static crate::info::Generics {
         self.type_info.generics()
     }
 
@@ -142,7 +107,7 @@ impl TypeMeta {
     /// If reflect_docs feature is not enabled, this function always return `None`.
     /// So you can use this without worrying about compilation options.
     #[inline]
-    pub fn docs(&self) -> Option<&'static str> {
+    pub const fn docs(&self) -> Option<&'static str> {
         self.type_info.docs()
     }
 
@@ -176,16 +141,30 @@ impl TypeMeta {
     }
 
     /// Insert a new [`TypeTrait`].
-    #[inline]
+    #[inline(always)]
     pub fn insert_trait<T: TypeTrait>(&mut self, data: T) {
-        self.trait_table.insert(TypeId::of::<T>(), Box::new(data));
+        self.insert_trait_by_id(TypeId::of::<T>(), Box::new(data));
+    }
+
+    /// Block code inline.
+    #[inline(never)]
+    fn insert_trait_by_id(&mut self, id: TypeId, val: Box<dyn TypeTrait>) {
+        self.trait_table.insert(id, val);
     }
 
     /// Removes a [`TypeTrait`] from the meta.
+    #[inline]
     pub fn remove_trait<T: TypeTrait>(&mut self) -> Option<Box<T>> {
-        self.trait_table
-            .remove(&TypeId::of::<T>())
-            .map(|val| <Box<dyn Any>>::downcast::<T>(val).unwrap())
+        #[inline(always)]
+        fn force_downcast<T: Any>(value: Box<dyn TypeTrait>) -> Box<T> {
+            #[expect(unsafe_code, reason = "downcast_unchecked is unsafe.")]
+            unsafe {
+                <Box<dyn Any>>::downcast(value).unwrap_unchecked()
+            }
+        }
+
+        self.remove_trait_by_id(TypeId::of::<T>())
+            .map(force_downcast)
     }
 
     /// Removes a [`TypeTrait`] from the meta.
@@ -194,10 +173,10 @@ impl TypeMeta {
     }
 
     /// Get a [`TypeTrait`] reference, or return `None` if it's doesn't exist.
+    #[inline]
     pub fn get_trait<T: TypeTrait>(&self) -> Option<&T> {
-        self.trait_table
-            .get(&TypeId::of::<T>())
-            .and_then(|val| val.downcast_ref::<T>())
+        self.get_trait_by_id(TypeId::of::<T>())
+            .and_then(<dyn TypeTrait>::downcast_ref)
     }
 
     /// Get a [`TypeTrait`] reference, or return `None` if it's doesn't exist.
@@ -206,10 +185,10 @@ impl TypeMeta {
     }
 
     /// Get a mutable [`TypeTrait`] reference, or return `None` if it's doesn't exist.
+    #[inline]
     pub fn get_trait_mut<T: TypeTrait>(&mut self) -> Option<&mut T> {
-        self.trait_table
-            .get_mut(&TypeId::of::<T>())
-            .and_then(|val| val.downcast_mut())
+        self.get_trait_mut_by_id(TypeId::of::<T>())
+            .and_then(<dyn TypeTrait>::downcast_mut)
     }
 
     /// Get a mutable [`TypeTrait`] reference, or return `None` if it's doesn't exist.
@@ -218,8 +197,9 @@ impl TypeMeta {
     }
 
     /// Return true if specific [`TypeTrait`] is exist.
+    #[inline]
     pub fn has_trait<T: TypeTrait>(&self) -> bool {
-        self.trait_table.contains_key(&TypeId::of::<T>())
+        self.has_trait_by_id(TypeId::of::<T>())
     }
 
     /// Return true if specific [`TypeTrait`] is exist.
@@ -271,6 +251,7 @@ impl Clone for TypeMeta {
         Self {
             trait_table: new_map,
             type_info: self.type_info,
+            ty: self.ty,
         }
     }
 }

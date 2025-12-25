@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, format, string::String};
+use alloc::{boxed::Box, string::String};
 use vc_os::sync::Arc;
 use vc_utils::hash::HashMap;
 
@@ -69,10 +69,10 @@ impl EnumInfo {
     }
 
     /// Returns an iterator over the variants in **declaration order**.
-    pub fn iter(&self) -> impl Iterator<Item = &VariantInfo> {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &VariantInfo> {
         self.variant_names
             .iter()
-            .map(|name| self.variants.get(name).unwrap())
+            .map(|name| self.variants.get(name).unwrap()) // variants names should be valid
     }
 
     /// Returns `true` if a variant with the given name exists.
@@ -96,7 +96,7 @@ impl EnumInfo {
     /// Returns the full path for a variant name, e.g. `Type::Variant`.
     #[inline]
     pub fn variant_path(&self, name: &str) -> String {
-        format!("{}::{name}", self.type_path())
+        crate::impls::concat(&[self.type_path(), "::", name])
     }
 
     /// Returns the number of variants.

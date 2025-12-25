@@ -77,21 +77,21 @@ impl<T: Clone + Any + Send + Sync + DynamicTypePath> TypeTrait for T {
 impl dyn TypeTrait {
     /// Returns `true` if the underlying value is of type `T`.
     ///
-    /// Note that this is this is a comparison of its own type,
-    /// not the target type for implementing the trait.
-    #[inline]
+    /// Note that this is a comparison of its own type,
+    /// not the target type that implemented this trait.
+    #[inline(always)]
     pub fn is<T: Any>(&self) -> bool {
         self.type_id() == TypeId::of::<T>()
     }
 
     /// Downcasts the value to type `T` by reference.
-    #[inline]
+    #[inline(always)]
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
         <dyn Any>::downcast_ref(self)
     }
 
     /// Downcasts the value to type `T` by mutable reference.
-    #[inline]
+    #[inline(always)]
     pub fn downcast_mut<T: Any>(&mut self) -> Option<&mut T> {
         <dyn Any>::downcast_mut(self)
     }

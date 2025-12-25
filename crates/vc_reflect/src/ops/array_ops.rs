@@ -11,17 +11,27 @@ use crate::{
 
 /// Represents an [`Array`], used to dynamically modify data and its reflected type information.
 ///
-/// Dynamic types are special in that their `TypeInfo` is [`OpaqueInfo`],
-/// but other APIs behave like the represented type, such as [`reflect_kind`] and [`reflect_ref`].
-///
 /// This differs from [`DynamicList`] in that the size of the [`DynamicArray`]
 /// is constant, whereas a [`DynamicList`] can have items added and removed.
 ///
 /// This isn't to say that a [`DynamicArray`] is immutable— its items
 /// can be mutated— just that the _number_ of items cannot change.
 ///
-/// [`reflect_kind`]: crate::Reflect::reflect_kind
-/// [`reflect_ref`]: crate::Reflect::reflect_ref
+/// # Examples
+///
+/// ```
+/// use vc_reflect::{Reflect, ops::{Array, DynamicArray}};
+///
+/// let mut dynamic = [0, 0, 0].to_dynamic_array();
+///
+/// let item = dynamic.get_mut_as::<i32>(1).unwrap();
+/// *item += 5;
+///
+/// let mut arr = [0, 0, 0];
+/// arr.apply(&dynamic);
+/// assert_eq!(arr, [0, 5, 0]);
+/// ```
+///
 /// [`DynamicList`]: crate::ops::DynamicList
 pub struct DynamicArray {
     array_info: Option<&'static TypeInfo>, // Ensure it is None or ArrayInfo
@@ -56,6 +66,9 @@ impl Typed for DynamicArray {
 
 impl DynamicArray {
     /// Creates a new [`DynamicArray`].
+    ///
+    /// It is recommended to create using `from` or
+    /// `to_dynamic_array` instead of this function.
     #[inline]
     pub fn new(values: Box<[Box<dyn Reflect>]>) -> Self {
         Self {
@@ -143,7 +156,7 @@ impl<T: Reflect> FromIterator<T> for DynamicArray {
             array_info: None,
             values: values
                 .into_iter()
-                .map(|value| Box::new(value).into_reflect())
+                .map(Reflect::into_boxed_reflect)
                 .collect(),
         }
     }
@@ -196,8 +209,8 @@ impl<'a> IntoIterator for &'a DynamicArray {
 /// let foo: &dyn Array = &[123_u32, 456_u32, 789_u32];
 /// assert_eq!(foo.len(), 3);
 ///
-/// let field: &dyn Reflect = foo.get(0).unwrap();
-/// assert_eq!(field.downcast_ref::<u32>(), Some(&123));
+/// let field = foo.get_as::<u32>(0);
+/// assert_eq!(field, Some(&123_u32));
 /// ```
 ///
 /// [array-like]: https://doc.rust-lang.org/book/ch03-02-data-types.html#the-array-type
@@ -205,15 +218,61 @@ impl<'a> IntoIterator for &'a DynamicArray {
 /// [type-erasing]: https://doc.rust-lang.org/book/ch17-02-trait-objects.html
 pub trait Array: Reflect {
     /// Returns a reference to the element at `index`, or `None` if out of bounds.
+    ///
+    /// If data access is required, consider using `get_as` .
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::Array};
+    /// let arr = [123_u32, 456_u32, 789_u32];
+    /// let foo: &dyn Array = &arr;
+    ///
+    /// let field = foo.get(0);
+    /// assert!(field.is_some());
+    /// ```
     fn get(&self, index: usize) -> Option<&dyn Reflect>;
 
     /// Returns a mutable reference to the element at `index`, or `None` if out of bounds.
+    ///
+    /// If data access is required, consider using `get_mut_as` .
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::Array};
+    /// let mut arr = [123_u32, 456_u32, 789_u32];
+    /// let foo: &mut dyn Array = &mut arr;
+    ///
+    /// let field = foo.get_mut(0);
+    /// assert!(field.is_some());
+    /// ```
     fn get_mut(&mut self, index: usize) -> Option<&mut dyn Reflect>;
 
     /// Returns the number of elements in the array.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::Array};
+    /// let arr = [123_u32, 456_u32, 789_u32];
+    /// let foo: &dyn Array = &arr;
+    ///
+    /// assert_eq!(foo.len(), 3);
+    /// ```
     fn len(&self) -> usize;
 
     /// Returns `true` if the collection contains no elements.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::Array};
+    /// let arr = [123_u32, 456_u32, 789_u32];
+    /// let foo: &dyn Array = &arr;
+    ///
+    /// assert!(!foo.is_empty());
+    /// ```
     #[inline]
     fn is_empty(&self) -> bool {
         self.len() == 0
@@ -254,6 +313,7 @@ pub trait Array: Reflect {
     }
 }
 
+/// A Iterator for [`Array`].
 pub struct ArrayItemIter<'a> {
     array: &'a dyn Array,
     index: usize,
@@ -289,12 +349,14 @@ impl<'a> ExactSizeIterator for ArrayItemIter<'a> {}
 impl Array for DynamicArray {
     #[inline]
     fn get(&self, index: usize) -> Option<&dyn Reflect> {
-        self.values.get(index).map(|value| &**value)
+        self.values.get(index).map(core::ops::Deref::deref)
     }
 
     #[inline]
     fn get_mut(&mut self, index: usize) -> Option<&mut dyn Reflect> {
-        self.values.get_mut(index).map(|value| &mut **value)
+        self.values
+            .get_mut(index)
+            .map(core::ops::DerefMut::deref_mut)
     }
 
     #[inline]
@@ -320,5 +382,63 @@ impl Array for DynamicArray {
     #[inline]
     fn represented_array_info(&self) -> Option<&'static ArrayInfo> {
         self.array_info?.as_array().ok()
+    }
+}
+
+impl dyn Array {
+    /// Returns a reference to the element at `index`.
+    ///
+    /// Return `None` if out of bounds or downcast failed.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::Array};
+    /// let arr = [123_u32, 456_u32, 789_u32];
+    /// let foo: &dyn Array = &arr;
+    ///
+    /// let field = foo.get_as::<u32>(0);
+    /// assert!(field.is_some());
+    /// ```
+    #[inline]
+    pub fn get_as<T: Reflect>(&self, index: usize) -> Option<&T> {
+        self.get(index).and_then(<dyn Reflect>::downcast_ref)
+    }
+
+    /// Returns a mutable reference to the element at `index`.
+    ///
+    /// Return `None` if out of bounds or downcast failed.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::Array};
+    /// let mut arr = [123_u32, 456_u32, 789_u32];
+    /// let foo: &mut dyn Array = &mut arr;
+    ///
+    /// let field = foo.get_mut_as::<u32>(0);
+    /// assert!(field.is_some());
+    /// ```
+    #[inline]
+    pub fn get_mut_as<T: Reflect>(&mut self, index: usize) -> Option<&mut T> {
+        self.get_mut(index).and_then(<dyn Reflect>::downcast_mut)
+    }
+}
+
+impl DynamicArray {
+    /// Returns a reference to the element at `index`.
+    ///
+    /// Return `None` if out of bounds or downcast failed.
+    #[inline]
+    pub fn get_as<T: Reflect>(&self, index: usize) -> Option<&T> {
+        self.get(index).and_then(<dyn Reflect>::downcast_ref)
+    }
+
+    /// Returns a mutable reference to the element at `index`.
+    ///
+    /// Return `None` if out of bounds or downcast failed.
+    #[inline]
+    pub fn get_mut_as<T: Reflect>(&mut self, index: usize) -> Option<&mut T> {
+        self.get_mut(index).and_then(<dyn Reflect>::downcast_mut)
     }
 }

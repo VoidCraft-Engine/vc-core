@@ -11,6 +11,7 @@
 /// my_macro!(1: [P0]);
 /// my_macro!(2: [P0, P1]);
 /// my_macro!(3: [P0, P1, P2]);
+/// my_macro!(4: [P0, P1, P2, P3]);
 ///
 /// range_invoke!(my_macro,  4: P);
 /// // eq  to ↓
@@ -18,6 +19,7 @@
 /// my_macro!(1: [0: P0]);
 /// my_macro!(2: [0: P0, 1: P1]);
 /// my_macro!(3: [0: P0, 1: P1, 2: P2]);
+/// my_macro!(4: [0: P0, 1: P1, 2: P2, 3: P3]);
 /// ```
 #[macro_export]
 macro_rules! range_invoke {

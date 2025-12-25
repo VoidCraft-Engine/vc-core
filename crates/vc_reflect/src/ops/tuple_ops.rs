@@ -247,12 +247,14 @@ pub trait Tuple: Reflect {
 impl Tuple for DynamicTuple {
     #[inline]
     fn field(&self, index: usize) -> Option<&dyn Reflect> {
-        self.fields.get(index).map(|field| &**field)
+        self.fields.get(index).map(core::ops::Deref::deref)
     }
 
     #[inline]
     fn field_mut(&mut self, index: usize) -> Option<&mut dyn Reflect> {
-        self.fields.get_mut(index).map(|field| &mut **field)
+        self.fields
+            .get_mut(index)
+            .map(core::ops::DerefMut::deref_mut)
     }
 
     #[inline]

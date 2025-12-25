@@ -10,20 +10,20 @@ pub mod macro_utils {
     pub use ::vc_utils::prelude::{Box, Cow, ToOwned, ToString};
 
     pub use crate::impls::concat as __concat;
-}
 
-// use for `reflect_clone` impl
-pub fn __reflect_clone_field<T: crate::Reflect + crate::info::TypePath>(
-    source: &T,
-) -> Result<T, crate::ops::ReflectCloneError> {
-    if let Ok(t) = source.reflect_clone()
-        && let Ok(val) = t.take::<T>()
-    {
-        Ok(val)
-    } else {
-        Err(crate::ops::ReflectCloneError::NotSupport {
-            type_path: T::type_path().into(),
-        })
+    // use for `reflect_clone` impl
+    pub fn __reflect_clone_field<T: crate::Reflect + crate::info::TypePath>(
+        source: &T,
+    ) -> Result<T, crate::ops::ReflectCloneError> {
+        if let Ok(t) = source.reflect_clone()
+            && let Ok(val) = t.take::<T>()
+        {
+            Ok(val)
+        } else {
+            Err(crate::ops::ReflectCloneError::NotSupport {
+                type_path: T::type_path().into(),
+            })
+        }
     }
 }
 
@@ -84,11 +84,11 @@ pub mod auto_register {
         }
     }
 
-    // Used to determine if automatic registration is working properly.
+    /// For checking if automatic registration is working properly.
     #[derive(Reflect)]
     #[reflect(auto_register)]
     #[reflect(GetTypeMeta = false, FromReflect = false)]
-    pub struct __AvailFlag;
+    pub(crate) struct __AvailFlag;
 
     impl GetTypeMeta for __AvailFlag {
         fn get_type_meta() -> TypeMeta {

@@ -118,7 +118,7 @@ impl<'a> ReflectMeta<'a> {
 
         quote! {
             .with_generics(
-                #generics_::from_iter([ #generics ])
+                #generics_::from([ #generics ])
             )
         }
     }

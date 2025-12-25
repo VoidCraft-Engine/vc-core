@@ -279,20 +279,42 @@ impl Generics {
         Self(None)
     }
 
+    /// Create a `Generics` from `GenericInfo`s.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::info::{Generics, GenericInfo, TypeParamInfo, ConstParamInfo};
+    /// // The generics of `[i32; 5]` :
+    /// let array_i32 = Generics::from([
+    ///     GenericInfo::Type(TypeParamInfo::new::<i32>("T")),
+    ///     GenericInfo::Const(ConstParamInfo::new::<usize>("N", 5)),
+    /// ]);
+    /// ```
+    #[inline]
+    pub fn from<const P: usize>(buf: [GenericInfo; P]) -> Self {
+        Self(Some(Box::new(buf)))
+    }
+
     /// Returns the `GenericInfo` for the parameter with the given `name`,
     /// if present.
     ///
     /// Complexity: O(n) in the number of parameters.
+    ///
+    /// ```
+    /// use vc_reflect::{derive::Reflect, info::Typed};
+    ///
+    /// #[derive(Reflect)]
+    /// struct Foo<T = usize>(T);
+    ///
+    /// let info = <Foo<i32>>::type_info().generics().get("T").unwrap();
+    /// assert!(!info.is_const());
+    /// ```
     pub fn get(&self, name: &str) -> Option<&GenericInfo> {
         match &self.0 {
             Some(val) => val.iter().find(|info| info.name() == name),
             None => None,
         }
-    }
-
-    /// Create a [`Generics`] from iterator.
-    pub fn from_iter<I: IntoIterator<Item = GenericInfo>>(iter: I) -> Self {
-        Self(Some(iter.into_iter().collect()))
     }
 }
 
@@ -325,7 +347,7 @@ macro_rules! impl_generic_fn {
         }
     };
     ($self:ident => $expr:expr) => {
-        /// Get generics from self based on expressions
+        /// Get generic infomation.
         ///
         /// See [`Generics`](crate::info::Generics) .
         #[inline]

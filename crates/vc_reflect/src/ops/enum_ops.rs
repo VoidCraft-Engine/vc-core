@@ -1,7 +1,6 @@
 use alloc::{
     borrow::{Cow, ToOwned},
     boxed::Box,
-    format,
     string::String,
 };
 use core::fmt;
@@ -18,9 +17,6 @@ use crate::{
 };
 
 /// A dynamic representation of an enum, allows for enums to be configured at runtime.
-///
-/// Dynamic types are special in that their TypeInfo is [`OpaqueInfo`],
-/// but other APIs are consistent with the type they represent, such as [`reflect_kind`], [`reflect_ref`]
 ///
 /// # Example
 ///
@@ -83,6 +79,16 @@ impl Typed for DynamicEnum {
 
 impl DynamicEnum {
     /// Create a new [`TypeInfo`] to represent an enum at runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::DynamicEnum};
+    /// let mut dynamic_option = DynamicEnum::new(
+    ///   "None",
+    ///   DynamicVariant::Unit
+    /// );
+    /// ```
     #[inline]
     pub fn new<I: Into<Cow<'static, str>>, V: Into<DynamicVariant>>(
         variant_name: I,
@@ -174,15 +180,34 @@ impl DynamicEnum {
 
     /// Create a [`DynamicEnum`] from an existing one.
     ///
-    /// This is functionally the same as [`DynamicEnum::from_ref`] except it takes an owned value.
+    /// This is functionally the same as [`DynamicEnum::from_ref`] except this takes an owned value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::ops::{DynamicEnum, Enum};
+    ///
+    /// let dyn_enum = DynamicEnum::from(Some(10));
+    /// assert_eq!(dyn_enum.variant_name(), "Some");
+    /// ```
+    #[inline]
     pub fn from<TEnum: Enum>(value: TEnum) -> Self {
-        // copy value instead of referencing
         Self::from_ref(&value)
     }
 
     /// Create a [`DynamicEnum`] from an existing one.
     ///
-    /// This is functionally the same as [`DynamicEnum::from`] except it takes a reference.
+    /// This is functionally the same as [`DynamicEnum::from`] except this takes a reference.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::ops::{DynamicEnum, Enum};
+    ///
+    /// let dyn_enum = DynamicEnum::from_ref(&Some(10));
+    /// assert_eq!(dyn_enum.variant_name(), "Some");
+    /// ```
+    #[inline(never)]
     pub fn from_ref<TEnum: Enum + ?Sized>(value: &TEnum) -> Self {
         let mut dyn_enum = match value.variant_kind() {
             VariantKind::Unit => DynamicEnum::new_with_index(
@@ -191,7 +216,7 @@ impl DynamicEnum {
                 DynamicVariant::Unit,
             ),
             VariantKind::Tuple => {
-                let mut data = DynamicTuple::new();
+                let mut data = DynamicTuple::with_capacity(value.field_len());
                 for field in value.iter_fields() {
                     data.insert(field.value().to_dynamic());
                 }
@@ -202,7 +227,7 @@ impl DynamicEnum {
                 )
             }
             VariantKind::Struct => {
-                let mut data = DynamicStruct::new();
+                let mut data = DynamicStruct::with_capacity(value.field_len());
                 for field in value.iter_fields() {
                     let name = field.name().unwrap();
                     data.insert(name.to_owned(), field.value().to_dynamic());
@@ -248,14 +273,14 @@ impl Reflect for DynamicEnum {
             let dyn_variant = match y.variant_kind() {
                 VariantKind::Unit => DynamicVariant::Unit,
                 VariantKind::Tuple => {
-                    let mut dyn_tuple = DynamicTuple::new();
+                    let mut dyn_tuple = DynamicTuple::with_capacity(y.field_len());
                     for y_field in y.iter_fields() {
                         dyn_tuple.insert(y_field.value().to_dynamic());
                     }
                     DynamicVariant::Tuple(dyn_tuple)
                 }
                 VariantKind::Struct => {
-                    let mut dyn_struct = DynamicStruct::new();
+                    let mut dyn_struct = DynamicStruct::with_capacity(y.field_len());
                     for y_field in y.iter_fields() {
                         dyn_struct.insert(
                             y_field.name().unwrap().to_owned(),
@@ -299,6 +324,7 @@ impl fmt::Debug for DynamicEnum {
 ///
 /// This allows enums to be processed and modified dynamically at runtime without
 /// necessarily knowing the actual type.
+///
 /// Enums are much more complex than their struct counterparts.
 /// As a result, users will need to be mindful of conventions, considerations,
 /// and complications when working with this trait.
@@ -310,7 +336,7 @@ impl fmt::Debug for DynamicEnum {
 /// Consider Rust's [`Option<T>`]. It's an enum with two variants: [`None`] and [`Some`].
 /// If you're `None`, you can't be `Some` and vice versa.
 ///
-/// > ⚠️ __This is very important:__
+/// > ⚠️ **This is very important:**
 /// > The [`Enum`] trait represents an enum _as one of its variants_.
 /// > It does not represent the entire enum since that's not true to how enums work.
 ///
@@ -323,7 +349,8 @@ impl fmt::Debug for DynamicEnum {
 /// | Struct       | `MyEnum::Foo{ value: String }` |
 ///
 /// As you can see, a unit variant contains no fields, while tuple and struct variants
-/// can contain one or more fields.
+/// can contain zero, one or more fields.
+///
 /// The fields in a tuple variant is defined by their _order_ within the variant.
 /// Index `0` represents the first field in the variant and so on.
 /// Fields in struct variants (excluding tuple structs), on the other hand, are
@@ -415,8 +442,13 @@ pub trait Enum: Reflect {
     fn variant_name(&self) -> &str;
 
     /// Returns the full path to the current variant.
+    ///
+    /// Note that this is **origin** type_path + variant_name,
+    /// not represented type_path + variant_name.
+    ///
+    /// Therefore, unexpected results may be returned when using dynamic types.
     fn variant_path(&self) -> String {
-        format!("{}::{}", self.reflect_type_path(), self.variant_name())
+        crate::impls::concat(&[self.reflect_type_path(), "::", self.variant_name()])
     }
 
     /// The index of the current variant.
@@ -429,12 +461,6 @@ pub trait Enum: Reflect {
     #[inline]
     fn to_dynamic_enum(&self) -> DynamicEnum {
         DynamicEnum::from_ref(self)
-    }
-
-    /// Returns true if the current variant's type matches the given one.
-    #[inline]
-    fn is_variant(&self, variant_kind: VariantKind) -> bool {
-        self.variant_kind() == variant_kind
     }
 
     /// Get actual [`EnumInfo`] of underlying types.

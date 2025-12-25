@@ -1,4 +1,36 @@
-//! Provide interfaces for data operation.
+//! Provide interfaces and dynamic types for data operation.
+//!
+//! ## Menu
+//!
+//! ### Interface
+//!
+//! - [`Array`]: For array (e.g. `[i32; 5]`) .
+//! - [`Tuple`]: For tuple (e.g. `(i32, f32)`) .
+//! - [`List`]: For list-like (e.g. `Vec<i32>`) .
+//! - [`Struct`]: For struct (e.g. `A{ .. }`) .
+//! - [`TupleStruct`]: For tuple-struct (e.g. `A(..)`) .
+//! - [`Map`]: For map-like (e.g. `HashMap<i32, f32>`) .
+//! - [`Set`]: For set-like (e.g. `HashSet<i32>`) .
+//! - [`Enum`]: For **a variant of enum**, e.g. `Option::Some(T)`.
+//!
+//! ### Dynamic Type
+//!
+//! - [`DynamicArray`]: representing array data, with fixed length, similar to `Box<[Box<dyn Reflect>]>`.
+//! - [`DynamicList`]: representing list-like data, similar to `Vec<Box<dyn Reflect>>`.
+//! - [`DynamicTuple`]: representing tuple data, similar to `Vec<Box<dyn Reflect>>`.
+//! - [`DynamicStruct`]: representing struct data, similar to `Map<String, Box<dyn Reflect>>`.
+//! - [`DynamicTupleStruct`]: representing tuple-struct data, similar to `Vec<Box<dyn Reflect>>`.
+//! - [`DynamicMap`]: representing map-like data, similar to `Map<Box<dyn Reflect>, Box<dyn Reflect>>`.
+//! - [`DynamicSet`]: representing set-like data, similar to `Set<Box<dyn Reflect>>`.
+//! - [`DynamicEnum`]: representing **a variant of enum**, it's `DynamicVariant` + `EnumInfo` + `VariantName`.
+//! - [`DynamicVariant`]: A enum representing enum variant, one of `()`, `DynamicStruct`, `DynamicTuple`.
+//!
+//! Dynamic types are special in that their `TypeInfo` is [`OpaqueInfo`],
+//! but other APIs behave like the represented type, such as [`reflect_kind`] and [`reflect_ref`].
+//!
+//! [`OpaqueInfo`]: crate::info::OpaqueInfo
+//! [`reflect_kind`]: crate::Reflect::reflect_kind
+//! [`reflect_ref`]: crate::Reflect::reflect_ref
 
 mod apply_error;
 mod array_ops;

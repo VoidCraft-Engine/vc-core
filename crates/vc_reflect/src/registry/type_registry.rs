@@ -195,10 +195,10 @@ impl TypeRegistry {
     ///
     /// This will also recursively register any type dependencies as specified by [`GetTypeMeta::register_dependencies`].
     /// When deriving `Reflect`, this will generally be all the fields of the struct or enum variant.
-    /// As with any type registration, these type dependencies will not be registered more than once.
+    /// As with any type meta, these type dependencies will not be registered more than once.
     ///
-    /// If the registration for type `T` already exists, it will not be registered again and neither will its type dependencies.
-    /// To register the type, overwriting any existing registration, use [register](Self::insert_type_trait) instead.
+    /// If the meta for type `T` already exists, it will not be registered again and neither will its type dependencies.
+    /// To register the type, overwriting any existing meta, use [register](Self::insert_type_meta) instead.
     ///
     /// Additionally, this will add any reflect [type data](TypeTrait) as specified in the `Reflect` derive.
     ///
@@ -419,7 +419,7 @@ impl TypeRegistry {
         }
     }
 
-    /// Returns `true` if the given [short type path] is ambiguous, that is, it matches multiple registered types.
+    /// Returns `true` if the given [type name] is ambiguous, that is, it matches multiple registered types.
     ///
     /// # Example
     /// ```
@@ -440,7 +440,7 @@ impl TypeRegistry {
     /// assert_eq!(type_registry.is_ambiguous("MyType"), true);
     /// ```
     ///
-    /// [short type path]: TypePath::short_type_path
+    /// [type name]: crate::info::TypePath::type_name
     pub fn is_ambiguous(&self, type_name: &str) -> bool {
         self.ambiguous_names.contains(type_name)
     }

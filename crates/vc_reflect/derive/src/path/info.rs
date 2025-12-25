@@ -8,26 +8,12 @@ pub(crate) fn type_path_(vc_reflect_path: &syn::Path) -> TokenStream {
     }
 }
 
-// #[inline(always)]
-// pub(crate) fn type_path_table_(vc_reflect_path: &syn::Path) -> TokenStream {
-//     quote! {
-//         #vc_reflect_path::info::TypePathTable
-//     }
-// }
-
 #[inline(always)]
 pub(crate) fn dynamic_type_path_(vc_reflect_path: &syn::Path) -> TokenStream {
     quote! {
         #vc_reflect_path::info::DynamicTypePath
     }
 }
-
-// #[inline]
-// pub(crate) fn type_(vc_reflect_path: &syn::Path) -> TokenStream {
-//     quote! {
-//         #vc_reflect_path::Type
-//     }
-// }
 
 #[inline(always)]
 pub(crate) fn custom_attributes_(vc_reflect_path: &syn::Path) -> TokenStream {
@@ -65,13 +51,6 @@ pub(crate) fn type_param_info_(vc_reflect_path: &syn::Path) -> TokenStream {
 }
 
 #[inline(always)]
-pub(crate) fn field_id_(vc_reflect_path: &syn::Path) -> TokenStream {
-    quote! {
-        #vc_reflect_path::info::FieldId
-    }
-}
-
-#[inline(always)]
 pub(crate) fn named_field_(vc_reflect_path: &syn::Path) -> TokenStream {
     quote! {
         #vc_reflect_path::info::NamedField
@@ -105,41 +84,6 @@ pub(crate) fn tuple_struct_info_(vc_reflect_path: &syn::Path) -> TokenStream {
         #vc_reflect_path::info::TupleStructInfo
     }
 }
-
-// #[inline(always)]
-// pub(crate) fn tuple_info_(vc_reflect_path: &syn::Path) -> TokenStream {
-//     quote! {
-//         #vc_reflect_path::info::TupleInfo
-//     }
-// }
-
-// #[inline(always)]
-// pub(crate) fn list_info_(vc_reflect_path: &syn::Path) -> TokenStream {
-//     quote! {
-//         #vc_reflect_path::info::ListInfo
-//     }
-// }
-
-// #[inline(always)]
-// pub(crate) fn array_info_(vc_reflect_path: &syn::Path) -> TokenStream {
-//     quote! {
-//         #vc_reflect_path::info::ArrayInfo
-//     }
-// }
-
-// #[inline(always)]
-// pub(crate) fn map_info_(vc_reflect_path: &syn::Path) -> TokenStream {
-//     quote! {
-//         #vc_reflect_path::info::MapInfo
-//     }
-// }
-
-// #[inline(always)]
-// pub(crate) fn set_info_(vc_reflect_path: &syn::Path) -> TokenStream {
-//     quote! {
-//         #vc_reflect_path::info::SetInfo
-//     }
-// }
 
 #[inline(always)]
 pub(crate) fn struct_variant_info_(vc_reflect_path: &syn::Path) -> TokenStream {
@@ -190,26 +134,12 @@ pub(crate) fn reflect_kind_(vc_reflect_path: &syn::Path) -> TokenStream {
     }
 }
 
-// #[inline(always)]
-// pub(crate) fn reflect_kind_error_(vc_reflect_path: &syn::Path) -> TokenStream {
-//     quote! {
-//         #vc_reflect_path::info::ReflectKindError
-//     }
-// }
-
 #[inline(always)]
 pub(crate) fn type_info_(vc_reflect_path: &syn::Path) -> TokenStream {
     quote! {
         #vc_reflect_path::info::TypeInfo
     }
 }
-
-// #[inline(always)]
-// pub(crate) fn dynamic_typed_(vc_reflect_path: &syn::Path) -> TokenStream {
-//     quote! {
-//         #vc_reflect_path::info::DynamicTyped
-//     }
-// }
 
 #[inline(always)]
 pub(crate) fn typed_(vc_reflect_path: &syn::Path) -> TokenStream {

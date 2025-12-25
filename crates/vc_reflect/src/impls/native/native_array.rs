@@ -5,7 +5,7 @@ use crate::{
     ops::{Array, ArrayItemIter, ReflectCloneError},
     registry::{FromType, GetTypeMeta, TypeMeta, TypeRegistry, TypeTraitFromPtr},
 };
-use alloc::{borrow::ToOwned, boxed::Box, format, vec::Vec};
+use alloc::{borrow::ToOwned, boxed::Box, string::ToString, vec::Vec};
 
 impl<T: TypePath> TypePath for [T]
 where
@@ -13,34 +13,40 @@ where
 {
     fn type_path() -> &'static str {
         static CELL: GenericTypePathCell = GenericTypePathCell::new();
-        CELL.get_or_insert::<Self>(|| format!("[{}]", <T>::type_path()))
+        CELL.get_or_insert::<Self>(|| crate::impls::concat(&["[", <T>::type_path(), "]"]))
     }
 
     fn type_name() -> &'static str {
         static CELL: GenericTypePathCell = GenericTypePathCell::new();
-        CELL.get_or_insert::<Self>(|| format!("[{}]", <T>::type_name()))
+        CELL.get_or_insert::<Self>(|| crate::impls::concat(&["[", <T>::type_name(), "]"]))
     }
 
     fn type_ident() -> &'static str {
         static CELL: GenericTypePathCell = GenericTypePathCell::new();
-        CELL.get_or_insert::<Self>(|| format!("[{}]", <T>::type_ident()))
+        CELL.get_or_insert::<Self>(|| crate::impls::concat(&["[", <T>::type_ident(), "]"]))
     }
 }
 
 impl<T: TypePath, const N: usize> TypePath for [T; N] {
     fn type_path() -> &'static str {
         static CELL: GenericTypePathCell = GenericTypePathCell::new();
-        CELL.get_or_insert::<Self>(|| format!("[{t}; {N}]", t = T::type_path()))
+        CELL.get_or_insert::<Self>(|| {
+            crate::impls::concat(&["[", T::type_path(), "; ", &N.to_string(), "]"])
+        })
     }
 
     fn type_name() -> &'static str {
         static CELL: GenericTypePathCell = GenericTypePathCell::new();
-        CELL.get_or_insert::<Self>(|| format!("[{t}; {N}]", t = T::type_name()))
+        CELL.get_or_insert::<Self>(|| {
+            crate::impls::concat(&["[", T::type_name(), "; ", &N.to_string(), "]"])
+        })
     }
 
     fn type_ident() -> &'static str {
         static CELL: GenericTypePathCell = GenericTypePathCell::new();
-        CELL.get_or_insert::<Self>(|| format!("[{t}; {N}]", t = T::type_ident()))
+        CELL.get_or_insert::<Self>(|| {
+            crate::impls::concat(&["[", T::type_ident(), "; ", &N.to_string(), "]"])
+        })
     }
 }
 
@@ -102,12 +108,12 @@ impl<T: Reflect + Typed, const N: usize> Reflect for [T; N] {
 impl<T: Reflect + Typed, const N: usize> Array for [T; N] {
     #[inline]
     fn get(&self, index: usize) -> Option<&dyn Reflect> {
-        <[T]>::get(self, index).map(|value| value as &dyn Reflect)
+        <[T]>::get(self, index).map(Reflect::as_reflect)
     }
 
     #[inline]
     fn get_mut(&mut self, index: usize) -> Option<&mut dyn Reflect> {
-        <[T]>::get_mut(self, index).map(|value| value as &mut dyn Reflect)
+        <[T]>::get_mut(self, index).map(Reflect::as_reflect_mut)
     }
 
     #[inline]
@@ -121,9 +127,7 @@ impl<T: Reflect + Typed, const N: usize> Array for [T; N] {
     }
 
     fn drain(self: Box<Self>) -> Vec<Box<dyn Reflect>> {
-        self.into_iter()
-            .map(|value| Box::new(value) as Box<dyn Reflect>)
-            .collect()
+        self.into_iter().map(Reflect::into_boxed_reflect).collect()
     }
 }
 

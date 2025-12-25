@@ -11,42 +11,58 @@ use core::any::{Any, TypeId};
 /// - [`type_name`]: Type name without module path, may be duplicated.
 /// - [`type_ident`]: The shortest type name without module path and generics.
 /// - [`module_path`]: Optional module path.
+/// - [`crate_name`]: Optional crate name.
 ///
 /// We guarantee that these names do not have the prefix `::`.
 /// Users should also ensure this when manually implementing it.
 ///
-/// We did not provide A to reduce compilation time and the size of [`TypePathTable`].
-/// But we provide the [`TypePathTable::crate_name`] method to quickly parse it from module_path.
-///
 /// # Implementation
 ///
-/// ## Use [`#[derive(`Reflect`)]`](crate::derive::Reflect)
+/// ## derive macro
+///
+/// [`#[derive(TypePath)`](crate::derive::TypePath): only implement `TypePath` trait.
 ///
 /// ```
-/// use vc_reflect::derive::Reflect;
+/// use vc_reflect::derive::TypePath;
 ///
 /// // This type path will not change with compiler versions or recompiles,
 /// // although it will not be the same if the definition is moved.
-/// #[derive(Reflect)]
+/// #[derive(TypePath)]
 /// struct NonStableTypePath;
 ///
 /// // This type path will never change, even if the definition is moved.
-/// #[derive(Reflect)]
+/// #[derive(TypePath)]
 /// #[reflect(type_path = "my_crate::foo::StableTypePath")]
 /// struct StableTypePath;
 ///
 /// // Type paths can have any number of path segments.
-/// #[derive(Reflect)]
-/// #[reflect(type_path = "my_crate::foo::bar::baz")]
-/// struct DeeplyNestedStableTypePath;
+/// // the last segment will be considered as type_name/type_ident.
+/// #[derive(TypePath)]
+/// #[reflect(type_path = "my_crate::foo::bar::baz::DeeplyNestedTypePath")]
+/// struct DeeplyNestedTypePath;
 ///
 /// // Generics are also supported, will be recognized by macro automatically.
-/// // Should not not manually mark.
-/// #[derive(Reflect)]
+/// // Should not not manually mark it.
+/// #[derive(TypePath)]
 /// #[reflect(type_path = "my_crate::foo::StableGenericTypePath")]
 /// struct StableGenericTypePath<T, const N: usize>([T; N]);
+/// ```
+///
+/// [`#[derive(Reflect)`](crate::derive::Reflect): impl full reflect, including `TypePath` trait.
+///
+/// ```
+/// use vc_reflect::derive::Reflect;
+///
+/// // just like `#[derive(TypePath)]`
+/// #[derive(Reflect)]
+/// struct DefaultImpl;
+///
+/// #[derive(Reflect)]
+/// #[reflect(type_path = "my_crate::foo::CustomImpl")]
+/// struct CustomImpl;
 ///
 /// // All other trait can be disabled, only implementing TypePath.
+/// // this is equal to #[derive(TypePath)]
 /// #[derive(Reflect)]
 /// #[reflect(Typed = false, Reflect = false)]
 /// #[reflect(FromReflect = false, GetTypeMeta = false)]
@@ -54,16 +70,20 @@ use core::any::{Any, TypeId};
 /// struct TypePathOnly;
 /// ```
 ///
-/// ## Use [`impl_type_path!`](crate::derive::impl_type_path)
+/// ## impl for foreign type
+///
+/// Use [`impl_type_path!`](crate::derive::impl_type_path) macro:
 ///
 /// ```ignore
-/// // impl for primitive type.
-/// impl_type_path!(u64);
+/// use vc_reflect::derive::impl_type_path;
 ///
-/// // Implement for specified type.
+/// // Impl for primitive type, if it's necessary.
+/// impl_type_path!(Int);
+///
+/// // Impl for specified foreign type, with prefix `::`.
 /// impl_type_path!(::alloc::string::String);
-/// // The prefix `::` will be removed by the macro, but it's required.
-/// // This indicates that it's a complete path.
+/// // The prefix `::` is necessary, it indicates that it's a complete path.
+/// // Although it will be removed by macro.
 ///
 /// // Generics are also supported.
 /// impl_type_path!(::utils::One<T>);
@@ -79,8 +99,8 @@ use core::any::{Any, TypeId};
 ///
 /// ## Manually
 ///
-/// We guarantee that these names do not have the prefix `::`.
-/// Users should also ensure this when manually implementing it.
+/// Users should ensure these names do not have the prefix `::`
+/// when manually implementing `TypePath`.
 ///
 /// For non generic types, implementation is simple.
 ///
@@ -127,19 +147,23 @@ use core::any::{Any, TypeId};
 /// [`type_name`]: TypePath::type_name
 /// [`type_ident`]: TypePath::type_ident
 /// [`module_path`]: TypePath::module_path
+/// [`crate_name`]: TypePath::crate_name
 /// [`GenericTypePathCell`]: crate::impls::GenericTypePathCell
 pub trait TypePath: 'static {
-    /// Returns the fully qualified path with generics of the underlying type.
+    /// Returns the fully qualified path with generics of the target type.
     ///
-    /// This is the complete identifier of a type,
-    /// and different types should **not** have the same type path
+    /// This is the complete unique identifier of a type,
+    /// and should **not** duplicated in different types.
     ///
     /// For `Option<Vec<usize>>`, this is `"core::option::Option<alloc::vec::Vec<usize>>"`.
     fn type_path() -> &'static str;
 
     /// Returns a short, pretty-print enabled path to the type.
     ///
-    /// Note that this is different from [`core::any::type_name`].
+    /// This name allows for duplication.
+    ///
+    /// Note that this is different from [`core::any::type_name`],
+    /// the latter is more like [`TypePath::type_path`].
     ///
     /// For `Option<Vec<usize>>`, this is `"Option<Vec<usize>>"`.
     fn type_name() -> &'static str;
@@ -152,14 +176,52 @@ pub trait TypePath: 'static {
     /// Optional module path where the type is defined.
     ///
     /// Primitive built-in types may return `None`.
+    ///
+    /// For `Option<Vec<usize>>`, this is `Some("core::option")`.
     fn module_path() -> Option<&'static str> {
         None
+    }
+
+    /// Optional crate name where the type is defined.
+    ///
+    /// Primitive built-in types may return `None`.
+    ///
+    /// For `Option<Vec<usize>>`, this is `Some("core")`.
+    ///
+    /// Usually do not need to impl this method,
+    /// as it is auto implemented using [`module_path`](TypePath::module_path).
+    ///
+    /// Because module_path is determined in compilation.
+    /// This function can usually be optimized to return the result directly.
+    fn crate_name() -> Option<&'static str> {
+        let s = Self::module_path()?;
+        let mut index = 0;
+        for &c in s.as_bytes() {
+            if c == b':' {
+                return Some(&s[0..index]);
+            }
+            index += 1;
+        }
+        Some(s)
     }
 }
 
 /// Provides dynamic dispatch for types that implement [`TypePath`].
 ///
 /// Auto impl for all types that implemented [`TypePath`].
+///
+/// # Examples
+///
+/// ```
+/// use vc_reflect::{info::DynamicTypePath, Reflect};
+///
+/// let x = String::from("");
+/// assert_eq!(x.reflect_type_path(), "alloc::string::String");
+///
+/// // this is useful for reflect type.
+/// let y: &dyn Reflect = &x;
+/// assert_eq!(y.reflect_type_path(), "alloc::string::String");
+/// ```
 pub trait DynamicTypePath {
     /// Returns the fully qualified path with generics of the underlying type.
     ///
@@ -180,6 +242,11 @@ pub trait DynamicTypePath {
     ///
     /// See [`TypePath::module_path`].
     fn reflect_module_path(&self) -> Option<&'static str>;
+
+    /// Optional crate name where the type is defined.
+    ///
+    /// See [`TypePath::crate_name`].
+    fn reflect_crate_name(&self) -> Option<&'static str>;
 }
 
 impl<T: TypePath> DynamicTypePath for T {
@@ -202,12 +269,33 @@ impl<T: TypePath> DynamicTypePath for T {
     fn reflect_module_path(&self) -> Option<&'static str> {
         Self::module_path()
     }
+
+    #[inline]
+    fn reflect_crate_name(&self) -> Option<&'static str> {
+        Self::crate_name()
+    }
 }
 
 /// Lightweight vtable providing dynamic access to [`TypePath`] APIs.
 ///
 /// This struct stores function pointers to a type's `TypePath` implementations,
 /// keeping initialization minimal for types that are rarely queried.
+///
+/// It provides an additional function [`crate_name`](TypePathTable::crate_name),
+/// for parsing `crate_name` from `module_name`.
+///
+/// # Examples
+///
+/// ```
+/// use vc_reflect::info::TypePathTable;
+///
+/// let x = TypePathTable::of::<String>();
+/// assert_eq!(x.path(), "alloc::string::String");
+/// assert_eq!(x.name(), "String");
+/// assert_eq!(x.ident(), "String");
+/// assert_eq!(x.module_path(), Some("alloc::string"));
+/// assert_eq!(x.crate_name(), Some("alloc"));
+/// ```
 #[derive(Clone, Copy)]
 pub struct TypePathTable {
     type_path: fn() -> &'static str,
@@ -256,10 +344,14 @@ impl TypePathTable {
     #[inline(never)]
     pub fn crate_name(&self) -> Option<&'static str> {
         let s = (self.module_path)()?;
-        match s.find(':') {
-            Some(index) => Some(&s[0..index]),
-            None => Some(s),
+        let mut index = 0;
+        for &c in s.as_bytes() {
+            if c == b':' {
+                return Some(&s[0..index]);
+            }
+            index += 1;
         }
+        Some(s)
     }
 }
 
@@ -277,7 +369,23 @@ impl core::fmt::Debug for TypePathTable {
 
 /// The base representation of a Rust type.
 ///
-/// Includes a [`TypeId`] and a [`TypePathTable`].
+/// Includes a [`TypeId`] and a [`TypePathTable`],
+/// re-exported their functions.
+///
+/// # Examples
+///
+/// ```
+/// # use core::any::TypeId;
+/// use vc_reflect::info::Type;
+///
+/// let ty = Type::of::<String>();
+///
+/// assert!(ty.is::<String>());
+/// assert_eq!(ty.path(), "alloc::string::String");
+///
+/// let type_id: TypeId = ty.id();
+/// // ...
+/// ```
 #[derive(Copy, Clone)]
 pub struct Type {
     type_path_table: TypePathTable,
@@ -286,6 +394,13 @@ pub struct Type {
 
 impl Type {
     /// Creates a new [`Type`] from a type that implements [`TypePath`].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use vc_reflect::info::Type;
+    /// let ty = Type::of::<String>();
+    /// ```
     #[inline]
     pub const fn of<T: TypePath + ?Sized>() -> Self {
         Self {
@@ -295,6 +410,15 @@ impl Type {
     }
 
     /// Returns the [`TypeId`] of the type.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use core::any::TypeId;
+    /// # use vc_reflect::info::Type;
+    /// let ty = Type::of::<String>();
+    /// assert_eq!(ty.id(), TypeId::of::<String>());
+    /// ```
     #[inline(always)]
     pub const fn id(&self) -> TypeId {
         self.type_id
@@ -303,6 +427,14 @@ impl Type {
     /// Check if the given type matches this one.
     ///
     /// This only compares the [`TypeId`] of the types.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use vc_reflect::info::Type;
+    /// let ty = Type::of::<String>();
+    /// assert!(ty.is::<String>());
+    /// ```
     #[inline(always)]
     pub fn is<T: Any>(&self) -> bool {
         TypeId::of::<T>() == self.type_id
@@ -311,11 +443,10 @@ impl Type {
     /// Returns the [`TypePathTable`] of the type.
     ///
     /// It is usually recommended to directly use the re-export methos by [`Type`].
-    ///
-    /// Unless it is necessary to copy the TypePathTable`
+    /// Unless it is necessary to copy the `TypePathTable`.
     #[inline(always)]
-    pub const fn path_table(&self) -> &TypePathTable {
-        &self.type_path_table
+    pub const fn path_table(&self) -> TypePathTable {
+        self.type_path_table
     }
 
     /// See [`TypePath::type_path`].
@@ -394,8 +525,8 @@ macro_rules! impl_type_fn {
     () => {
         /// Returns the `TypePathTable`.
         #[inline]
-        pub const fn type_path_table(&self) -> &$crate::info::TypePathTable {
-            &self.ty().path_table()
+        pub const fn type_path_table(&self) -> $crate::info::TypePathTable {
+            self.ty().path_table()
         }
 
         /// Returns the `TypeId`.
@@ -443,3 +574,25 @@ macro_rules! impl_type_fn {
 }
 
 pub(crate) use impl_type_fn;
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn crate_name() {
+        let s = "你好::world";
+
+        let f = |s: &'static str| {
+            let mut index = 0;
+            for &c in s.as_bytes() {
+                if c == b':' {
+                    return Some(&s[0..index]);
+                }
+                index += 1;
+            }
+            Some(s)
+        };
+
+        let hello = f(s);
+        assert_eq!(hello, Some("你好"));
+    }
+}

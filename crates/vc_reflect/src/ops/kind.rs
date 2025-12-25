@@ -10,10 +10,17 @@ use alloc::boxed::Box;
 /// Each variant contains a trait object with methods specific to a kind of
 /// type.
 ///
-/// A [`ReflectRef`] is obtained via [`Reflect::reflect_ref`].
+/// A [`ReflectRef`] is obtained via [`Reflect::reflect_ref`],
+/// its kind must be consistent with [`Reflect::reflect_kind`].
 ///
-/// # Note
-/// The type obtained here must be consistent with [`Reflect::reflect_kind`].
+/// # Examples
+///
+/// ```
+/// # use vc_reflect::{Reflect, ops::Enum};
+/// let p = Reflect::into_boxed_reflect(Some(true));
+///
+/// let dyn_enum: &dyn Enum = p.reflect_ref().as_enum().unwrap();
+/// ```
 pub enum ReflectRef<'a> {
     Struct(&'a dyn Struct),
     TupleStruct(&'a dyn TupleStruct),
@@ -31,10 +38,17 @@ pub enum ReflectRef<'a> {
 /// Each variant contains a trait object with methods specific to a kind of
 /// type.
 ///
-/// A [`ReflectMut`] is obtained via [`Reflect::reflect_mut`].
+/// A [`ReflectMut`] is obtained via [`Reflect::reflect_mut`],
+/// its kind must be consistent with [`Reflect::reflect_kind`].
 ///
-/// # Note
-/// The type obtained here must be consistent with [`Reflect::reflect_kind`].
+/// # Examples
+///
+/// ```
+/// # use vc_reflect::{Reflect, ops::Enum};
+/// let mut p = Reflect::into_boxed_reflect(Some(true));
+///
+/// let dyn_enum: &mut dyn Enum = p.reflect_mut().as_enum().unwrap();
+/// ```
 pub enum ReflectMut<'a> {
     Struct(&'a mut dyn Struct),
     TupleStruct(&'a mut dyn TupleStruct),
@@ -52,10 +66,17 @@ pub enum ReflectMut<'a> {
 /// Each variant contains a trait object with methods specific to a kind of
 /// type.
 ///
-/// A [`ReflectOwned`] is obtained via [`Reflect::reflect_owned`].
+/// A [`ReflectOwned`] is obtained via [`Reflect::reflect_owned`],
+/// its kind must be consistent with [`Reflect::reflect_kind`].
 ///
-/// # Note
-/// The type obtained here must be consistent with [`Reflect::reflect_kind`].
+/// # Examples
+///
+/// ```
+/// # use vc_reflect::{Reflect, ops::Enum};
+/// let p = Reflect::into_boxed_reflect(Some(true));
+///
+/// let dyn_enum: Box<dyn Enum> = p.reflect_owned().as_enum().unwrap();
+/// ```
 pub enum ReflectOwned {
     Struct(Box<dyn Struct>),
     TupleStruct(Box<dyn TupleStruct>),

@@ -10,7 +10,10 @@ use alloc::{
     boxed::Box,
     vec::Vec,
 };
-use core::fmt;
+use core::{
+    fmt,
+    ops::{Deref, DerefMut},
+};
 use vc_utils::hash::HashMap;
 
 /// Represents a [`Struct`], used to dynamically modify data and its reflected type information.
@@ -345,12 +348,12 @@ impl Struct for DynamicStruct {
 
     #[inline]
     fn field_at(&self, index: usize) -> Option<&dyn Reflect> {
-        self.fields.get(index).map(|value| &**value)
+        self.fields.get(index).map(Deref::deref)
     }
 
     #[inline]
     fn field_at_mut(&mut self, index: usize) -> Option<&mut dyn Reflect> {
-        self.fields.get_mut(index).map(|value| &mut **value)
+        self.fields.get_mut(index).map(DerefMut::deref_mut)
     }
 
     #[inline]

@@ -6,7 +6,7 @@ use crate::{
     reflection::impl_reflect_cast_fn,
 };
 use alloc::{boxed::Box, vec::Vec};
-use core::fmt;
+use core::{fmt, ops::Deref};
 use vc_utils::hash::{HashTable, hash_table};
 
 /// Represents a [`Set`], used to dynamically modify data and its reflected type information.
@@ -202,7 +202,7 @@ impl<'a> IntoIterator for &'a DynamicSet {
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.hash_table.iter().map(|v| v.as_ref())
+        self.hash_table.iter().map(Deref::deref)
     }
 }
 
@@ -349,7 +349,7 @@ impl Set for DynamicSet {
     fn get(&self, value: &dyn Reflect) -> Option<&dyn Reflect> {
         self.hash_table
             .find(Self::internal_hash(value), Self::internal_eq(value))
-            .map(|value| &**value)
+            .map(Deref::deref)
     }
 
     #[inline]
@@ -359,7 +359,7 @@ impl Set for DynamicSet {
 
     #[inline]
     fn iter(&self) -> Box<dyn Iterator<Item = &dyn Reflect> + '_> {
-        Box::new(self.hash_table.iter().map(|v| &**v))
+        Box::new(self.hash_table.iter().map(Deref::deref))
     }
 
     #[inline]

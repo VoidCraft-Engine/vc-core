@@ -75,10 +75,10 @@ impl StructInfo {
     }
 
     /// Returns an iterator over the fields in **declaration order**.
-    pub fn iter(&self) -> impl Iterator<Item = &NamedField> {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &NamedField> {
         self.field_names
             .iter()
-            .map(|name| self.fields.get(name).unwrap())
+            .map(|name| self.fields.get(name).unwrap()) // field names should be valid
     }
 
     /// Returns the field names in declaration order.
@@ -97,6 +97,6 @@ impl StructInfo {
     /// Returns the number of fields.
     #[inline]
     pub fn field_len(&self) -> usize {
-        self.fields.len()
+        self.field_names.len()
     }
 }

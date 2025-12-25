@@ -197,9 +197,7 @@ impl<'a> IntoIterator for &'a DynamicMap {
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.hash_table
-            .iter()
-            .map(|(k, v)| (k.as_ref(), v.as_ref()))
+        self.hash_table.iter().map(|(k, v)| (&**k, &**v))
     }
 }
 

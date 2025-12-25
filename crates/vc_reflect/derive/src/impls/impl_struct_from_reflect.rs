@@ -50,9 +50,20 @@ pub(crate) fn impl_struct_from_reflect(
         .unzip();
 
     let constructor = if meta.attrs().avail_traits.default.is_some() {
+        let check_field_len = if is_tuple {
+            quote! {
+                if <Self as #struct_trait_path_>::field_len(&__this) != #struct_trait_path_::field_len(#input_) {
+                    return #OptionFP::None;
+                }
+            }
+        } else {
+            crate::utils::empty()
+        };
+
         quote! {
             if let #reflect_ref_::#struct_kind_(#input_) = #reflect_::reflect_ref(#input_) {
                 let mut __this = <Self as #DefaultFP>::default();
+                #check_field_len
                 #(
                     if let #option_::Some(__field_val) = #active_values {
                         __this.#active_members = __field_val;

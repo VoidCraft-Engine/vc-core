@@ -105,14 +105,14 @@ impl StringExpr {
         }
 
         if exprs.iter().all(|expr| expr.is_const()) {
-            let inner = exprs.into_iter().map(|expr| expr.into_const()); // `exprs` will not be empty here.
+            let inner = exprs.into_iter().map(StringExpr::into_const); // `exprs` will not be empty here.
 
             Self::Const(quote! {
                 ::core::concat!( #(#inner),* )
             })
         } else {
             let macro_utils_ = crate::path::macro_utils_(vc_reflect_path);
-            let inner = exprs.into_iter().map(|expr| expr.into_borrowed());
+            let inner = exprs.into_iter().map(StringExpr::into_borrowed);
 
             Self::Owned(quote! {
                 #macro_utils_::__concat(&[ #(#inner),* ])

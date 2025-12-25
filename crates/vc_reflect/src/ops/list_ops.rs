@@ -13,6 +13,13 @@ use core::fmt;
 /// Dynamic types are special in that their `TypeInfo` is [`OpaqueInfo`],
 /// but other APIs behave like the represented type, such as [`reflect_kind`] and [`reflect_ref`].
 ///
+/// # Examples
+///
+/// ```
+/// use vc_reflect::{Reflect, ops::{List, DynamicList}};
+///
+/// ```
+///
 /// [`reflect_kind`]: crate::Reflect::reflect_kind
 /// [`reflect_ref`]: crate::Reflect::reflect_ref
 pub struct DynamicList {
@@ -59,7 +66,7 @@ impl DynamicList {
         }
     }
 
-    /// See [`Vec::with_capacity`]
+    /// Create a empty [`DynamicList`] with at least the specified capacity.
     #[inline]
     pub fn with_capacity(capcity: usize) -> Self {
         Self {
@@ -147,7 +154,7 @@ impl<T: Reflect> FromIterator<T> for DynamicList {
             list_info: None,
             values: values
                 .into_iter()
-                .map(|field| Box::new(field) as Box<dyn Reflect>)
+                .map(Reflect::into_boxed_reflect)
                 .collect(),
         }
     }
@@ -191,10 +198,6 @@ impl<'a> IntoIterator for &'a DynamicList {
 /// Methods like [insertion](List::insert) and [removal](List::remove) explicitly allow for their
 /// internal size to change.
 ///
-/// [`push`](List::push) and [`pop`](List::pop) have default implementations,
-/// however it will generally be more performant to implement them manually
-/// as the default implementation uses a very naive approach to find the correct position.
-///
 /// This trait expects its elements to be ordered linearly from front to back.
 /// The _front_ element starts at index 0 with the _back_ element ending at the largest index.
 /// This contract above should be upheld by any manual implementors.
@@ -230,14 +233,17 @@ pub trait List: Reflect {
     ///
     /// # Panics
     /// - Panics if `index > len`.
-    /// - Panics if input type incompatible, for non-dynamic types.
+    /// - Panics if input type incompatible.
     fn insert(&mut self, index: usize, element: Box<dyn Reflect>);
 
     /// Try appends an element to the _back_ of the list.
     ///
     /// Return Err if `index > len` or value type incompatible.
-    fn try_insert(&mut self, index: usize, value: Box<dyn Reflect>)
-    -> Result<(), Box<dyn Reflect>>;
+    fn try_insert(
+        &mut self,
+        index: usize,
+        element: Box<dyn Reflect>,
+    ) -> Result<(), Box<dyn Reflect>>;
 
     /// Removes and returns the element at position `index` within the list,
     /// shifting all elements before it towards the front of the list.
@@ -249,15 +255,17 @@ pub trait List: Reflect {
     /// Appends an element to the _back_ of the list.
     ///
     /// # Panics
-    /// - Panics if input type incompatible, for non-dynamic types.
+    /// - Panics if input type incompatible.
     fn push(&mut self, value: Box<dyn Reflect>);
 
     /// Try appends an element to the _back_ of the list.
     ///
     /// Return Err if value type incompatible.
+    /// The return value upon failure needs to be consistent with the input.
     fn try_push(&mut self, value: Box<dyn Reflect>) -> Result<(), Box<dyn Reflect>>;
 
-    /// Removes the _back_ element from the list and returns it, or [`None`] if it is empty.
+    /// Removes the _back_ element from the list and returns it,
+    /// or `None` if it is empty.
     fn pop(&mut self) -> Option<Box<dyn Reflect>>;
 
     /// Returns the number of elements in the list.
@@ -343,12 +351,14 @@ impl ExactSizeIterator for ListItemIter<'_> {}
 impl List for DynamicList {
     #[inline]
     fn get(&self, index: usize) -> Option<&dyn Reflect> {
-        self.values.get(index).map(|value| &**value)
+        self.values.get(index).map(core::ops::Deref::deref)
     }
 
     #[inline]
     fn get_mut(&mut self, index: usize) -> Option<&mut dyn Reflect> {
-        self.values.get_mut(index).map(|value| &mut **value)
+        self.values
+            .get_mut(index)
+            .map(core::ops::DerefMut::deref_mut)
     }
 
     #[inline]
@@ -413,5 +423,88 @@ impl List for DynamicList {
     #[inline]
     fn represented_list_info(&self) -> Option<&'static ListInfo> {
         self.list_info?.as_list().ok()
+    }
+}
+
+impl dyn List {
+    /// Returns a reference to the element at `index`.
+    ///
+    /// Return `None` if out of bounds or downcast failed.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::List};
+    /// let vec = vec![123_u32, 456_u32, 789_u32];
+    /// let foo: &dyn List = &vec;
+    ///
+    /// let field = foo.get_as::<u32>(0);
+    /// assert!(field.is_some());
+    /// ```
+    #[inline]
+    pub fn get_as<T: Reflect>(&self, index: usize) -> Option<&T> {
+        self.get(index).and_then(<dyn Reflect>::downcast_ref)
+    }
+
+    /// Returns a mutable reference to the element at `index`.
+    ///
+    /// Return `None` if out of bounds or downcast failed.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::List};
+    /// let mut vec = vec![123_u32, 456_u32, 789_u32];
+    /// let foo: &mut dyn List = &mut vec;
+    ///
+    /// let field = foo.get_mut_as::<u32>(0);
+    /// assert!(field.is_some());
+    /// ```
+    #[inline]
+    pub fn get_mut_as<T: Reflect>(&mut self, index: usize) -> Option<&mut T> {
+        self.get_mut(index).and_then(<dyn Reflect>::downcast_mut)
+    }
+
+    /// Appends an element to the _back_ of the list.
+    ///
+    /// # Panics
+    /// - Panics if input type incompatible.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::List};
+    /// let mut vec = vec![123_u32, 456_u32, 789_u32];
+    /// let foo: &mut dyn List = &mut vec;
+    ///
+    /// foo.push_value(1_u32);
+    /// ```
+    #[inline]
+    pub fn push_value<T: Reflect>(&mut self, value: T) {
+        self.push(Box::new(value));
+    }
+
+    /// Appends an element to the _back_ of the list.
+    ///
+    /// Return Err if input type incompatible.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::List};
+    /// let mut vec = vec![123_u32, 456_u32, 789_u32];
+    /// let foo: &mut dyn List = &mut vec;
+    ///
+    /// if let Ok(_) = foo.try_push_value("123") {
+    ///     unreachable!();
+    /// }
+    /// ```
+    #[inline]
+    pub fn try_push_value<T: Reflect>(&mut self, value: T) -> Result<(), T> {
+        if let Err(e) = self.try_push(Box::new(value)) {
+            Err(e.take().expect("push failure should not change the value."))
+        } else {
+            Ok(())
+        }
     }
 }

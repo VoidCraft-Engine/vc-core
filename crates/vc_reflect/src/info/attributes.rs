@@ -51,7 +51,7 @@ impl CustomAttributes {
     /// allocations when there are no attributes.
     ///
     /// To avoid returning `None`, we provide this const empty instance.
-    pub const EMPTY: &'static Self = &Self::new();
+    pub(crate) const EMPTY: &'static Self = &Self::new();
 
     /// Creates an empty [`CustomAttributes`].
     ///
@@ -90,11 +90,10 @@ impl CustomAttributes {
     /// Returns `true` if an attribute of type `T` is present.
     #[inline]
     pub fn contains<T: Reflect>(&self) -> bool {
-        self.attributes.contains_key(&TypeId::of::<T>())
+        self.contains_by_id(TypeId::of::<T>())
     }
 
     /// Returns `true` if it contains the attribute with the given `TypeId`.
-    #[inline]
     pub fn contains_by_id(&self, id: TypeId) -> bool {
         self.attributes.contains_key(&id)
     }
@@ -102,13 +101,13 @@ impl CustomAttributes {
     /// Returns the attribute of type `T`, if present.
     #[inline]
     pub fn get<T: Reflect>(&self) -> Option<&T> {
-        self.attributes.get(&TypeId::of::<T>())?.downcast_ref::<T>()
+        self.get_by_id(TypeId::of::<T>())
+            .and_then(<dyn Reflect>::downcast_ref)
     }
 
     /// Returns the attribute with the given `TypeId`, if present.
-    #[inline]
     pub fn get_by_id(&self, id: TypeId) -> Option<&dyn Reflect> {
-        Some(self.attributes.get(&id)?.as_ref())
+        self.attributes.get(&id).map(core::ops::Deref::deref)
     }
 
     /// Returns the number of stored attributes.

@@ -20,12 +20,10 @@ where
     fn type_info() -> &'static TypeInfo {
         static CELL: GenericTypeInfoCell = GenericTypeInfoCell::new();
         CELL.get_or_insert::<Self>(|| {
-            TypeInfo::Map(
-                MapInfo::new::<Self, K, V>().with_generics(Generics::from_iter([
-                    GenericInfo::Type(TypeParamInfo::new::<K>("K")),
-                    GenericInfo::Type(TypeParamInfo::new::<V>("V")),
-                ])),
-            )
+            TypeInfo::Map(MapInfo::new::<Self, K, V>().with_generics(Generics::from([
+                GenericInfo::Type(TypeParamInfo::new::<K>("K")),
+                GenericInfo::Type(TypeParamInfo::new::<V>("V")),
+            ])))
         })
     }
 }
@@ -88,13 +86,13 @@ where
     fn get(&self, key: &dyn Reflect) -> Option<&dyn Reflect> {
         key.downcast_ref::<K>()
             .and_then(|key| Self::get(self, key))
-            .map(|value| value as &dyn Reflect)
+            .map(Reflect::as_reflect)
     }
 
     fn get_mut(&mut self, key: &dyn Reflect) -> Option<&mut dyn Reflect> {
         key.downcast_ref::<K>()
             .and_then(move |key| Self::get_mut(self, key))
-            .map(|value| value as &mut dyn Reflect)
+            .map(Reflect::as_reflect_mut)
     }
 
     #[inline]
@@ -115,10 +113,7 @@ where
     fn drain(&mut self) -> Vec<(Box<dyn Reflect>, Box<dyn Reflect>)> {
         let mut result = Vec::with_capacity(self.len());
         while let Some((k, v)) = self.pop_first() {
-            result.push((
-                Box::new(k) as Box<dyn Reflect>,
-                Box::new(v) as Box<dyn Reflect>,
-            ));
+            result.push((k.into_boxed_reflect(), v.into_boxed_reflect()));
         }
         result
     }
@@ -145,7 +140,7 @@ where
             )
         });
 
-        Self::insert(self, key, value).map(|old_val| Box::new(old_val) as Box<dyn Reflect>)
+        Self::insert(self, key, value).map(Reflect::into_boxed_reflect)
     }
 
     fn try_insert(
@@ -161,7 +156,7 @@ where
             Ok(v) => v,
             Err(e) => return Err((Box::new(key), e)),
         };
-        Ok(Self::insert(self, key, value).map(|old_val| Box::new(old_val).into_reflect()))
+        Ok(Self::insert(self, key, value).map(Reflect::into_boxed_reflect))
     }
 
     fn remove(&mut self, key: &dyn Reflect) -> Option<Box<dyn Reflect>> {
@@ -172,7 +167,7 @@ where
                 from_reflect.as_ref()
             })
             .and_then(|key| self.remove(key))
-            .map(|value| Box::new(value) as Box<dyn Reflect>)
+            .map(Reflect::into_boxed_reflect)
     }
 }
 

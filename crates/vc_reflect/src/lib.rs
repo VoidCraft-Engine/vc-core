@@ -2,7 +2,11 @@
 #![cfg_attr(docsrs, feature(doc_cfg, rustdoc_internals))]
 #![no_std]
 
-// Required to make proc macros work in bevy itself.
+// Required to make proc macros work in crate itself.
+//
+// Usually, we need to use `crate` in the crate itself and use `vc_reflect` in doc testing.
+// But `macro_utils::Manifest` can only choose one, so we must have an
+// `extern self` to ensure `vc_reflect` can be used as an alias for `crate`.
 extern crate self as vc_reflect;
 
 extern crate alloc;

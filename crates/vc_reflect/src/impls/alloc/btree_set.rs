@@ -18,11 +18,9 @@ impl<T: FromReflect + Typed + Ord + Eq> Typed for BTreeSet<T> {
     fn type_info() -> &'static TypeInfo {
         static CELL: GenericTypeInfoCell = GenericTypeInfoCell::new();
         CELL.get_or_insert::<Self>(|| {
-            TypeInfo::Set(
-                SetInfo::new::<Self, T>().with_generics(Generics::from_iter([GenericInfo::Type(
-                    TypeParamInfo::new::<T>("T"),
-                )])),
-            )
+            TypeInfo::Set(SetInfo::new::<Self, T>().with_generics(Generics::from([
+                GenericInfo::Type(TypeParamInfo::new::<T>("T")),
+            ])))
         })
     }
 }
@@ -73,7 +71,7 @@ impl<T: FromReflect + Typed + Ord + Eq> Set for BTreeSet<T> {
         value
             .downcast_ref::<T>()
             .and_then(|key| Self::get(self, key))
-            .map(|value| value as &dyn Reflect)
+            .map(Reflect::as_reflect)
     }
 
     #[inline]
@@ -87,13 +85,13 @@ impl<T: FromReflect + Typed + Ord + Eq> Set for BTreeSet<T> {
     }
 
     fn iter(&self) -> Box<dyn Iterator<Item = &dyn Reflect> + '_> {
-        Box::new(Self::iter(self).map(|v| v as &dyn Reflect))
+        Box::new(Self::iter(self).map(Reflect::as_reflect))
     }
 
     fn drain(&mut self) -> Vec<Box<dyn Reflect>> {
         let mut result = Vec::with_capacity(self.len());
         while let Some(v) = self.pop_first() {
-            result.push(Box::new(v) as Box<dyn Reflect>);
+            result.push(v.into_boxed_reflect());
         }
         result
     }

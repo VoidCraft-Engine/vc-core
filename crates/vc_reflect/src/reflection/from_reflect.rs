@@ -7,19 +7,64 @@ use alloc::boxed::Box;
 ///
 /// `FromReflect` allows dynamic proxy types, like [`DynamicStruct`], to be used to generate
 /// their concrete counterparts.
-/// It can also be used to partially or fully clone a type (depending on whether it has
-/// ignored fields or not).
 ///
-/// In some cases, this trait may even be required.
-/// Deriving [`Reflect`] on an enum requires all its fields to implement `FromReflect`.
-/// Additionally, some complex types like `Vec<T>` require that their element types
-/// implement this trait.
+/// In some cases, this trait may even be required. Deriving [`Reflect`] on an enum requires
+/// all its fields to implement `FromReflect`. Additionally, some complex types like `Vec<T>`
+/// require that their element types implement this trait.
+///
 /// The reason for such requirements is that some operations require new data to be constructed,
 /// such as swapping to a new variant or pushing data to a homogeneous list.
 ///
-/// See the [crate-level documentation] to see how this trait can be used.
+/// # Rules
 ///
-/// [derive macro]: crate::FromReflect
+/// 1. For unit type, if `TypeId` matched, return a new value.
+/// 2. For all other types, if `TypeId` matched, try to clone/reflect_clone and return.
+/// 3. If `Self` is Opaque type or [`ReflectKind`] mismatched, return `None`.
+/// 4. Otherwise:
+///     - Set: Try to construct all values through [`from_reflect`].
+///     - Map: Try to construct all key-values through [`from_reflect`].
+///     - List: try to construct all items through [`from_reflect`].
+///     - Enum: Try to construct all fields through [`from_reflect`] with specific enum variant.
+///     - Array: If lengths matched, try to construct all items through [`from_reflect`].
+///     - Tuple: If field lengths matched, try to construct all fields through [`from_reflect`].
+///     - TupleStruct: If field lengths matched:
+///         1. If Self support default (`reflect(default)` flag), create a default value call [`try_apply`].
+///         2. Otherwise try to construct all fields through [`from_reflect`].
+///     - Struct:
+///         1. If Self support default (`reflect(default)` flag), create a default value, call [`try_apply`].
+///         2. Try to construct all fields through [`from_reflect`].
+///
+/// `Struct` is the most special and may allow successful conversion between types
+/// with different numbers of fields(if `reflect(default)` attribute is marked).
+///
+/// # Examples
+///
+/// ```
+/// use vc_reflect::{FromReflect, ops::DynamicStruct, derive::Reflect};
+///
+/// #[derive(Reflect)]
+/// struct A {
+///     field_a: i32,
+///     field_b: bool,
+/// }
+///
+/// let mut dynamic = DynamicStruct::new();
+/// dynamic.insert("field_a", Box::new(10_i32));
+/// dynamic.insert("field_b", Box::new(true));
+///
+///
+/// let a = A::from_reflect(&dynamic).unwrap();
+///
+/// assert_eq!(a.field_a, 10);
+/// assert_eq!(a.field_b, true);
+/// ```
+///
+/// [`try_apply`]: Reflect::try_apply
+/// [`reflect_clone`]: Reflect::reflect_clone
+/// [`from_reflect`]: FromReflect::from_reflect
+/// [`take_from_reflect`]: FromReflect::take_from_reflect
+/// [`ReflectKind`]: crate::info::ReflectKind
+/// [derive macro]: crate::derive::Reflect
 /// [`DynamicStruct`]: crate::ops::DynamicStruct
 /// [crate-level documentation]: crate
 #[diagnostic::on_unimplemented(

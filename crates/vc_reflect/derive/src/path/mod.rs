@@ -39,16 +39,16 @@ pub(crate) use registry::*;
 // `vc_reflect::access` does not require additional content.
 
 #[inline(always)]
-pub(crate) fn macro_exports_(vc_reflect_path: &syn::Path) -> TokenStream {
+pub(crate) fn macro_utils_(vc_reflect_path: &syn::Path) -> TokenStream {
     quote! {
-        #vc_reflect_path::__macro_exports
+        #vc_reflect_path::__macro_exports::macro_utils
     }
 }
 
 #[inline(always)]
-pub(crate) fn macro_utils_(vc_reflect_path: &syn::Path) -> TokenStream {
+pub(crate) fn auto_register_(vc_reflect_path: &syn::Path) -> TokenStream {
     quote! {
-        #vc_reflect_path::__macro_exports::macro_utils
+        #vc_reflect_path::__macro_exports::auto_register
     }
 }
 
@@ -70,12 +70,5 @@ pub(crate) fn from_reflect_(vc_reflect_path: &syn::Path) -> TokenStream {
 pub(crate) fn reflect_hasher_(vc_reflect_path: &syn::Path) -> TokenStream {
     quote! {
         #vc_reflect_path::reflect_hasher
-    }
-}
-
-#[inline(always)]
-pub(crate) fn auto_register_(vc_reflect_path: &syn::Path) -> TokenStream {
-    quote! {
-        #vc_reflect_path::__macro_exports::auto_register
     }
 }

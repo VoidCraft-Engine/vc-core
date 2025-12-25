@@ -1,18 +1,16 @@
 use alloc::{borrow::Cow, format};
 use core::fmt;
 
-use crate::info::FieldId;
-
 /// A enumeration of all error outcomes
 /// that might happen when running [`Reflect::reflect_clone`](crate::Reflect::reflect_clone)..
 #[derive(Debug)]
 pub enum ReflectCloneError {
-    /// The type does not have a custom implementation.
+    /// The type does not support clone.
     NotSupport { type_path: Cow<'static, str> },
     /// The field cannot be cloned.
     FieldNotCloneable {
         type_path: Cow<'static, str>,
-        field: FieldId,
+        field: Cow<'static, str>,
         variant: Option<Cow<'static, str>>,
     },
 }

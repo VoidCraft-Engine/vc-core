@@ -1,3 +1,4 @@
 mod btree_map;
 mod btree_set;
 mod string;
+mod vec;

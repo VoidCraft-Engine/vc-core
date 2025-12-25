@@ -19,13 +19,13 @@ pub enum ApplyError {
         from_kind: ReflectKind,
         to_kind: ReflectKind,
     },
+    /// The enum we tried to apply to didn't contain a variant with the give name.
+    MismatchedVariant {
+        from_variant: Cow<'static, str>,
+        to_variant: Cow<'static, str>,
+    },
     /// Attempted to apply an array or tuple like type to another of different size, e.g. a `[u8; 4]` to `[u8; 3]`.
     DifferentSize { from_size: usize, to_size: usize },
-    /// The enum we tried to apply to didn't contain a variant with the give name.
-    UnknownVariant {
-        enum_name: Cow<'static, str>,
-        variant_name: Cow<'static, str>,
-    },
 }
 
 impl fmt::Display for ApplyError {
@@ -40,19 +40,16 @@ impl fmt::Display for ApplyError {
             Self::MismatchedKinds { from_kind, to_kind } => {
                 write!(f, "attempted to apply `{from_kind}` to `{to_kind}`")
             }
+            Self::MismatchedVariant {
+                from_variant,
+                to_variant,
+            } => {
+                write!(f, "attempted to apply `{from_variant}` to `{to_variant}`")
+            }
             Self::DifferentSize { from_size, to_size } => {
                 write!(
                     f,
                     "attempted to apply type with {from_size} size to {to_size} size"
-                )
-            }
-            Self::UnknownVariant {
-                enum_name,
-                variant_name,
-            } => {
-                write!(
-                    f,
-                    "variant `{variant_name}` does not exist on enum `{enum_name}`"
                 )
             }
         }

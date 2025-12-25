@@ -1,13 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
-// #[inline]
-// pub(crate) fn type_trait_(vc_reflect_path: &syn::Path) -> TokenStream {
-//     quote! {
-//         #vc_reflect_path::registry::TypeTrait
-//     }
-// }
-
 #[inline]
 pub(crate) fn type_meta_(vc_reflect_path: &syn::Path) -> TokenStream {
     quote! {
@@ -35,13 +28,6 @@ pub(crate) fn type_registry_(vc_reflect_path: &syn::Path) -> TokenStream {
         #vc_reflect_path::registry::TypeRegistry
     }
 }
-
-// #[inline]
-// pub(crate) fn type_registry_arc_(vc_reflect_path: &syn::Path) -> TokenStream {
-//     quote! {
-//         #vc_reflect_path::registry::TypeRegistryArc
-//     }
-// }
 
 #[inline]
 pub(crate) fn type_trait_default_(vc_reflect_path: &syn::Path) -> TokenStream {

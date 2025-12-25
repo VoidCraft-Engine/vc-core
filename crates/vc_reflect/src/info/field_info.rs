@@ -1,8 +1,4 @@
-use alloc::borrow::Cow;
-use core::{
-    any::{Any, TypeId},
-    fmt,
-};
+use core::any::{Any, TypeId};
 use vc_os::sync::Arc;
 
 use crate::info::{
@@ -10,7 +6,7 @@ use crate::info::{
     impl_with_custom_attributes,
 };
 
-/// Information for a named (struct) field, size = 40.
+/// Information for a named (struct) field, size = 48.
 ///
 /// # Examples
 ///
@@ -151,25 +147,5 @@ impl UnnamedField {
     #[inline]
     pub fn type_info(&self) -> &'static TypeInfo {
         (self.type_info)()
-    }
-}
-
-/// Represents a field identifier, either named or unnamed.
-///
-/// Primarily used for formatting field identifiers in error messages and
-/// diagnostics.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum FieldId {
-    Named(Cow<'static, str>),
-    Unnamed(usize),
-}
-
-impl fmt::Display for FieldId {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Named(name) => fmt::Display::fmt(name, f),
-            Self::Unnamed(name) => fmt::Display::fmt(name, f),
-        }
     }
 }

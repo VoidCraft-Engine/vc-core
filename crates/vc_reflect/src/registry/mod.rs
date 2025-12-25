@@ -15,6 +15,27 @@
 //!     - [`TypeTraitDeserialize`]: Provide deserialization support for reflection type.
 //! - [`reflect_trait`]: a attribute macro, which generate a `Reflect{trait_name}` struct, can be used as [`TypeTrait`].
 //!
+//! ## auto_register
+//!
+//! See [`TypeRegistry::auto_register`] .
+//!
+//! We use [`inventory`] crate to implement static registration,
+//! not all platforms support it (although major platforms do).
+//!
+//! The good news is that if it is not supported,
+//! this function will directly return false without causing any errors.
+//!
+//! ### auto_register type menu
+//!
+//! - `()` `bool` `char` `f32` `f64`
+//! - `i8` `i16` `i32` `i64` `i128` `isize`
+//! - `u8` `u16` `u32` `u64` `u128` `usize`
+//! - `String` `&'static str`
+//! - `TypeId`
+//! - `Atomic`: Bool I8-I64 U8-U64 Isize Usize (without Ptr)
+//!
+//!
+//! [`reflect_trait`]: crate::derive::reflect_trait
 //! [`FromReflect`]: crate::FromReflect
 //! [`TypeInfo`]: crate::info::TypeInfo
 
