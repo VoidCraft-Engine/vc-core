@@ -82,22 +82,6 @@ impl<T: Typed + FromReflect> List for Vec<T> {
         Self::insert(self, index, element);
     }
 
-    fn try_insert(
-        &mut self,
-        index: usize,
-        element: Box<dyn Reflect>,
-    ) -> Result<(), Box<dyn Reflect>> {
-        if index > Self::len(self) {
-            return Err(element);
-        }
-        let element = match T::take_from_reflect(element) {
-            Ok(v) => v,
-            Err(e) => return Err(e),
-        };
-        Self::insert(self, index, element);
-        Ok(())
-    }
-
     fn remove(&mut self, index: usize) -> Box<dyn Reflect> {
         Box::new(Self::remove(self, index))
     }

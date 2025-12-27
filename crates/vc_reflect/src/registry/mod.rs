@@ -1,4 +1,4 @@
-//! # VoidCraft Reflection Registry
+//! Provide type registry for non-object infomation querying.
 //!
 //! ## Menu
 //!

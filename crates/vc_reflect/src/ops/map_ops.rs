@@ -1,23 +1,69 @@
 use crate::{
     Reflect,
     impls::NonGenericTypeInfoCell,
-    info::{MapInfo, OpaqueInfo, TypeInfo, TypePath, Typed},
+    info::{OpaqueInfo, TypeInfo, TypePath, Typed},
     ops::{ApplyError, ReflectCloneError},
-    reflection::impl_reflect_cast_fn,
 };
 use alloc::{boxed::Box, vec::Vec};
 use core::fmt;
 use vc_utils::hash::{HashTable, hash_table};
 
-/// Representing [`Map`], used to dynamically modify the type of data and information.
+/// A dynamic container representing a map-like collection.
 ///
-/// Dynamic types are special in that their TypeInfo is [`OpaqueInfo`],
-/// but other APIs are consistent with the type they represent, such as [`reflect_kind`], [`reflect_ref`]
+/// `DynamicMap` is a type-erased dynamic map that can store key-value pairs where
+/// both keys and values implement [`Reflect`]. It represents associative collections
+/// like `HashMap` or `BTreeMap` in Rust.
 ///
-/// [`reflect_kind`]: crate::Reflect::reflect_kind
-/// [`reflect_ref`]: crate::Reflect::reflect_ref
+/// # Type Information
+///
+/// Dynamic types are special in that their `TypeInfo` is [`OpaqueInfo`],
+/// but other APIs behave like the represented type, such as [`reflect_kind`] and [`reflect_ref`].
+///
+/// A `DynamicMap` can optionally represent a specific map type through its
+/// [`represented_type_info`]. When set, this allows the dynamic map to be treated
+/// as if it were a specific static map type for reflection purposes.
+///
+/// # Key Requirements
+///
+/// Keys in a `DynamicMap` must support:
+/// - Hashing via [`Reflect::reflect_hash`]
+/// - Equality comparison via [`Reflect::reflect_partial_eq`]
+/// - Self-equality (a key must be equal to itself)
+///
+/// # Examples
+///
+/// ## Creating and populating a dynamic map
+///
+/// ```
+/// use vc_reflect::ops::{Map, DynamicMap};
+///
+/// let mut map = DynamicMap::new();
+/// map.extend("key1", "value1");
+/// map.extend("key2", "value2");
+/// map.extend("key3", 42);
+///
+/// assert_eq!(map.len(), 3);
+/// ```
+///
+/// ## Looking up values
+///
+/// ```
+/// use vc_reflect::ops::{Map, DynamicMap};
+///
+/// let mut map = DynamicMap::new();
+/// map.extend("counter", 100_i32);
+///
+/// // Get as dynamic reference
+/// if let Some(value) = map.get(&"counter") {
+///     println!("Found: {:?}", value);
+/// }
+/// ```
+///
+/// [`reflect_kind`]: Reflect::reflect_kind
+/// [`reflect_ref`]: Reflect::reflect_ref
+/// [`represented_type_info`]: Reflect::represented_type_info
 pub struct DynamicMap {
-    map_info: Option<&'static TypeInfo>,
+    info: Option<&'static TypeInfo>,
     hash_table: HashTable<(Box<dyn Reflect>, Box<dyn Reflect>)>,
 }
 
@@ -48,43 +94,150 @@ impl Typed for DynamicMap {
 }
 
 impl DynamicMap {
-    /// Create a empty [`DynamicMap`].
+    /// Creates an empty `DynamicMap`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use vc_reflect::ops::DynamicMap;
+    /// let map = DynamicMap::new();
+    /// ```
     #[inline]
     pub const fn new() -> Self {
         Self {
-            map_info: None,
+            info: None,
             hash_table: HashTable::new(),
         }
     }
 
-    /// See [`Vec::with_capacity`]
+    /// Creates a new empty `DynamicMap` with at least the specified capacity.
+    ///
+    /// This can be used to avoid reallocations when you know approximately
+    /// how many key-value pairs will be added to the map.
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            map_info: None,
+            info: None,
             hash_table: HashTable::with_capacity(capacity),
         }
     }
 
-    /// Sets the [`TypeInfo`] to be represented by this `DynamicMap`.
+    /// Sets the [`TypeInfo`] that this dynamic map represents.
     ///
-    /// # Panic
+    /// When set, [`Reflect::represented_type_info`] will return this information,
+    /// allowing the dynamic map to be treated as if it were a specific static map type.
     ///
-    /// If the input is not list info or None.
-    #[inline]
-    pub fn set_type_info(&mut self, map_info: Option<&'static TypeInfo>) {
-        match map_info {
-            Some(TypeInfo::Map(_)) | None => {}
-            _ => {
-                panic!(
-                    "Call `DynamicMap::set_type_info`, but the input is not map information or None."
-                )
+    /// # Panics
+    ///
+    /// Panics if `info` is `Some` but does not contain map type information.
+    pub const fn set_type_info(&mut self, info: Option<&'static TypeInfo>) {
+        match info {
+            Some(info) => {
+                assert!(info.is_map(), "`TypeInfo` mismatched.");
+                self.info = Some(info);
+            }
+            None => {
+                self.info = None;
             }
         }
-
-        self.map_info = map_info;
     }
 
+    /// Inserts a boxed key-value pair into the map.
+    ///
+    /// This is the low-level version of [`extend`] that accepts already-boxed values.
+    ///
+    /// # Returns
+    ///
+    /// - `Some(old_value)` if the key already existed in the map (the old value is replaced)
+    /// - `None` if the key did not exist in the map
+    ///
+    /// # Panics
+    ///
+    /// Panics if:
+    /// - The key does not support [`Reflect::reflect_hash`]
+    /// - The key does not support [`Reflect::reflect_partial_eq`]
+    /// - The key is not equal to itself (violates reflexivity)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::ops::DynamicMap;
+    /// let mut map = DynamicMap::new();
+    /// let old_value = map.extend_boxed(Box::new("key1"), Box::new("value1"));
+    /// assert!(old_value.is_none());
+    ///
+    /// let old_value = map.extend_boxed(Box::new("key1"), Box::new("value2"));
+    /// assert!(old_value.is_some());
+    /// ```
+    ///
+    /// [`extend`]: DynamicMap::extend
+    pub fn extend_boxed(
+        &mut self,
+        key: Box<dyn Reflect>,
+        value: Box<dyn Reflect>,
+    ) -> Option<Box<dyn Reflect>> {
+        debug_assert_eq!(
+            key.reflect_partial_eq(&*key),
+            Some(true),
+            "The key is not `reflect_partial_eq` to itself: `{}`.",
+            key.reflect_type_path(),
+        );
+
+        let hash = Self::internal_hash(&*key);
+        let eq = Self::internal_eq(&*key);
+        match self.hash_table.find_mut(hash, eq) {
+            Some((_, old)) => Some(core::mem::replace(old, value)),
+            None => {
+                self.hash_table.insert_unique(
+                    Self::internal_hash(key.as_ref()),
+                    (key, value),
+                    |(key, _)| Self::internal_hash(&**key),
+                );
+                None
+            }
+        }
+    }
+
+    /// Inserts a key-value pair into the map.
+    ///
+    /// This is a convenience method that boxes the key and value and calls
+    /// [`extend_boxed`].
+    ///
+    /// # Returns
+    ///
+    /// - `Some(old_value)` if the key already existed in the map (the old value is replaced)
+    /// - `None` if the key did not exist in the map
+    ///
+    /// # Panics
+    ///
+    /// Panics if:
+    /// - The key does not support [`Reflect::reflect_hash`]
+    /// - The key does not support [`Reflect::reflect_partial_eq`]
+    /// - The key is not equal to itself (violates reflexivity)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::ops::{Map, DynamicMap};
+    /// let mut map = DynamicMap::new();
+    /// map.extend("name", "Alice");
+    /// map.extend("age", 30_i32);
+    /// map.extend("active", true);
+    ///
+    /// assert_eq!(map.len(), 3);
+    /// ```
+    ///
+    /// [`extend_boxed`]: DynamicMap::extend_boxed
+    #[inline]
+    pub fn extend<K: Reflect, V: Reflect>(&mut self, key: K, value: V) -> Option<Box<dyn Reflect>> {
+        self.extend_boxed(Box::new(key), Box::new(value))
+    }
+
+    /// Computes the hash of a value for internal use.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value does not support `reflect_hash`.
     fn internal_hash(value: &dyn Reflect) -> u64 {
         value.reflect_hash().unwrap_or_else(|| {
             panic!(
@@ -94,19 +247,23 @@ impl DynamicMap {
         })
     }
 
+    /// Creates an equality comparison function for a key.
     fn internal_eq(
         key: &dyn Reflect,
     ) -> impl FnMut(&(Box<dyn Reflect>, Box<dyn Reflect>)) -> bool + '_ {
         |(other, _)| {
-            key
-            .reflect_partial_eq(&**other)
-            .expect("underlying type does not reflect `PartialEq` and hence doesn't support equality checks")
+            key.reflect_partial_eq(&**other).unwrap_or_else(|| {
+                panic!(
+                    "the given value of type `{}` does not support reflect hashing",
+                    other.reflect_type_path(),
+                )
+            })
         }
     }
 }
 
 impl Reflect for DynamicMap {
-    impl_reflect_cast_fn!(Map);
+    crate::reflection::impl_reflect_cast_fn!(Map);
 
     #[inline]
     fn is_dynamic(&self) -> bool {
@@ -115,7 +272,7 @@ impl Reflect for DynamicMap {
 
     #[inline]
     fn represented_type_info(&self) -> Option<&'static TypeInfo> {
-        self.map_info
+        self.info
     }
 
     #[inline]
@@ -159,20 +316,22 @@ impl fmt::Debug for DynamicMap {
 }
 
 impl FromIterator<(Box<dyn Reflect>, Box<dyn Reflect>)> for DynamicMap {
+    #[inline]
     fn from_iter<I: IntoIterator<Item = (Box<dyn Reflect>, Box<dyn Reflect>)>>(items: I) -> Self {
         let mut this = DynamicMap::new();
         for (key, value) in items.into_iter() {
-            this.insert(key, value);
+            this.extend_boxed(key, value);
         }
         this
     }
 }
 
 impl<K: Reflect, V: Reflect> FromIterator<(K, V)> for DynamicMap {
+    #[inline]
     fn from_iter<I: IntoIterator<Item = (K, V)>>(items: I) -> Self {
         let mut this = DynamicMap::new();
         for (key, value) in items.into_iter() {
-            this.insert(Box::new(key), Box::new(value));
+            this.extend_boxed(Box::new(key), Box::new(value));
         }
         this
     }
@@ -201,82 +360,158 @@ impl<'a> IntoIterator for &'a DynamicMap {
     }
 }
 
-/// A trait used to power [map-like] operations via [reflection].
+/// A trait for type-erased map-like operations via reflection.
 ///
-/// Maps contain zero or more entries of a key and its associated value,
-/// and correspond to types like `HashMap` and [`BTreeMap`].
-/// The order of these entries is not guaranteed by this trait.
+/// This trait represents any associative collection that maps keys to values, including:
+/// - Hash maps (`HashMap<K, V>`)
+/// - B-tree maps (`BTreeMap<K, V>`)
+/// - Other key-value collections
 ///
-/// # Hashing and equality
+/// # Key Requirements
 ///
-/// All keys are expected to return a valid hash value from [`Reflect::reflect_hash`] and be
-/// comparable using [`Reflect::reflect_partial_eq`].
+/// Implementors must ensure that keys:
+/// 1. Support hashing via [`Reflect::reflect_hash`]
+/// 2. Support equality comparison via [`Reflect::reflect_partial_eq`]
+/// 3. Are equal to themselves (reflexivity)
+/// 4. Have consistent hashing (equal keys have equal hashes)
 ///
-/// If using the [`#[derive(Reflect)]`](crate::derive::Reflect) macro, these functions will provide
-/// default implementations (through internal fields), but this is usually not efficient enough.
-/// You can add `#[reflect(hash, partial_eq)]` to implement these functions using [`Clone`]
-/// and [`PartialEq`] trait.
+/// The ordering of entries is not guaranteed by this trait and may vary by implementation.
 ///
-/// The ordering is expected to be total, that is as if the reflected type implements the [`Eq`] trait.
-/// This is true even for manual implementors who do not hash or compare values,
-/// as it is still relied on by [`DynamicMap`].
-///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use vc_reflect::{Reflect, ops::Map};
 /// use std::collections::BTreeMap;
 ///
-/// let foo: &mut dyn Map = &mut BTreeMap::<u32, bool>::new();
-/// foo.insert(Box::new(123_u32), Box::new(true));
-/// assert_eq!(foo.len(), 1);
+/// let mut map = BTreeMap::new();
+/// map.insert("a", 1);
+/// map.insert("b", 2);
 ///
-/// let field: &dyn Reflect = foo.get(&123_u32).unwrap();
-/// assert_eq!(field.downcast_ref::<bool>(), Some(&true));
+/// let map_ref: &mut dyn Map = &mut map;
+/// assert_eq!(map_ref.len(), 2);
+///
+/// if let Some(value) = map_ref.get_as::<i32>(&"b") {
+///     assert_eq!(value, &2);
+/// }
 /// ```
-///
-/// [`BTreeMap`]: alloc::collections::BTreeMap
-/// [map-like]: https://doc.rust-lang.org/book/ch08-03-hash-maps.html
-/// [reflection]: crate
 pub trait Map: Reflect {
     /// Returns a reference to the value associated with the given key.
     ///
-    /// If no value is associated with `key`, returns `None`.
+    /// Returns `None` if the key is not present in the map or incompitable.
+    ///
+    /// For type-safe access when the k-v type is known,
+    /// use `<dyn Map>::get_as` instead.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::Map};
+    /// # use std::collections::BTreeMap;
+    /// let mut map = BTreeMap::new();
+    /// map.insert("key", 42);
+    /// let map_ref: &dyn Map = &map;
+    ///
+    /// assert!(map_ref.get(&"key").is_some());
+    /// assert!(map_ref.get(&"missing").is_none());
+    /// ```
     fn get(&self, key: &dyn Reflect) -> Option<&dyn Reflect>;
 
     /// Returns a mutable reference to the value associated with the given key.
     ///
-    /// If no value is associated with `key`, returns `None`.
+    /// Returns `None` if the key is not present in the map or incompitable.
+    ///
+    /// For type-safe access when the k-v type is known,
+    /// use `<dyn Map>::get_as` instead.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::Map};
+    /// # use std::collections::BTreeMap;
+    /// let mut map = BTreeMap::new();
+    /// map.insert("counter", 0_i32);
+    /// let map_ref: &mut dyn Map = &mut map;
+    ///
+    /// if let Some(value) = map_ref.get_mut(&"counter") {
+    ///     *value.downcast_mut::<i32>().unwrap() += 1;
+    /// }
+    ///
+    /// assert_eq!(map.get(&"counter"), Some(&1));
+    /// ```
     fn get_mut(&mut self, key: &dyn Reflect) -> Option<&mut dyn Reflect>;
 
-    /// Returns the number of elements in the map.
+    /// Returns the number of key-value pairs in the map.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::Map};
+    /// # use std::collections::BTreeMap;
+    /// let map: BTreeMap<&str, i32> = [("a", 1), ("b", 2), ("c", 3)]
+    ///     .into_iter()
+    ///     .collect();
+    /// let map_ref: &dyn Map = &map;
+    ///
+    /// assert_eq!(map_ref.len(), 3);
+    /// ```
     fn len(&self) -> usize;
 
     /// Returns `true` if the list contains no elements.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::Map};
+    /// # use std::collections::BTreeMap;
+    /// let empty: BTreeMap<&str, i32> = BTreeMap::new();
+    /// let empty_ref: &dyn Map = &empty;
+    /// assert!(empty_ref.is_empty());
+    /// ```
     #[inline]
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// Returns an iterator over the key-value pairs of the map.
+    ///
+    /// The iteration order is not specified and may vary between implementations.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::Map};
+    /// # use std::collections::BTreeMap;
+    ///
+    /// let map: BTreeMap<&str, i32> = [("a", 1), ("b", 2), ("c", 3)]
+    ///     .into_iter()
+    ///     .collect();
+    /// let map_ref: &dyn Map = &map;
+    ///
+    /// let sum: i32 = map_ref.iter()
+    ///     .filter_map(|(_, v)| v.downcast_ref::<i32>())
+    ///     .sum();
+    ///
+    /// assert_eq!(sum, 6);
+    /// ```
     fn iter(&self) -> Box<dyn Iterator<Item = (&dyn Reflect, &dyn Reflect)> + '_>;
 
-    /// Drain the key-value pairs of this map to get a vector of owned values.
+    /// Removes all key-value pairs from the map and returns them as a vector.
     ///
-    /// After calling this function, `self` will be empty.
+    /// After calling this method, the map will be empty. The order of the
+    /// returned pairs is not specified.
     fn drain(&mut self) -> Vec<(Box<dyn Reflect>, Box<dyn Reflect>)>;
 
-    /// Retain only the elements specified by the predicate.
+    /// Retains only the key-value pairs specified by the predicate.
     ///
-    /// In other words, remove all pairs `(k, v)` such that `f(&k, &mut v)` returns `false`.
+    /// Remove all pairs `(k, v)` for which `f(&k, &mut v)` returns `false`.
     fn retain(&mut self, f: &mut dyn FnMut(&dyn Reflect, &mut dyn Reflect) -> bool);
 
     /// Creates a new [`DynamicMap`] from this map.
     ///
-    /// Usually, `to_dynamic_map` recursively converts all data to a dynamic type, except for 'Opaque'.
-    /// But for Map keys, converting them to dynamic types is not a good idea.
+    /// This method converts the map to a dynamic representation.
     ///
-    /// Therefore, for keys, we choose to directly clone them if feasible.
+    /// For keys, it attempts to clone them using [`Reflect::reflect_clone`] if possible,
+    /// otherwise falls back to converting them to dynamic types.
     fn to_dynamic_map(&self) -> DynamicMap {
         let mut map = DynamicMap::with_capacity(self.len());
         map.set_type_info(self.represented_type_info());
@@ -298,54 +533,90 @@ pub trait Map: Reflect {
 
     /// Inserts a key-value pair into the map.
     ///
-    /// If the map did not have this key present, `None` is returned.
-    /// If the map did have this key present, the value is updated, and the old value is returned.
+    /// If the map already contained a value for the key, the old value is returned.
+    ///
+    /// In standard implementation (e.g. `BTreeMap<K, V>`), this function will use
+    /// [`FromReflect::take_from_reflect`] to convert key and value.
     ///
     /// # Panics
     ///
-    /// May Panics if type incompatible.
+    /// May panic if:
+    /// - The key type is incompatible with the map
+    /// - The key does not support required operations (hashing, equality)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::Map};
+    /// # use std::collections::BTreeMap;
+    /// let mut map = <BTreeMap<&str, i32>>::new();
+    /// let map_ref: &mut dyn Map = &mut map;
+    ///
+    /// // Insert new key
+    /// let result = map_ref.insert(Box::new("key"), Box::new(1_i32));
+    /// assert!(result.is_none());
+    ///
+    /// // Replace existing key
+    /// let result = map_ref.insert(Box::new("key"), Box::new(2_i32));
+    /// assert_eq!(result.unwrap().downcast_ref::<i32>(), Some(&1));
+    /// ```
+    ///
+    /// [`FromReflect::take_from_reflect`]: crate::FromReflect::take_from_reflect
     fn insert(
         &mut self,
         key: Box<dyn Reflect>,
         value: Box<dyn Reflect>,
     ) -> Option<Box<dyn Reflect>>;
 
-    /// Try insert key values.
+    /// Attempts to insert a key-value pair into the map.
     ///
-    /// If type incompatible, return  `Err((K, V))`.
+    /// This only requires checking whether the types match.
     ///
-    /// Use for `try_apply` implementation, should not panics.
+    /// In standard implementation (e.g. `BTreeMap<K, V>`), this function will use
+    /// [`FromReflect::take_from_reflect`] to convert key and value.
+    ///
+    /// # Panics
+    /// May panic if the key does not support required operations (hashing, equality).
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(Some(old_value))` if the key already existed (old value replaced)
+    /// - `Ok(None)` if the key did not exist (new entry inserted)
+    /// - `Err((key, value))` if the key type is incompatible
+    ///
+    /// [`FromReflect::take_from_reflect`]: crate::FromReflect::take_from_reflect
     fn try_insert(
         &mut self,
         key: Box<dyn Reflect>,
         value: Box<dyn Reflect>,
     ) -> Result<Option<Box<dyn Reflect>>, (Box<dyn Reflect>, Box<dyn Reflect>)>;
 
-    /// Removes an entry from the map.
+    /// Removes a key from the map, returning the value if the key was previously in the map.
     ///
-    /// If the map did not have this key present, `None` is returned.
-    /// If the map did have this key present, the removed value is returned.
+    /// # Returns
+    ///
+    /// - `None` if the key type is incompitable.
+    /// - `Some(value)` if the key was present in the map
+    /// - `None` if the key was not present in the map
+    ///
+    /// # Panics
+    ///
+    /// May panic if the key does not support required operations (hashing, equality)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::Map};
+    /// # use std::collections::BTreeMap;
+    /// let mut map = BTreeMap::new();
+    /// map.insert("key", "value");
+    /// let map_ref: &mut dyn Map = &mut map;
+    ///
+    /// let removed = map_ref.remove(&"key");
+    /// assert!(removed.is_some());
+    /// assert!(map_ref.is_empty());
+    /// ```
     fn remove(&mut self, key: &dyn Reflect) -> Option<Box<dyn Reflect>>;
-
-    /// Get actual [`MapInfo`] of underlying types.
-    ///
-    /// If it is a dynamic type, it will return `None`.
-    ///
-    /// If it is not a dynamic type and the returned value is not `None` or `MapInfo`, it will panic.
-    /// (If you want to implement dynamic types yourself, please return None.)
-    #[inline]
-    fn reflect_map_info(&self) -> Option<&'static MapInfo> {
-        self.reflect_type_info().as_map().ok()
-    }
-
-    /// Get the [`MapInfo`] of representation.
-    ///
-    /// Normal types return their own information,
-    /// while dynamic types return `None`` if they do not represent an object
-    #[inline]
-    fn represented_map_info(&self) -> Option<&'static MapInfo> {
-        self.represented_type_info()?.as_map().ok()
-    }
 }
 
 impl Map for DynamicMap {
@@ -385,30 +656,13 @@ impl Map for DynamicMap {
             .retain(move |(key, value)| f(&**key, &mut **value));
     }
 
+    #[inline]
     fn insert(
         &mut self,
         key: Box<dyn Reflect>,
         value: Box<dyn Reflect>,
     ) -> Option<Box<dyn Reflect>> {
-        debug_assert_eq!(
-            key.reflect_partial_eq(&*key),
-            Some(true),
-            "keys inserted in `Map`-like types are expected to reflect `PartialEq`"
-        );
-
-        let hash = Self::internal_hash(&*key);
-        let eq = Self::internal_eq(&*key);
-        match self.hash_table.find_mut(hash, eq) {
-            Some((_, old)) => Some(core::mem::replace(old, value)),
-            None => {
-                self.hash_table.insert_unique(
-                    Self::internal_hash(key.as_ref()),
-                    (key, value),
-                    |(key, _)| Self::internal_hash(&**key),
-                );
-                None
-            }
-        }
+        self.extend_boxed(key, value)
     }
 
     #[inline]
@@ -417,7 +671,7 @@ impl Map for DynamicMap {
         key: Box<dyn Reflect>,
         value: Box<dyn Reflect>,
     ) -> Result<Option<Box<dyn Reflect>>, (Box<dyn Reflect>, Box<dyn Reflect>)> {
-        Ok(Map::insert(self, key, value))
+        Ok(self.extend_boxed(key, value))
     }
 
     fn remove(&mut self, key: &dyn Reflect) -> Option<Box<dyn Reflect>> {
@@ -431,14 +685,58 @@ impl Map for DynamicMap {
             Err(_) => None,
         }
     }
+}
 
+impl dyn Map {
+    /// Returns a typed reference to the value associated with the given key.
+    ///
+    /// Returns `None` if:
+    /// - The key is not present in the map
+    /// - The key type is incompatible with the map
+    /// - The value cannot be downcast to type `T`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use vc_reflect::{Reflect, ops::Map};
+    /// use std::collections::BTreeMap;
+    ///
+    /// let map: BTreeMap<&str, i32> = [("count", 42)].into_iter().collect();
+    /// let map_ref: &dyn Map = &map;
+    ///
+    /// assert_eq!(map_ref.get_as::<i32>(&"count"), Some(&42));
+    /// assert_eq!(map_ref.get_as::<&str>(&"count"), None); // Wrong type
+    /// assert_eq!(map_ref.get_as::<i32>(&"missing"), None); // Not found
+    /// ```
     #[inline]
-    fn reflect_map_info(&self) -> Option<&'static MapInfo> {
-        None
+    pub fn get_as<T: Reflect>(&self, key: &dyn Reflect) -> Option<&T> {
+        self.get(key).and_then(<dyn Reflect>::downcast_ref)
     }
 
+    /// Returns a typed mutable reference to the value associated with the given key.
+    ///
+    /// Returns `None` if:
+    /// - The key is not present in the map
+    /// - The key type is incompatible with the map
+    /// - The value cannot be downcast to type `T`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use vc_reflect::{Reflect, ops::Map};
+    /// use std::collections::BTreeMap;
+    ///
+    /// let mut map: BTreeMap<&str, i32> = [("counter", 0)].into_iter().collect();
+    /// let map_ref: &mut dyn Map = &mut map;
+    ///
+    /// if let Some(value) = map_ref.get_mut_as::<i32>(&"counter") {
+    ///     *value += 1;
+    /// }
+    ///
+    /// assert_eq!(map.get("counter"), Some(&1));
+    /// ```
     #[inline]
-    fn represented_map_info(&self) -> Option<&'static MapInfo> {
-        self.map_info?.as_map().ok()
+    pub fn get_mut_as<T: Reflect>(&mut self, key: &dyn Reflect) -> Option<&mut T> {
+        self.get_mut(key).and_then(<dyn Reflect>::downcast_mut)
     }
 }

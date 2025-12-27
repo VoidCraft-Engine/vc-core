@@ -72,11 +72,11 @@ impl error::Error for ReflectKindError {}
 /// 4. [`TypeRegistry::get_type_info`]
 ///
 /// Each returns a static reference to [`TypeInfo`], but they all have their own use cases.
-/// For example, if you know the type at compile time, [`Typed::type_info`] is probably
-/// the simplest. If you have a `dyn Reflect` you can use [`DynamicTyped::reflect_type_info`].
-/// If you only care about data content (such as serialization), then [`Reflect::represented_type_info`] should be used.
-/// Lastly, if all you have is a [`TypeId`] or [type path], you will need to go through
-/// [`TypeRegistry::get_type_info`].
+///
+/// - If you know the type at compile time, [`Typed::type_info`] is probably the simplest.
+/// - If you have a `dyn Reflect` you can use [`DynamicTyped::reflect_type_info`]..
+/// - If you only care about data content (such as serialization), then [`Reflect::represented_type_info`] should be used.
+/// - If all you have is a [`TypeId`] or [type path], you will need to get through [`TypeRegistry::get_type_info`].
 ///
 /// You may also opt to use [`TypeRegistry::get_type_info`] in place of the other methods simply because
 /// it can be more performant. This is because those other methods may require attaining a lock on
@@ -106,9 +106,8 @@ macro_rules! impl_cast_method {
     ($name:ident : $kind:ident => $info:ident) => {
         /// Convert [`TypeInfo`] to specific type information.
         ///
-        /// Then you can call some more specific methods.
-        ///
-        /// And methods such as `ty` and `custom_attributes` will also be more efficient,
+        /// Then you can call some more specific methods,
+        /// and methods such as `ty` and `custom_attributes` will also be more efficient,
         /// without the need to determine the [type kind](ReflectKind).
         pub const fn $name(&self) -> Result<&$info, ReflectKindError> {
             match self {
@@ -117,6 +116,19 @@ macro_rules! impl_cast_method {
                     expected: ReflectKind::$kind,
                     received: self.kind(),
                 }),
+            }
+        }
+    };
+}
+
+macro_rules! impl_is_method {
+    ($name:ident : $kind:ident) => {
+        /// Check infomation kind, can be used in const function.
+        #[inline]
+        pub(crate) const fn $name(&self) -> bool {
+            match self {
+                Self::$kind(..) => true,
+                _ => false,
             }
         }
     };
@@ -132,6 +144,15 @@ impl TypeInfo {
     impl_cast_method!(as_set: Set => SetInfo);
     impl_cast_method!(as_enum: Enum => EnumInfo);
     impl_cast_method!(as_opaque: Opaque => OpaqueInfo);
+
+    impl_is_method!(is_struct: Struct);
+    impl_is_method!(is_tuple_struct: TupleStruct);
+    impl_is_method!(is_tuple: Tuple);
+    impl_is_method!(is_list: List);
+    impl_is_method!(is_array: Array);
+    impl_is_method!(is_map: Map);
+    impl_is_method!(is_set: Set);
+    impl_is_method!(is_enum: Enum);
 
     /// Returns the underlying [`Type`] metadata for this `TypeInfo`.
     pub const fn ty(&self) -> &Type {

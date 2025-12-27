@@ -177,7 +177,7 @@ fn impl_trait_struct(info: &ReflectStruct) -> TokenStream {
             fn to_dynamic_struct(&self) -> #dynamic_struct_ {
                 let mut dynamic = #dynamic_struct_::with_capacity(#struct_::field_len(self));
                 dynamic.set_type_info(#reflect_::represented_type_info(self));
-                #(dynamic.insert(#field_names, #reflect_::to_dynamic(#fields_ref));)*
+                #(dynamic.extend_boxed(#field_names, #reflect_::to_dynamic(#fields_ref));)*
                 dynamic
             }
         }

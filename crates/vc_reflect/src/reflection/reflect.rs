@@ -8,70 +8,140 @@ use crate::{
     ops::{ApplyError, ReflectCloneError, ReflectMut, ReflectOwned, ReflectRef},
 };
 
-/// The foundational trait of [`vc_reflect`], used for accessing and modifying data dynamically.
+/// The foundational trait for runtime reflection in [`vc_reflect`].
 ///
-/// It's recommended to use [the derive macro for `Reflect`] rather than manually implementing this trait.
-/// Doing so will automatically implement this trait as well as many other useful traits for reflection,
-/// including one of the appropriate subtraits: [`Struct`], [`TupleStruct`] or [`Enum`].
+/// This trait enables dynamic access and modification of data without compile-time
+/// type information. It's the core abstraction that powers the entire reflection system.
 ///
-/// # Methods
+/// # Recommendations
 ///
-/// [`Reflect`] is a subtrait of [`DynamicTypePath`] and [`DynamicTyped`], so you can call their methods:
+/// It's strongly recommended to use [the derive macro for `Reflect`] rather than
+/// manually implementing this trait. The derive macro automatically implements
+/// this trait along with other useful reflection traits ([`Struct`], [`TupleStruct`],
+/// or [`Enum`]) based on the type's structure.
 ///
-/// ```
+/// # Core Functionality
+///
+/// ## Type Information
+///
+/// `Reflect` extends [`DynamicTypePath`] and [`DynamicTyped`], providing:
+///
+/// ```rust
 /// # use vc_reflect::{Reflect, info::{DynamicTypePath, DynamicTyped}};
 /// let value = 10i32.into_boxed_reflect();
-/// let type_path = value.reflect_type_path();
-/// let type_info = value.reflect_type_info();
+/// let type_path = value.reflect_type_path();   // Gets the type's path
+/// let type_info = value.reflect_type_info();   // Gets the type's reflection metadata
 /// ```
 ///
-/// This also supports [`Any`], but [`Any::type_id`] has a problem,
-/// For `Box<dyn Reflect>`, it may return the container type instead of inner value type.
+/// ## Type Identification
 ///
-/// Therefore, we provided a [`ty_id`] method:
+/// While `Reflect` supports [`Any`], note that [`Any::type_id`] on `Box<dyn Reflect>`
+/// returns the container's type ID, not the inner value's. Use [`Reflect::ty_id`] instead:
 ///
-/// ```
+/// ```rust
 /// # use vc_reflect::Reflect;
 /// # use core::any::{Any, TypeId};
-/// let mut x: Box<dyn Reflect> = Box::new(32_i32).into_reflect();
+/// let x: Box<dyn Reflect> = Box::new(32_i32).into_reflect();
 ///
-/// assert!(x.type_id() != TypeId::of::<i32>()); // !!!
-/// assert!((*x).type_id() == TypeId::of::<i32>());
-/// assert!(x.ty_id() == TypeId::of::<i32>());   // good
+/// assert!(x.type_id() != TypeId::of::<i32>());    // Container type ID
+/// assert!((*x).type_id() == TypeId::of::<i32>()); // Dereferenced works
+/// assert!(x.ty_id() == TypeId::of::<i32>());      // Preferred method
 /// ```
 ///
-/// The type_info of the dynamic type is `OpaqueInfo`, so we provided a [`represented_type_info`]
-/// method, it returns information represented by a dynamic type.
-/// For other type, it's equal to [`reflect_type_info`].
+/// ## Dynamic Type Representation
 ///
-/// ```
-/// # use vc_reflect::{ops::{Array, DynamicArray}, Reflect};
-/// let info = [1_i32, 2, 3, 4, 5].to_dynamic_array().represented_type_info().unwrap();
-/// assert!(info.type_is::<[i32;5]>());
+/// Dynamic types have opaque type information ([`OpaqueInfo`]). Use [`represented_type_info`]
+/// to get the type information they represent:
+///
+/// ```rust
+/// # use vc_reflect::Reflect;
+/// let dynamic_array = [1_i32, 2, 3, 4, 5].to_dynamic();
+/// let info = dynamic_array.represented_type_info().unwrap();
+/// assert!(info.type_is::<[i32; 5]>());  // Represents [i32; 5]
 /// ```
 ///
-/// Use [`reflect_ref`], [`reflect_mut`], [`reflect_owned`] to convert itself to a subtype
-/// (e.g. [`Struct`], [`TupleStruct`]) .
+/// For non-dynamic type, it's equal to [`reflect_type_info`].
 ///
-/// ```
+/// ## Type Casting
+///
+/// Use [`reflect_ref`], [`reflect_mut`], and [`reflect_owned`] to cast to reflection
+/// subtypes ([`Struct`], [`TupleStruct`], [`Enum`], etc.):
+///
+/// ```rust
 /// # use vc_reflect::{Reflect, ops::List};
 /// let vec = vec![1, 2, 3].into_boxed_reflect();
-/// let vec: Box<dyn List> = vec.reflect_owned().into_list().unwrap();
+/// let list: Box<dyn List> = vec.reflect_owned().into_list().unwrap();
 /// ```
 ///
-/// Use `downcast_ref`, `downcast_mut`, `downcast` to convert itself to a specific type.
+/// Use `downcast_ref`, `downcast_mut`, and `downcast` for concrete type conversion:
 ///
-/// ```
+/// ```rust
 /// # use vc_reflect::Reflect;
 /// let x: Box<dyn Reflect> = 10.into_boxed_reflect();
 /// let y = x.downcast_ref::<i32>().unwrap();
 /// assert_eq!(*y, 10);
 /// ```
 ///
-/// See more examples in [`reflect_clone`], [`try_apply`],  [`to_dynamic`].
+/// # Implementation Guide
 ///
-/// See the [crate-level documentation] to see how this trait and its subtraits can be used.
+/// ## Using the Derive Macro (Recommended)
 ///
+/// See [derive::Reflect](crate::derive::Reflect) for comprehensive documentation.
+///
+/// ## Manual Implementation
+///
+/// Some methods have standard implementations:
+///
+/// ```rust, ignore
+/// fn set(&mut self, value: Box<dyn Reflect>) -> Result<(), Box<dyn Reflect>> {
+///     *self = value.take::<Self>()?;  // Extract Self from Box<dyn Reflect>
+///     Ok(())
+/// }
+///
+/// fn reflect_kind(&self) -> ReflectKind {
+///     ReflectKind::Kind  // e.g., ReflectKind::Struct, ReflectKind::Enum
+/// }
+///
+/// fn reflect_ref(&self) -> ReflectRef<'_> {
+///     ReflectRef::Kind(self)  // Construct appropriate ReflectRef variant
+/// }
+///
+/// fn reflect_mut(&mut self) -> ReflectMut<'_> {
+///     ReflectMut::Kind(self)  // Construct appropriate ReflectMut variant
+/// }
+///
+/// fn reflect_owned(self: Box<Self>) -> ReflectOwned {
+///     ReflectOwned::Kind(self)  // Construct appropriate ReflectOwned variant
+/// }
+///
+/// fn to_dynamic(&self) -> Box<dyn Reflect> {
+///     // Convert to corresponding dynamic type
+///     Box::new(<Self as Kind>::to_dynamic_kind(self))
+/// }
+/// ```
+///
+/// ## Helper Functions
+///
+/// For non-opaque types, use helper functions in [`vc_reflect::impls`]:
+///
+/// - [`struct_try_apply`](crate::impls::struct_try_apply)
+/// - [`struct_partial_eq`](crate::impls::struct_partial_eq)
+/// - [`struct_debug`](crate::impls::struct_debug)
+/// - [`struct_hash`](crate::impls::struct_hash)
+/// - Similar functions for tuples, enums, arrays ...
+///
+/// Only [`reflect_clone`] must be implemented manually (use `self.clone()` for
+/// cloneable types).
+///
+/// ## Opaque Types
+///
+/// Opaque types require manual implementation of all methods. Consider implementing
+/// one of the reflection subtraits ([`Struct`], [`TupleStruct`], [`Enum`]) for
+/// better integration.
+///
+/// [`reflect_partial_eq`]: Reflect::reflect_partial_eq
+/// [`reflect_hash`]: Reflect::reflect_hash
+/// [`reflect_debug`]: Reflect::reflect_debug
 /// [`reflect_clone`]: Reflect::reflect_clone
 /// [`try_apply`]: Reflect::try_apply
 /// [`to_dynamic`]: Reflect::to_dynamic
@@ -80,13 +150,15 @@ use crate::{
 /// [`reflect_owned`]: Reflect::reflect_owned
 /// [`reflect_type_info`]: crate::info::DynamicTyped::reflect_type_info
 /// [`represented_type_info`]: Reflect::represented_type_info
-/// [`ty_id`]: Reflect::ty_id
 /// [`vc_reflect`]: crate
 /// [the derive macro for `Reflect`]: crate::derive::Reflect
 /// [`Struct`]: crate::ops::Struct
 /// [`TupleStruct`]: crate::ops::TupleStruct
 /// [`Enum`]: crate::ops::Enum
-/// [crate-level documentation]: crate
+/// [`OpaqueInfo`]: crate::info::OpaqueInfo
+/// [`DynamicTypePath`]: crate::info::DynamicTypePath
+/// [`DynamicTyped`]: crate::info::DynamicTyped
+/// [`Any`]: core::any::Any
 pub trait Reflect: DynamicTypePath + DynamicTyped + Send + Sync + Any {
     /// Casts this type to a fully-reflected value.
     ///
@@ -298,6 +370,9 @@ pub trait Reflect: DynamicTypePath + DynamicTyped + Send + Sync + Any {
     ///
     /// This method will panic if the [kind] is [opaque] and the call to [`reflect_clone`] fails.
     ///
+    /// By default, [`#[derive(Reflect)]`](crate::derive::Reflect) requires the
+    /// `reflecct(clone)` flag for Opaque type, so this function will hardly panic.
+    ///
     /// # Example
     ///
     /// ```
@@ -326,12 +401,7 @@ pub trait Reflect: DynamicTypePath + DynamicTyped + Send + Sync + Any {
             ReflectRef::Map(val) => Box::new(val.to_dynamic_map()),
             ReflectRef::Set(val) => Box::new(val.to_dynamic_set()),
             ReflectRef::Enum(val) => Box::new(val.to_dynamic_enum()),
-            ReflectRef::Opaque(val) => val.reflect_clone().unwrap_or_else(|_| {
-                panic!(
-                    "`Reflect::to_dynamic` failed because opaque type `{}` does not support `reflect_clone`.",
-                    val.reflect_type_path()
-                );
-            }),
+            ReflectRef::Opaque(val) => val.reflect_clone().unwrap(),
         }
     }
 
@@ -341,8 +411,8 @@ pub trait Reflect: DynamicTypePath + DynamicTyped + Send + Sync + Any {
     ///
     /// If `self.ty_id` == `value.ty_id`:
     ///
-    /// - If the type support `Clone`, try `downcast_ref` + [`Clone::clone`] + assignment.
-    /// - Otherwise, try [`Reflect::reflect_clone`] + `Reflect::take` + assignment.
+    /// - If the type support `Clone`, try `Reflect::downcast_ref` + `Clone::clone` + assignment.
+    /// - Otherwise, try `Reflect::reflect_clone` + `Reflect::take` + assignment.
     ///
     /// Otherwise, call following method, depend on [`ReflectKind`]:
     ///
@@ -395,6 +465,9 @@ pub trait Reflect: DynamicTypePath + DynamicTyped + Send + Sync + Any {
     /// This function normally succeeds, except for certain types that explicitly prohibit cloning.
     /// But if the clone cannot be performed, an appropriate [`ReflectCloneError`] is returned.
     ///
+    /// Note that when cloning successfully, the returned value
+    /// must with the same type, otherwise the program may panic in some functions.
+    ///
     /// # Example
     ///
     /// ```
@@ -404,22 +477,26 @@ pub trait Reflect: DynamicTypePath + DynamicTyped + Send + Sync + Any {
     /// assert!(cloned.is::<(i32, bool, f64)>())
     /// ```
     ///
-    /// When generating implementations via macros, opaque types are required to
-    /// implement the [`Clone`] trait, making this operation infallible for them.
+    /// # Rules
     ///
-    /// For non-opaque types, this function performs a field-by-field `reflect_clone`
-    /// by default. Therefore, it's generally recommended to implement [`Clone`]
-    /// for your type and mark it with the `#[reflect(clone)]` attribute.
-    /// When this is done, the function directly uses the trait implementation,
-    /// guaranteeing success.
+    /// 1. If the `reflect(Clone)` flag is enabled, this function will call [`Clone::clone`] directly.
+    /// 2. Otherwise:
+    ///     1. If the type is unit struct and without `reflect(Opauqe)` flag, crate a new value directly.
+    ///     2. If the type is not Opaque, try to clone fields and create a new value.
+    ///     3. If the type is Opaque, panic.
+    ///
+    /// Therefore, it's generally recommended to implement [`Clone`] for your type and
+    /// mark it with the `#[reflect(clone)]` attribute.
     ///
     /// ```
-    /// use vc_reflect::derive::Reflect;
-    ///
+    /// # use vc_reflect::derive::Reflect;
     /// #[derive(Reflect, Clone)]
     /// #[reflect(clone)]
     /// struct A { /* ... */ }
     /// ```
+    ///
+    /// By default, [`#[derive(Reflect)]`](crate::derive::Reflect) requires
+    /// the `reflect(clone)` flag for Opaque type, so this function will hardly panic.
     ///
     /// [`to_dynamic`]: Reflect::to_dynamic
     fn reflect_clone(&self) -> Result<Box<dyn Reflect>, ReflectCloneError>;

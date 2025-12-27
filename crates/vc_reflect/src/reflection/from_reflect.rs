@@ -49,8 +49,8 @@ use alloc::boxed::Box;
 /// }
 ///
 /// let mut dynamic = DynamicStruct::new();
-/// dynamic.insert("field_a", Box::new(10_i32));
-/// dynamic.insert("field_b", Box::new(true));
+/// dynamic.extend("field_a", 10_i32);
+/// dynamic.extend("field_b", true);
 ///
 ///
 /// let a = A::from_reflect(&dynamic).unwrap();

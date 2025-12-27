@@ -5,9 +5,26 @@ use crate::{
 };
 
 /// A dynamic representation of an enum variant.
-#[derive(Default, Debug)]
+///
+/// This enum can represent any of the three possible enum variant types:
+/// - **Unit variants**: no associated data (e.g., `Variant::Unit`)
+/// - **Tuple variants**: ordered, unnamed fields (e.g., `Variant::Tuple(u32, String)`)
+/// - **Struct variants**: named fields (e.g., `Variant::Struct { x: f32, y: f32 }`)
+///
+/// # Internal Representation
+///
+/// - **Unit variants**: no internal data
+/// - **Tuple variants**: stored as [`DynamicTuple`]
+/// - **Struct variants**: stored as [`DynamicStruct`]
+///
+/// # Creation
+///
+/// Use [`From::from`] to create a `DynamicVariant`:
+/// - Unit variant: `DynamicVariant::from(())`
+/// - Tuple variant: `DynamicVariant::from(dynamic_tuple)`
+/// - Struct variant: `DynamicVariant::from(dynamic_struct)`
+#[derive(Debug)]
 pub enum DynamicVariant {
-    #[default]
     Unit,
     Tuple(DynamicTuple),
     Struct(DynamicStruct),
@@ -44,6 +61,14 @@ impl From<DynamicStruct> for DynamicVariant {
     }
 }
 
+/// A field in the current enum variant.
+///
+/// This enum represents a field within an enum variant, which can be either:
+/// - A named field in a struct variant
+/// - An unnamed field in a tuple variant
+///
+/// This provides a unified interface for accessing fields regardless of the
+/// variant's kind.
 pub enum VariantField<'a> {
     /// The name and value of a field in a struct variant.
     Struct(&'a str, &'a dyn Reflect),
@@ -52,7 +77,7 @@ pub enum VariantField<'a> {
 }
 
 impl<'a> VariantField<'a> {
-    /// Returns the name of a struct variant field, or [`None`] for a tuple variant field.
+    /// Returns the name of a struct variant field, or `None` for a tuple variant field.
     #[inline]
     pub fn name(&self) -> Option<&'a str> {
         if let Self::Struct(name, ..) = self {
@@ -63,6 +88,8 @@ impl<'a> VariantField<'a> {
     }
 
     /// Gets a reference to the value of this field.
+    ///
+    /// This works for both struct and tuple variant fields.
     #[inline]
     pub fn value(&self) -> &'a dyn Reflect {
         match *self {
@@ -72,14 +99,21 @@ impl<'a> VariantField<'a> {
 }
 
 /// An iterator over the fields in the current enum variant.
+///
+/// This iterator yields [`VariantField`] items, which provide a unified
+/// interface for accessing fields regardless of whether they come from a
+/// struct variant (with names) or a tuple variant (without names).
+///
+/// The iterator respects the order of fields as defined in the enum variant.
 pub struct VariantFieldIter<'a> {
     container: &'a dyn Enum,
     index: usize,
 }
 
 impl<'a> VariantFieldIter<'a> {
+    /// Creates a new iterator for the given enum.
     #[inline(always)]
-    pub fn new(container: &'a dyn Enum) -> Self {
+    pub const fn new(container: &'a dyn Enum) -> Self {
         Self {
             container,
             index: 0,

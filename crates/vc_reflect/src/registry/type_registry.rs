@@ -279,7 +279,7 @@ impl TypeRegistry {
     /// assert!(type_registry.contains(TypeId::of::<Option<String>>()));
     /// assert!(type_registry.contains(TypeId::of::<i32>()));
     ///
-    /// // Associated type data is available
+    /// // Associated type trait is available
     /// assert!(type_registry
     ///     .get_type_trait::<TypeTraitDefault>(TypeId::of::<Foo>())
     ///     .is_some());

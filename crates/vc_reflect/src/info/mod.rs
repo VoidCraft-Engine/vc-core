@@ -9,7 +9,6 @@
 //!     - [`type_name`](TypePath::type_name): The name without module path, may be duplicated.
 //!     - [`type_ident`](TypePath::type_ident): The name without generics and module path.
 //!     - [`module_path`](TypePath::module_path): optional module path(e.g. "vc_reflect::info").
-//!     - [`module_path`](TypePath::module_path): optional crate_name(e.g. "vc_reflect").
 //!
 //! - [`DynamicTypePath`]: Provides dynamic dispatch for `TypePath`.
 //!

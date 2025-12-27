@@ -16,10 +16,11 @@ use crate::{
 /// # Examples
 ///
 /// ```rust
-/// # use vc_reflect::info::{Typed, Type};
+/// # use vc_reflect::info::Typed;
+/// use core::any::TypeId;
 /// let info = <Vec<i32> as Typed>::type_info().as_list().unwrap();
 ///
-/// assert_eq!(info.item_ty(), Type::of::<i32>());
+/// assert_eq!(info.item_id(), TypeId::of::<i32>());
 /// ```
 #[derive(Clone, Debug)]
 pub struct ListInfo {

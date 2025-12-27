@@ -1,29 +1,65 @@
 use crate::{
     Reflect,
     impls::NonGenericTypeInfoCell,
-    info::{ListInfo, OpaqueInfo, TypeInfo, TypePath, Typed},
+    info::{OpaqueInfo, TypeInfo, TypePath, Typed},
     ops::{ApplyError, ReflectCloneError},
-    reflection::impl_reflect_cast_fn,
 };
 use alloc::{boxed::Box, vec::Vec};
 use core::fmt;
 
-/// Represents a [`List`], used to dynamically modify data and its reflected type information.
+/// A dynamic container representing a list-like collection.
+///
+/// `DynamicList` is a type-erased dynamic list that can hold any type implementing
+/// [`Reflect`]. It represents variable-length collections like [`Vec`] in Rust.
+///
+/// Unlike arrays, lists are expected to have variable lengths, so operations like
+/// [`extend`] and [`push`] are natural extensions of the list's functionality.
+///
+/// # Type Information
 ///
 /// Dynamic types are special in that their `TypeInfo` is [`OpaqueInfo`],
 /// but other APIs behave like the represented type, such as [`reflect_kind`] and [`reflect_ref`].
 ///
+/// A `DynamicList` can optionally represent a specific list type through its
+/// [`represented_type_info`]. When set, this allows the dynamic list to be treated
+/// as if it were a specific static list type for reflection purposes.
+///
 /// # Examples
 ///
-/// ```
-/// use vc_reflect::{Reflect, ops::{List, DynamicList}};
+/// ## Creating and extending a dynamic list
 ///
 /// ```
+/// use vc_reflect::ops::{List, DynamicList};
 ///
-/// [`reflect_kind`]: crate::Reflect::reflect_kind
-/// [`reflect_ref`]: crate::Reflect::reflect_ref
+/// let mut dynamic = DynamicList::new();
+/// dynamic.extend(1);
+/// dynamic.extend(2);
+/// dynamic.extend(3);
+///
+/// assert_eq!(dynamic.len(), 3);
+/// ```
+///
+/// ## Using list operations
+///
+/// ```
+/// use vc_reflect::{Reflect, ops::{DynamicList, List}};
+///
+/// let mut dynamic = DynamicList::new();
+/// dynamic.push(Box::new(1_i32));
+/// dynamic.push(Box::new(2_i32));
+/// dynamic.insert(1, Box::new(99_i32));
+///
+/// assert_eq!(dynamic.len(), 3);
+/// ```
+///
+/// [`reflect_kind`]: Reflect::reflect_kind
+/// [`reflect_ref`]: Reflect::reflect_ref
+/// [`represented_type_info`]: Reflect::represented_type_info
+/// [`extend`]: DynamicList::extend
+/// [`push`]: List::push
+/// [`DynamicArray`]: crate::ops::DynamicArray
 pub struct DynamicList {
-    list_info: Option<&'static TypeInfo>,
+    info: Option<&'static TypeInfo>,
     values: Vec<Box<dyn Reflect>>,
 }
 
@@ -57,46 +93,129 @@ impl Typed for DynamicList {
 }
 
 impl DynamicList {
-    /// Create a empty [`DynamicList`].
+    /// Creates an empty `DynamicList`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::ops::{List, DynamicList};
+    /// let dynamic = DynamicList::new();
+    /// assert!(dynamic.is_empty());
+    /// ```
     #[inline]
     pub const fn new() -> Self {
         Self {
-            list_info: None,
+            info: None,
             values: Vec::new(),
         }
     }
 
-    /// Create a empty [`DynamicList`] with at least the specified capacity.
+    /// Creates a new empty `DynamicList` with at least the specified capacity.
+    ///
+    /// This can be used to avoid reallocations when you know approximately
+    /// how many elements will be added to the list.
     #[inline]
     pub fn with_capacity(capcity: usize) -> Self {
         Self {
-            list_info: None,
+            info: None,
             values: Vec::with_capacity(capcity),
         }
     }
 
-    /// Sets the [`TypeInfo`] to be represented by this `DynamicList`.
+    /// Sets the [`TypeInfo`] that this dynamic list represents.
     ///
-    /// # Panic
+    /// When set, [`Reflect::represented_type_info`] will return this information,
+    /// allowing the dynamic list to be treated as if it were a specific static list type.
     ///
-    /// If the input is not list info or None.
-    #[inline]
-    pub fn set_type_info(&mut self, list_info: Option<&'static TypeInfo>) {
-        match list_info {
-            Some(TypeInfo::List(_)) | None => {}
-            _ => {
-                panic!(
-                    "Call `DynamicList::set_type_info`, but the input is not list information or None."
-                )
+    /// # Panics
+    ///
+    /// Panics if `info` is `Some` but does not contain list type information.
+    pub const fn set_type_info(&mut self, info: Option<&'static TypeInfo>) {
+        match info {
+            Some(info) => {
+                assert!(info.is_list(), "`TypeInfo` mismatched.");
+                self.info = Some(info);
+            }
+            None => {
+                self.info = None;
             }
         }
+    }
 
-        self.list_info = list_info;
+    /// Appends a boxed [`Reflect`] value to the end of the list.
+    ///
+    /// This is the low-level version of [`extend`] that accepts already-boxed values.
+    ///
+    /// # Note
+    ///
+    /// This method is equivalent to [`List::push`] but provided for consistency
+    /// with `DynamicArray`'s API.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use vc_reflect::ops::{List, DynamicList};
+    ///
+    /// let mut dynamic = DynamicList::new();
+    /// dynamic.extend_boxed(Box::new(1_i32));
+    /// dynamic.extend_boxed(Box::new(2_i32));
+    ///
+    /// assert_eq!(dynamic.len(), 2);
+    /// ```
+    ///
+    /// [`extend`]: DynamicList::extend
+    pub fn extend_boxed(&mut self, value: Box<dyn Reflect>) {
+        self.values.push(value);
+    }
+
+    /// Appends a value to the end of the list.
+    ///
+    /// This is a convenience method that boxes the value and calls
+    /// [`extend_boxed`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use vc_reflect::ops::{List, DynamicList};
+    ///
+    /// let mut dynamic = DynamicList::new();
+    /// dynamic.extend(1_i32);
+    /// dynamic.extend(2_i32);
+    /// dynamic.extend(3_i32);
+    ///
+    /// assert_eq!(dynamic.len(), 3);
+    /// ```
+    ///
+    /// [`extend_boxed`]: DynamicList::extend_boxed
+    #[inline]
+    pub fn extend<T: Reflect>(&mut self, value: T) {
+        self.extend_boxed(Box::new(value));
+    }
+}
+
+impl<T: Reflect> FromIterator<T> for DynamicList {
+    fn from_iter<I: IntoIterator<Item = T>>(values: I) -> Self {
+        Self {
+            info: None,
+            values: values
+                .into_iter()
+                .map(Reflect::into_boxed_reflect)
+                .collect(),
+        }
+    }
+}
+
+impl FromIterator<Box<dyn Reflect>> for DynamicList {
+    fn from_iter<I: IntoIterator<Item = Box<dyn Reflect>>>(values: I) -> Self {
+        Self {
+            info: None,
+            values: values.into_iter().collect(),
+        }
     }
 }
 
 impl Reflect for DynamicList {
-    impl_reflect_cast_fn!(List);
+    crate::reflection::impl_reflect_cast_fn!(List);
 
     #[inline]
     fn is_dynamic(&self) -> bool {
@@ -105,7 +224,7 @@ impl Reflect for DynamicList {
 
     #[inline]
     fn represented_type_info(&self) -> Option<&'static TypeInfo> {
-        self.list_info
+        self.info
     }
 
     #[inline]
@@ -148,27 +267,6 @@ impl fmt::Debug for DynamicList {
     }
 }
 
-impl<T: Reflect> FromIterator<T> for DynamicList {
-    fn from_iter<I: IntoIterator<Item = T>>(values: I) -> Self {
-        Self {
-            list_info: None,
-            values: values
-                .into_iter()
-                .map(Reflect::into_boxed_reflect)
-                .collect(),
-        }
-    }
-}
-
-impl FromIterator<Box<dyn Reflect>> for DynamicList {
-    fn from_iter<I: IntoIterator<Item = Box<dyn Reflect>>>(values: I) -> Self {
-        Self {
-            list_info: None,
-            values: values.into_iter().collect(),
-        }
-    }
-}
-
 impl IntoIterator for DynamicList {
     type Item = Box<dyn Reflect>;
     type IntoIter = alloc::vec::IntoIter<Self::Item>;
@@ -188,143 +286,356 @@ impl<'a> IntoIterator for &'a DynamicList {
     }
 }
 
-/// A trait used to power [list-like] operations via [reflection].
+/// A trait for type-erased list-like operations via reflection.
 ///
-/// This corresponds to types, like [`Vec`], which contain an ordered sequence
-/// of elements that implement [`Reflect`].
+/// This trait represents any variable-length sequential collection, including:
+/// - Rust vectors (`Vec<T>`)
+/// - Linked lists (`LinkedList<T>`)
+/// - Other collections that support sequential access and modification
 ///
-/// Unlike the [`Array`](crate::ops::Array) trait, implementors of this trait are not expected to
-/// maintain a constant length.
-/// Methods like [insertion](List::insert) and [removal](List::remove) explicitly allow for their
-/// internal size to change.
+/// We implemented this trait for some common type, such as [`Vec`], [`VecDeque`](alloc::collections::VecDeque).
 ///
-/// This trait expects its elements to be ordered linearly from front to back.
-/// The _front_ element starts at index 0 with the _back_ element ending at the largest index.
-/// This contract above should be upheld by any manual implementors.
+/// # Contract
 ///
-/// Due to the [type-erasing] nature of the reflection API as a whole,
-/// this trait does not make any guarantees that the implementor's elements
-/// are homogeneous (i.e. all the same type).
+/// Implementors must maintain elements in linear order from front to back,
+/// where the front element is at index 0 and the back element is at the largest index.
+/// Lists can grow and shrink dynamically through methods like [`push`], [`pop`],
+/// [`insert`], and [`remove`].
 ///
-/// # Example
+/// Unlike the [`Array`](crate::ops::Array) trait, lists are expected to support
+/// dynamic resizing as part of their normal operation.
+///
+/// # Safety
+///
+/// This trait is safe to implement. However, implementors must ensure that:
+/// 1. Elements are stored in sequential order
+/// 2. Index-based operations maintain proper bounds checking
+/// 3. Mutating operations preserve the integrity of the list
+///
+/// # Examples
+///
+/// ## Using with vectors
 ///
 /// ```
 /// use vc_reflect::{Reflect, ops::List};
 ///
-/// let foo: &mut dyn List = &mut vec![123_u32, 456_u32, 789_u32];
-/// assert_eq!(foo.len(), 3);
+/// let mut vec = vec![10_u32, 20_u32, 30_u32];
+/// let list_ref: &mut dyn List = &mut vec;
 ///
-/// let last_field: Box<dyn Reflect> = foo.pop().unwrap();
-/// assert_eq!(last_field.downcast_ref::<u32>(), Some(&789));
+/// assert_eq!(list_ref.len(), 3);
+/// list_ref.push(Box::new(40_u32));
+/// assert_eq!(list_ref.len(), 4);
 /// ```
 ///
-/// [list-like]: https://doc.rust-lang.org/book/ch08-01-vectors.html
-/// [reflection]: crate
-/// [type-erasing]: https://doc.rust-lang.org/book/ch17-02-trait-objects.html
+/// ## Modifying list contents
+///
+/// ```
+/// use vc_reflect::{Reflect, ops::List};
+///
+/// let mut vec = vec!["first", "second", "third"];
+/// let list_ref: &mut dyn List = &mut vec;
+///
+/// list_ref.insert(1, Box::new("inserted"));
+/// let removed = list_ref.remove(2);
+///
+/// assert_eq!(list_ref.len(), 3);
+/// assert_eq!(removed.downcast_ref::<&str>(), Some(&"second"));
+/// ```
+///
+/// [`push`]: List::push
+/// [`pop`]: List::pop
+/// [`insert`]: List::insert
+/// [`remove`]: List::remove
 pub trait List: Reflect {
-    /// Returns a reference to the element at `index`, or `None` if out of bounds.
+    /// Returns a reference to the element at the given index, or `None` if out of bounds.
+    ///
+    /// For type-safe access when the element type is known, use `<dyn List>::get_as` instead.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::ops::List;
+    /// let vec = vec![1, 2, 3];
+    /// let list_ref: &dyn List = &vec;
+    ///
+    /// assert!(list_ref.get(0).is_some());
+    /// assert!(list_ref.get(3).is_none());
+    /// ```
     fn get(&self, index: usize) -> Option<&dyn Reflect>;
 
-    /// Returns a mutable reference to the element at `index`, or `None` if out of bounds.
+    /// Returns a mutable reference to the element at the given index, or `None` if out of bounds.
+    ///
+    /// For type-safe mutable access when the element type is known, use `<dyn List>::get_mut_as` instead.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use vc_reflect::{Reflect, ops::List};
+    ///
+    /// let mut vec = vec![1, 2, 3];
+    /// let list_ref: &mut dyn List = &mut vec;
+    ///
+    /// if let Some(element) = list_ref.get_mut(1) {
+    ///     *element.downcast_mut::<i32>().unwrap() = 99;
+    /// }
+    ///
+    /// assert_eq!(vec, vec![1, 99, 3]);
+    /// ```
     fn get_mut(&mut self, index: usize) -> Option<&mut dyn Reflect>;
 
-    /// Inserts an element at position `index` within the list,
-    /// shifting all elements after it towards the back of the list.
+    /// Inserts an element at the specified position in the list.
+    ///
+    /// All elements after `index` are shifted to the right (their indices increase by 1).
+    ///
+    /// In standard implementation (e.g. `Vec<T>`), this function will use
+    /// [`FromReflect::take_from_reflect`] to convert value.
     ///
     /// # Panics
-    /// - Panics if `index > len`.
-    /// - Panics if input type incompatible.
+    ///
+    /// Panics if:
+    /// - `index > len`
+    /// - The element type is incompatible with the list (implementation-specific)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::ops::List;
+    /// let mut vec = vec![1, 3];
+    /// let list_ref: &mut dyn List = &mut vec;
+    ///
+    /// list_ref.insert(1, Box::new(2));
+    /// assert_eq!(list_ref.len(), 3);
+    /// ```
+    ///
+    /// [`FromReflect::take_from_reflect`]: crate::FromReflect::take_from_reflect
     fn insert(&mut self, index: usize, element: Box<dyn Reflect>);
 
-    /// Try appends an element to the _back_ of the list.
+    /// Removes and returns the element at the specified position in the list.
     ///
-    /// Return Err if `index > len` or value type incompatible.
-    fn try_insert(
-        &mut self,
-        index: usize,
-        element: Box<dyn Reflect>,
-    ) -> Result<(), Box<dyn Reflect>>;
-
-    /// Removes and returns the element at position `index` within the list,
-    /// shifting all elements before it towards the front of the list.
+    /// All elements after `index` are shifted to the left (their indices decrease by 1).
     ///
     /// # Panics
-    /// Panics if `index` is out of bounds.
+    ///
+    /// Panics if `index` is out of bounds (`index >= len`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use vc_reflect::{Reflect, ops::List};
+    ///
+    /// let mut vec = vec![1, 2, 3];
+    /// let list_ref: &mut dyn List = &mut vec;
+    ///
+    /// let removed = list_ref.remove(1);
+    /// assert_eq!(removed.downcast_ref::<i32>(), Some(&2));
+    /// assert_eq!(list_ref.len(), 2);
+    /// ```
     fn remove(&mut self, index: usize) -> Box<dyn Reflect>;
 
-    /// Appends an element to the _back_ of the list.
+    /// Appends an element to the end of the list.
+    ///
+    /// In standard implementation (e.g. `Vec<T>`), this function will use
+    /// [`FromReflect::take_from_reflect`] to convert value.
     ///
     /// # Panics
-    /// - Panics if input type incompatible.
+    ///
+    /// Panics if the element type is incompatible with the list (implementation-specific).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use vc_reflect::{Reflect, ops::List};
+    ///
+    /// let mut vec = vec![1, 2];
+    /// let list_ref: &mut dyn List = &mut vec;
+    ///
+    /// list_ref.push(Box::new(3));
+    /// assert_eq!(list_ref.len(), 3);
+    /// ```
+    ///
+    /// [`FromReflect::take_from_reflect`]: crate::FromReflect::take_from_reflect
     fn push(&mut self, value: Box<dyn Reflect>);
 
-    /// Try appends an element to the _back_ of the list.
+    /// Attempts to append an element to the end of the list.
     ///
-    /// Return Err if value type incompatible.
-    /// The return value upon failure needs to be consistent with the input.
+    /// This is a non-panicking version of [`push`].
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(())` if the element was successfully appended
+    /// * `Err(value)` if the element type is incompatible with the list
+    ///   (the element is returned unchanged)
+    ///
+    /// # Note
+    ///
+    /// The returned error value must be the same as the input value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::ops::List;
+    /// let mut vec = vec![1, 2];
+    /// let list_ref: &mut dyn List = &mut vec;
+    ///
+    /// assert!(list_ref.try_push(Box::new(3)).is_ok());
+    ///
+    /// // If type checking fails, the value is returned
+    /// let element = Box::new("string");
+    /// let result = list_ref.try_push(element);
+    /// assert!(result.is_err());
+    /// ```
+    ///
+    /// [`push`]: List::push
     fn try_push(&mut self, value: Box<dyn Reflect>) -> Result<(), Box<dyn Reflect>>;
 
-    /// Removes the _back_ element from the list and returns it,
-    /// or `None` if it is empty.
+    /// Removes and returns the last element of the list, or `None` if the list is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::List};
+    /// let mut vec = vec![1, 2, 3];
+    /// let list_ref: &mut dyn List = &mut vec;
+    ///
+    /// let last = list_ref.pop();
+    /// assert_eq!(last.unwrap().downcast_ref::<i32>(), Some(&3));
+    /// assert_eq!(list_ref.len(), 2);
+    ///
+    /// // Empty list
+    /// let mut empty: Vec<i32> = vec![];
+    /// let empty_ref: &mut dyn List = &mut empty;
+    /// assert!(empty_ref.pop().is_none());
+    /// ```
     fn pop(&mut self) -> Option<Box<dyn Reflect>>;
 
     /// Returns the number of elements in the list.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::List};
+    /// let vec = vec![1, 2, 3, 4, 5];
+    /// let list_ref: &dyn List = &vec;
+    ///
+    /// assert_eq!(list_ref.len(), 5);
+    /// ```
     fn len(&self) -> usize;
 
-    /// Returns `true` if the collection contains no elements.
+    /// Returns `true` if the list contains no elements.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::List};
+    /// let empty: Vec<i32> = vec![];
+    /// let non_empty = vec![1, 2, 3];
+    ///
+    /// let empty_ref: &dyn List = &empty;
+    /// let non_empty_ref: &dyn List = &non_empty;
+    ///
+    /// assert!(empty_ref.is_empty());
+    /// assert!(!non_empty_ref.is_empty());
+    /// ```
     #[inline]
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    /// Returns an iterator over the list.
+    /// Returns an iterator over the list's elements.
+    ///
+    /// The iterator yields references to each element in order,
+    /// from index 0 to `len() - 1`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::List};
+    /// let vec = vec![10, 20, 30];
+    /// let list_ref: &dyn List = &vec;
+    ///
+    /// let sum: i32 = list_ref.iter()
+    ///     .filter_map(|v| v.downcast_ref::<i32>())
+    ///     .sum();
+    ///
+    /// assert_eq!(sum, 60);
+    /// ```
     fn iter(&self) -> ListItemIter<'_>;
 
-    /// Drain the elements of this list to get a vector of owned values.
+    /// Removes all elements from the list and returns them as a vector.
     ///
-    /// After calling this function, `self` will be empty. The order of items in the returned
-    /// [`Vec`] will match the order of items in `self`.
+    /// After calling this method, the list will be empty. The elements are returned
+    /// in the same order they appeared in the list.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::List};
+    /// let mut vec = vec![1, 2, 3];
+    /// let list_ref: &mut dyn List = &mut vec;
+    ///
+    /// let drained = list_ref.drain();
+    /// assert!(list_ref.is_empty());
+    /// assert_eq!(drained.len(), 3);
+    /// ```
     fn drain(&mut self) -> Vec<Box<dyn Reflect>>;
 
-    /// Creates a new [`DynamicList`] from this list.
+    /// Creates a [`DynamicList`] copy of this list.
     ///
-    /// This function will replace all content with dynamic types, except for `Opaque`.
+    /// This is useful when you need a dynamic, mutable copy of a list.
+    ///
+    /// This function will replace all content with dynamic types, except for opaque types.
+    ///
+    /// # Panics
+    ///
+    /// Panic if inner items [`Reflect::to_dynamic`] failed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::List};
+    /// let vec = vec![1, 2, 3];
+    /// let dynamic = vec.to_dynamic_list();
+    ///
+    /// assert_eq!(dynamic.len(), 3);
+    /// ```
     fn to_dynamic_list(&self) -> DynamicList {
         DynamicList {
-            list_info: self.represented_type_info(),
+            info: self.represented_type_info(),
             values: self.iter().map(Reflect::to_dynamic).collect(),
         }
     }
-
-    /// Get actual [`ListInfo`] of underlying types.
-    ///
-    /// If it is a dynamic type, it will return `None`.
-    ///
-    /// If it is not a dynamic type and the returned value is not `None` or `ListInfo`, it will panic.
-    /// (If you want to implement dynamic types yourself, please return None.)
-    #[inline]
-    fn reflect_list_info(&self) -> Option<&'static ListInfo> {
-        self.reflect_type_info().as_list().ok()
-    }
-
-    /// Get the [`ListInfo`] of representation.
-    ///
-    /// Normal types return their own information,
-    /// while dynamic types return `None`` if they do not represent an object
-    #[inline]
-    fn represented_list_info(&self) -> Option<&'static ListInfo> {
-        self.represented_type_info()?.as_list().ok()
-    }
 }
 
+/// An iterator over the elements of a [`List`].
+///
+/// This is an [`ExactSizeIterator`] that yields references to each element
+/// in the list in order.
+///
+/// # Performance
+///
+/// The iterator uses [`List::get`] internally, which may have different
+/// performance characteristics than iterating directly over a concrete list type.
+///
+/// # Examples
+///
+/// ```
+/// use vc_reflect::{Reflect, ops::{List, ListItemIter}};
+///
+/// let vec = vec![1, 2, 3, 4, 5];
+/// let mut iter = ListItemIter::new(&vec);
+///
+/// assert_eq!(iter.len(), 5);
+/// assert_eq!(iter.next().and_then(|v| v.downcast_ref::<i32>()), Some(&1));
+/// ```
 pub struct ListItemIter<'a> {
     list: &'a dyn List,
     index: usize,
 }
 
 impl ListItemIter<'_> {
+    /// Creates a new iterator for the given list.
     #[inline(always)]
-    pub fn new(list: &dyn List) -> ListItemIter<'_> {
+    pub const fn new(list: &dyn List) -> ListItemIter<'_> {
         ListItemIter { list, index: 0 }
     }
 }
@@ -366,19 +677,6 @@ impl List for DynamicList {
         self.values.insert(index, element);
     }
 
-    fn try_insert(
-        &mut self,
-        index: usize,
-        value: Box<dyn Reflect>,
-    ) -> Result<(), Box<dyn Reflect>> {
-        if index <= self.values.len() {
-            self.values.insert(index, value);
-            Ok(())
-        } else {
-            Err(value)
-        }
-    }
-
     #[inline]
     fn remove(&mut self, index: usize) -> Box<dyn Reflect> {
         self.values.remove(index)
@@ -416,95 +714,54 @@ impl List for DynamicList {
     }
 
     #[inline]
-    fn reflect_list_info(&self) -> Option<&'static ListInfo> {
-        None
-    }
-
-    #[inline]
-    fn represented_list_info(&self) -> Option<&'static ListInfo> {
-        self.list_info?.as_list().ok()
+    fn is_empty(&self) -> bool {
+        self.values.is_empty()
     }
 }
 
 impl dyn List {
-    /// Returns a reference to the element at `index`.
+    /// Returns a typed reference to the element at the given index.
     ///
-    /// Return `None` if out of bounds or downcast failed.
+    /// Returns `None` if:
+    /// - The index is out of bounds
+    /// - The element cannot be downcast to type `T`
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
-    /// # use vc_reflect::{Reflect, ops::List};
-    /// let vec = vec![123_u32, 456_u32, 789_u32];
-    /// let foo: &dyn List = &vec;
+    /// # use vc_reflect::ops::List;
+    /// let vec = vec![10_i32, 20_i32, 30_i32];
+    /// let list_ref: &dyn List = &vec;
     ///
-    /// let field = foo.get_as::<u32>(0);
-    /// assert!(field.is_some());
+    /// assert_eq!(list_ref.get_as::<i32>(1), Some(&20));
+    /// assert_eq!(list_ref.get_as::<i32>(5), None); // Out of bounds
     /// ```
     #[inline]
     pub fn get_as<T: Reflect>(&self, index: usize) -> Option<&T> {
         self.get(index).and_then(<dyn Reflect>::downcast_ref)
     }
 
-    /// Returns a mutable reference to the element at `index`.
+    /// Returns a typed mutable reference to the element at the given index.
     ///
-    /// Return `None` if out of bounds or downcast failed.
+    /// Returns `None` if:
+    /// - The index is out of bounds
+    /// - The element cannot be downcast to type `T`
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// # use vc_reflect::{Reflect, ops::List};
-    /// let mut vec = vec![123_u32, 456_u32, 789_u32];
-    /// let foo: &mut dyn List = &mut vec;
+    /// let mut vec = vec![10_i32, 20_i32, 30_i32];
+    /// let list_ref: &mut dyn List = &mut vec;
     ///
-    /// let field = foo.get_mut_as::<u32>(0);
-    /// assert!(field.is_some());
+    /// if let Some(element) = list_ref.get_mut_as::<i32>(1) {
+    ///     *element = 99;
+    /// }
+    ///
+    /// assert_eq!(vec, vec![10, 99, 30]);
     /// ```
     #[inline]
     pub fn get_mut_as<T: Reflect>(&mut self, index: usize) -> Option<&mut T> {
         self.get_mut(index).and_then(<dyn Reflect>::downcast_mut)
-    }
-
-    /// Appends an element to the _back_ of the list.
-    ///
-    /// # Panics
-    /// - Panics if input type incompatible.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use vc_reflect::{Reflect, ops::List};
-    /// let mut vec = vec![123_u32, 456_u32, 789_u32];
-    /// let foo: &mut dyn List = &mut vec;
-    ///
-    /// foo.push_value(1_u32);
-    /// ```
-    #[inline]
-    pub fn push_value<T: Reflect>(&mut self, value: T) {
-        self.push(Box::new(value));
-    }
-
-    /// Appends an element to the _back_ of the list.
-    ///
-    /// Return Err if input type incompatible.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use vc_reflect::{Reflect, ops::List};
-    /// let mut vec = vec![123_u32, 456_u32, 789_u32];
-    /// let foo: &mut dyn List = &mut vec;
-    ///
-    /// if let Ok(_) = foo.try_push_value("123") {
-    ///     unreachable!();
-    /// }
-    /// ```
-    #[inline]
-    pub fn try_push_value<T: Reflect>(&mut self, value: T) -> Result<(), T> {
-        if let Err(e) = self.try_push(Box::new(value)) {
-            Err(e.take().expect("push failure should not change the value."))
-        } else {
-            Ok(())
-        }
     }
 }

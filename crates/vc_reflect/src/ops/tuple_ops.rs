@@ -1,22 +1,85 @@
 use crate::{
     Reflect,
     impls::NonGenericTypeInfoCell,
-    info::{OpaqueInfo, TupleInfo, TypeInfo, TypePath, Typed},
+    info::{OpaqueInfo, TypeInfo, TypePath, Typed},
     ops::{ApplyError, ReflectCloneError},
     reflection::impl_reflect_cast_fn,
 };
 use alloc::{boxed::Box, vec::Vec};
 use core::fmt;
 
-/// Represents a [`Tuple`], used to dynamically modify data and its reflected type information.
+/// A dynamic container representing a tuple-like collection.
+///
+/// `DynamicTuple` is a type-erased dynamic tuple that can hold any types implementing
+/// [`Reflect`]. Unlike static Rust tuples (`(T, U, V)`), `DynamicTuple` can change its
+/// length dynamically using [`extend`] or [`extend_boxed`].
+///
+/// # Type Information
 ///
 /// Dynamic types are special in that their `TypeInfo` is [`OpaqueInfo`],
 /// but other APIs behave like the represented type, such as [`reflect_kind`] and [`reflect_ref`].
 ///
-/// [`reflect_kind`]: crate::Reflect::reflect_kind
-/// [`reflect_ref`]: crate::Reflect::reflect_ref
+/// A `DynamicTuple` can optionally represent a specific tuple type through its
+/// [`represented_type_info`]. When set, this allows the dynamic tuple to be treated
+/// as if it were a specific static tuple type for reflection purposes.
+///
+/// But remember, we do not check whether the number and type of elements inside
+/// the container are correct, and users need to pay attention to it.
+///
+/// # Examples
+///
+/// ## Creating and extending a dynamic tuple
+///
+/// ```
+/// use vc_reflect::ops::{DynamicTuple, Tuple};
+///
+/// let mut dynamic = DynamicTuple::new();
+/// dynamic.extend(1_i32);
+/// dynamic.extend("hello");
+/// dynamic.extend(true);
+///
+/// assert_eq!(dynamic.field_len(), 3);
+/// ```
+///
+/// ## Converting from an iterator
+///
+/// ```
+/// use vc_reflect::ops::{DynamicTuple, Tuple};
+/// use vc_reflect::Reflect;
+///
+/// let fields = vec![
+///     Box::new(1_i32) as Box<dyn Reflect>,
+///     Box::new("world"),
+///     Box::new(3.14_f64),
+/// ];
+///
+/// let dynamic: DynamicTuple = fields.into_iter().collect();
+/// assert_eq!(dynamic.field_len(), 3);
+/// ```
+///
+/// ## Applying to a static tuple
+///
+/// ```
+/// use vc_reflect::{Reflect, ops::{Tuple, DynamicTuple}};
+///
+/// let mut dynamic = DynamicTuple::new();
+/// dynamic.extend(10);
+/// dynamic.extend(20);
+/// dynamic.extend(30);
+///
+/// let mut tup = (0, 0, 0);
+/// tup.apply(&dynamic);
+///
+/// assert_eq!(tup, (10, 20, 30));
+/// ```
+///
+/// [`reflect_kind`]: Reflect::reflect_kind
+/// [`reflect_ref`]: Reflect::reflect_ref
+/// [`extend`]: DynamicTuple::extend
+/// [`extend_boxed`]: DynamicTuple::extend_boxed
+/// [`represented_type_info`]: Reflect::represented_type_info
 pub struct DynamicTuple {
-    tuple_info: Option<&'static TypeInfo>,
+    info: Option<&'static TypeInfo>,
     fields: Vec<Box<dyn Reflect>>,
 }
 
@@ -50,47 +113,109 @@ impl Typed for DynamicTuple {
 }
 
 impl DynamicTuple {
-    /// Create a empty [`DynamicTuple`].
+    /// Creates an empty `DynamicTuple`.
+    ///
+    /// If you already have data to populate the tuple, consider using
+    /// [`FromIterator::from_iter`] instead.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::ops::DynamicTuple;
+    /// let dynamic = DynamicTuple::new();
+    /// ```
     #[inline]
     pub const fn new() -> Self {
         Self {
-            tuple_info: None,
+            info: None,
             fields: Vec::new(),
         }
     }
 
-    /// See [`Vec::with_capacity`]
+    /// Creates a new empty `DynamicTuple` with at least the specified capacity.
+    ///
+    /// This can be used to avoid reallocations when you know approximately
+    /// how many fields will be added to the tuple.
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            tuple_info: None,
+            info: None,
             fields: Vec::with_capacity(capacity),
         }
     }
 
-    /// Sets the [`TypeInfo`] to be represented by this `DynamicTuple`.
+    /// Sets the [`TypeInfo`] that this dynamic tuple represents.
     ///
-    /// # Panic
+    /// When set, [`Reflect::represented_type_info`] will return this information,
+    /// allowing the dynamic tuple to be treated as if it were a specific static tuple type.
     ///
-    /// If the input is not list info or None.
-    #[inline]
-    pub fn set_type_info(&mut self, tuple_info: Option<&'static TypeInfo>) {
-        match tuple_info {
-            Some(TypeInfo::Tuple(_)) | None => {}
-            _ => {
-                panic!(
-                    "Call `DynamicMap::set_type_info`, but the input is not tuple information or None."
-                )
+    /// # Panics
+    ///
+    /// Panics if `info` is `Some` but does not contain tuple type information.
+    pub const fn set_type_info(&mut self, info: Option<&'static TypeInfo>) {
+        match info {
+            Some(info) => {
+                assert!(info.is_tuple(), "`TypeInfo` mismatched.");
+                self.info = Some(info);
+            }
+            None => {
+                self.info = None;
             }
         }
-
-        self.tuple_info = tuple_info;
     }
 
-    /// Appends an element with value `value` to the tuple.
-    #[inline]
-    pub fn insert(&mut self, value: Box<dyn Reflect>) {
+    /// Appends a boxed [`Reflect`] value to the end of the tuple.
+    ///
+    /// This is the low-level version of [`extend`] that accepts already-boxed values.
+    ///
+    /// # Note
+    ///
+    /// While tuples in Rust have fixed lengths and specific types for each position,
+    /// `DynamicTuple` can be extended dynamically and can hold heterogeneous types.
+    ///
+    /// This makes it useful for building up tuples before applying them to static tuples
+    /// of known size and type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use vc_reflect::ops::{Tuple, DynamicTuple};
+    ///
+    /// let mut dynamic = DynamicTuple::new();
+    /// dynamic.extend_boxed(Box::new(1_i32));
+    /// dynamic.extend_boxed(Box::new("hello"));
+    /// dynamic.extend_boxed(Box::new(true));
+    ///
+    /// assert_eq!(dynamic.field_len(), 3);
+    /// ```
+    ///
+    /// [`extend`]: DynamicTuple::extend
+    pub fn extend_boxed(&mut self, value: Box<dyn Reflect>) {
         self.fields.push(value);
+    }
+
+    /// Appends a value to the end of the tuple.
+    ///
+    /// This is a convenience method that boxes the value and calls
+    /// [`extend_boxed`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use vc_reflect::ops::{Tuple, DynamicTuple};
+    ///
+    /// let mut dynamic = DynamicTuple::new();
+    /// dynamic.extend(42_i32);
+    /// dynamic.extend("world");
+    /// dynamic.extend(3.14_f64);
+    ///
+    /// assert_eq!(dynamic.field_len(), 3);
+    /// ```
+    ///
+    /// [`extend_boxed`]: DynamicTuple::extend_boxed
+    #[inline]
+    pub fn extend<T: Reflect>(&mut self, value: T) {
+        self.extend_boxed(Box::new(value));
     }
 }
 
@@ -104,7 +229,7 @@ impl Reflect for DynamicTuple {
 
     #[inline]
     fn represented_type_info(&self) -> Option<&'static TypeInfo> {
-        self.tuple_info
+        self.info
     }
 
     #[inline]
@@ -150,7 +275,7 @@ impl fmt::Debug for DynamicTuple {
 impl FromIterator<Box<dyn Reflect>> for DynamicTuple {
     fn from_iter<I: IntoIterator<Item = Box<dyn Reflect>>>(fields: I) -> Self {
         Self {
-            tuple_info: None,
+            info: None,
             fields: fields.into_iter().collect(),
         }
     }
@@ -175,72 +300,157 @@ impl<'a> IntoIterator for &'a DynamicTuple {
     }
 }
 
-/// A trait used to power [tuple-like] operations via [reflection].
+/// A trait for type-erased tuple-like operations via reflection.
 ///
-/// This trait uses the [`Reflect`] trait to allow implementors to have their fields
-/// be dynamically addressed by index.
+/// This trait represents any fixed-size heterogeneous collection, including:
+/// - Rust tuples (`(T, U, V)`)
+/// - Types that can be viewed as tuples through reflection
 ///
 /// This trait is automatically implemented for arbitrary tuples of up to **12**
 /// elements, provided that each element implements [`Reflect`].
 ///
-/// # Example
+/// # Contract
+///
+/// Implementors must maintain a fixed number of fields as returned by [`Tuple::field_len`].
+/// Unlike arrays, tuples can contain elements of different types, though in practice
+/// implementors typically know the specific type of each field position.
+///
+/// # Examples
+///
+/// ## Using with static tuples
+///
+/// ```
+/// use vc_reflect::ops::Tuple;
+///
+/// let tuple = (10_u32, "hello", true);
+/// let tuple_ref: &dyn Tuple = &tuple;
+///
+/// assert_eq!(tuple_ref.field_len(), 3);
+/// assert_eq!(tuple_ref.field_as::<u32>(0), Some(&10));
+/// assert_eq!(tuple_ref.field_as::<&str>(1), Some(&"hello"));
+/// assert_eq!(tuple_ref.field_as::<bool>(2), Some(&true));
+/// ```
+///
+/// ## Iterating over tuple fields
 ///
 /// ```
 /// use vc_reflect::{Reflect, ops::Tuple};
 ///
-/// let foo = (123_u32, true);
-/// assert_eq!(foo.field_len(), 2);
+/// let tuple = (1, "test", 3.14);
+/// let tuple_ref: &dyn Tuple = &tuple;
 ///
-/// let field: &dyn Reflect = foo.field(0).unwrap();
-/// assert_eq!(field.downcast_ref::<u32>(), Some(&123));
+/// let fields: Vec<&dyn Reflect> = tuple_ref.iter_fields().collect();
+/// assert_eq!(fields.len(), 3);
 /// ```
 ///
-/// [tuple-like]: https://doc.rust-lang.org/book/ch03-02-data-types.html#the-tuple-type
-/// [reflection]: crate
+/// [`field_len`]: Tuple::field_len
+/// [`field`]: Tuple::field
+/// [`field_mut`]: Tuple::field_mut
 pub trait Tuple: Reflect {
     /// Returns a reference to the value of the field with index `index` as a
     /// `&dyn Reflect`.
+    ///
+    /// Returns `None` if `index` is out of bounds.
+    ///
+    /// For type-safe access when the field type is known, use `<dyn Tuple>::field_as` instead.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::ops::Tuple;
+    /// let tuple = (1, "hello", true);
+    ///
+    /// assert!(tuple.field(0).is_some());
+    /// assert!(tuple.field(3).is_none());
+    /// ```
     fn field(&self, index: usize) -> Option<&dyn Reflect>;
 
     /// Returns a mutable reference to the value of the field with index `index`
     /// as a `&mut dyn Reflect`.
+    ///
+    /// Returns `None` if `index` is out of bounds.
+    ///
+    /// For type-safe mutable access when the field type is known,
+    /// use `<dyn Tuple>::field_mut_as` instead.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::Tuple};
+    /// let mut tuple = (1_i32, "test");
+    ///
+    /// if let Some(field) = tuple.field_mut(0) {
+    ///     *field.downcast_mut::<i32>().unwrap() = 42;
+    /// }
+    ///
+    /// assert_eq!(tuple.0, 42);
+    /// ```
     fn field_mut(&mut self, index: usize) -> Option<&mut dyn Reflect>;
 
     /// Returns the number of fields in the tuple.
+    ///
+    /// # Contract
+    ///
+    /// This value must remain constant for the lifetime of the object.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::ops::Tuple;
+    /// let tuple = (1, 2, 3, 4, 5);
+    /// assert_eq!(tuple.field_len(), 5);
+    /// ```
     fn field_len(&self) -> usize;
 
     /// Returns an iterator over the values of the tuple's fields.
+    ///
+    /// The iterator yields references to each field in order,
+    /// from index 0 to `field_len() - 1`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::Tuple};
+    /// let tuple = (10, "hello", 30);
+    ///
+    /// let mut values = vec![];
+    /// for field in tuple.iter_fields() {
+    ///     values.push(field);
+    /// }
+    ///
+    /// assert_eq!(values.len(), 3);
+    /// ```
     fn iter_fields(&self) -> TupleFieldIter<'_>;
 
-    /// Drain the fields of this tuple to get a vector of owned values.
+    /// Consumes the boxed tuple and returns its fields as a vector.
+    ///
+    /// This is useful when you need to take ownership of the tuple's contents.
     fn drain(self: Box<Self>) -> Vec<Box<dyn Reflect>>;
 
-    /// Creates a new [`DynamicTuple`] from this tuple.
+    /// Creates a [`DynamicTuple`] copy of this tuple.
+    ///
+    /// This is useful when you need a mutable, resizable version of a static tuple.
+    ///
+    /// This function will replace all content with dynamic types, except for opaque types.
+    ///
+    /// # Panics
+    ///
+    /// Panics if inner items [`Reflect::to_dynamic`] failed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use vc_reflect::ops::{DynamicTuple, Tuple};
+    ///
+    /// let tuple = (1, "hello", true);
+    /// let dynamic: DynamicTuple = tuple.to_dynamic_tuple();
+    /// assert_eq!(dynamic.field_len(), 3);
+    /// ```
     fn to_dynamic_tuple(&self) -> DynamicTuple {
         DynamicTuple {
-            tuple_info: self.represented_type_info(),
+            info: self.represented_type_info(),
             fields: self.iter_fields().map(Reflect::to_dynamic).collect(),
         }
-    }
-
-    /// Get actual [`TupleInfo`] of underlying types.
-    ///
-    /// If it is a dynamic type, it will return `None`.
-    ///
-    /// If it is not a dynamic type and the returned value is not `None` or `TupleInfo`, it will panic.
-    /// (If you want to implement dynamic types yourself, please return None.)
-    #[inline]
-    fn reflect_tuple_info(&self) -> Option<&'static TupleInfo> {
-        self.reflect_type_info().as_tuple().ok()
-    }
-
-    /// Get the [`TupleInfo`] of representation.
-    ///
-    /// Normal types return their own information,
-    /// while dynamic types return `None`` if they do not represent an object
-    #[inline]
-    fn represented_tuple_info(&self) -> Option<&'static TupleInfo> {
-        self.represented_type_info()?.as_tuple().ok()
     }
 }
 
@@ -271,27 +481,38 @@ impl Tuple for DynamicTuple {
     fn drain(self: Box<Self>) -> Vec<Box<dyn Reflect>> {
         self.fields
     }
-
-    #[inline]
-    fn reflect_tuple_info(&self) -> Option<&'static TupleInfo> {
-        None
-    }
-
-    #[inline]
-    fn represented_tuple_info(&self) -> Option<&'static TupleInfo> {
-        self.tuple_info?.as_tuple().ok()
-    }
 }
 
 /// An iterator over the field values of a tuple.
+///
+/// This is an [`ExactSizeIterator`] that yields references to each field
+/// in the tuple in order.
+///
+/// # Performance
+///
+/// The iterator uses [`Tuple::field`] internally, which may have different
+/// performance characteristics than iterating directly over a concrete tuple type.
+///
+/// # Examples
+///
+/// ```
+/// use vc_reflect::{Reflect, ops::{Tuple, TupleFieldIter}};
+///
+/// let tuple = (1, "test", true);
+/// let mut iter = TupleFieldIter::new(&tuple);
+///
+/// assert_eq!(iter.len(), 3);
+/// assert_eq!(iter.next().and_then(|v| v.downcast_ref::<i32>()), Some(&1));
+/// ```
 pub struct TupleFieldIter<'a> {
     tuple: &'a dyn Tuple,
     index: usize,
 }
 
 impl<'a> TupleFieldIter<'a> {
+    /// Creates a new iterator for the given tuple.
     #[inline(always)]
-    pub fn new(value: &'a dyn Tuple) -> Self {
+    pub const fn new(value: &'a dyn Tuple) -> Self {
         TupleFieldIter {
             tuple: value,
             index: 0,
@@ -317,3 +538,53 @@ impl<'a> Iterator for TupleFieldIter<'a> {
 }
 
 impl<'a> ExactSizeIterator for TupleFieldIter<'a> {}
+
+impl dyn Tuple {
+    /// Returns a typed reference to the field at the given index.
+    ///
+    /// Returns `None` if:
+    /// - The index is out of bounds
+    /// - The field cannot be downcast to type `T`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::ops::Tuple;
+    /// let tuple = (10_i32, "hello", true);
+    /// let tuple_ref: &dyn Tuple = &tuple;
+    ///
+    /// assert_eq!(tuple_ref.field_as::<i32>(0), Some(&10));
+    /// assert_eq!(tuple_ref.field_as::<&str>(1), Some(&"hello"));
+    /// # assert_eq!(tuple_ref.field_as::<bool>(2), Some(&true));
+    /// assert_eq!(tuple_ref.field_as::<i32>(3), None); // Out of bounds
+    /// assert_eq!(tuple_ref.field_as::<f64>(0), None); // Wrong type
+    /// ```
+    #[inline]
+    pub fn field_as<T: Reflect>(&self, index: usize) -> Option<&T> {
+        self.field(index).and_then(<dyn Reflect>::downcast_ref)
+    }
+
+    /// Returns a typed mutable reference to the field at the given index.
+    ///
+    /// Returns `None` if:
+    /// - The index is out of bounds
+    /// - The field cannot be downcast to type `T`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::ops::Tuple;
+    /// let mut tuple = (10_i32, "hello");
+    /// let tuple_ref: &mut dyn Tuple = &mut tuple;
+    ///
+    /// if let Some(field) = tuple_ref.field_mut_as::<i32>(0) {
+    ///     *field = 42;
+    /// }
+    ///
+    /// assert_eq!(tuple.0, 42);
+    /// ```
+    #[inline]
+    pub fn field_mut_as<T: Reflect>(&mut self, index: usize) -> Option<&mut T> {
+        self.field_mut(index).and_then(<dyn Reflect>::downcast_mut)
+    }
+}

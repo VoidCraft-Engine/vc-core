@@ -75,7 +75,7 @@ pub enum ReflectMut<'a> {
 /// # use vc_reflect::{Reflect, ops::Enum};
 /// let p = Reflect::into_boxed_reflect(Some(true));
 ///
-/// let dyn_enum: Box<dyn Enum> = p.reflect_owned().as_enum().unwrap();
+/// let dyn_enum: Box<dyn Enum> = p.reflect_owned().into_enum().unwrap();
 /// ```
 pub enum ReflectOwned {
     Struct(Box<dyn Struct>),

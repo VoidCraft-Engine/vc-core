@@ -7,7 +7,6 @@
 ///
 /// ```
 /// # use vc_reflect::info::ConstParamData;
-///
 /// let x: ConstParamData = 7i32.into();
 ///
 /// let y = TryInto::<i32>::try_into(x).unwrap();

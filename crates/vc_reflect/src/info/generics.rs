@@ -65,7 +65,7 @@ impl TypeParamInfo {
 
 /// Information about a const generic parameter, size = 64.
 ///
-/// When a function is instantiated, the value of the const generic is fixed,
+/// When a type is instantiated, the value of the const generic is fixed,
 /// so we provide value field, but there is no default value.
 ///
 /// # Examples
@@ -198,7 +198,7 @@ impl GenericInfo {
 
 /// A container for a list of generic parameters.
 ///
-/// This is automatically generated via the `Reflect` derive macro
+/// This is automatically generated via the [`#[derive(Reflect)]`](crate::derive::Reflect),
 /// and stored on the [`TypeInfo`] returned by [`Typed::type_info`]
 /// for types that have generics.
 ///
@@ -210,6 +210,8 @@ impl GenericInfo {
 /// # Examples
 ///
 /// ## GenericInfo
+///
+/// A enum of `TypeParamInfo` and `ConstParamInfo`, see [`GenericInfo`] .
 ///
 /// ```
 /// use vc_reflect::{derive::Reflect, info::Typed};
@@ -232,6 +234,8 @@ impl GenericInfo {
 ///
 /// ## TypeParamInfo
 ///
+/// See [`TypeParamInfo`] .
+///
 /// ```
 /// use vc_reflect::{derive::Reflect, info::Typed};
 ///
@@ -249,6 +253,8 @@ impl GenericInfo {
 /// ```
 ///
 /// ## ConstParamInfo
+///
+/// See [`ConstParamInfo`] .
 ///
 /// ```
 /// use vc_reflect::{derive::Reflect, info::Typed};

@@ -113,7 +113,7 @@ fn impl_trait_enum(info: &ReflectEnum) -> TokenStream {
     let mut enum_field_mut = Vec::new();
     let mut enum_field_at = Vec::new();
     let mut enum_field_at_mut = Vec::new();
-    let mut enum_index_of = Vec::new();
+    // let mut enum_index_of = Vec::new();
     let mut enum_name_at = Vec::new();
     let mut enum_field_len = Vec::new();
     let mut enum_variant_name = Vec::new();
@@ -198,9 +198,9 @@ fn impl_trait_enum(info: &ReflectEnum) -> TokenStream {
                     enum_field_at_mut.push(quote! {
                         #variant_path_{ #field_ident: __value, .. } if #ref_index == #reflection_index => #OptionFP::Some(__value)
                     });
-                    enum_index_of.push(quote! {
-                        #variant_path_{ .. } if #ref_name == #field_name => #OptionFP::Some(#reflection_index)
-                    });
+                    // enum_index_of.push(quote! {
+                    //     #variant_path_{ .. } if #ref_name == #field_name => #OptionFP::Some(#reflection_index)
+                    // });
                     enum_name_at.push(quote! {
                         #variant_path_{ .. } if #ref_index == #reflection_index => #OptionFP::Some(#field_name)
                     });
@@ -243,12 +243,12 @@ fn impl_trait_enum(info: &ReflectEnum) -> TokenStream {
                 }
             }
 
-            fn index_of(&self, #ref_name: &str) -> #OptionFP<usize> {
-                    match self {
-                    #(#enum_index_of,)*
-                    _ => #OptionFP::None,
-                }
-            }
+            // fn index_of(&self, #ref_name: &str) -> #OptionFP<usize> {
+            //         match self {
+            //         #(#enum_index_of,)*
+            //         _ => #OptionFP::None,
+            //     }
+            // }
 
             fn name_at(&self, #ref_index: usize) -> #OptionFP<&str> {
                     match self {

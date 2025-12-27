@@ -7,6 +7,18 @@ pub use from_reflect::FromReflect;
 
 /// A Fixed Hasher for [`Reflect::reflect_hash`] implementation.
 ///
+/// # Examples
+///
+/// ```
+/// use core::hash::{Hash, Hasher};
+/// fn fixed_hash<T: Hash>(val: &T) -> u64 {
+///     let mut hasher = vc_reflect::reflect_hasher();
+///     val.hash(&mut hasher);
+///     hasher.finish()
+/// }
+/// # let _ = fixed_hash(&1);
+/// ```
+///
 /// See more infomation in [`FixedHashState`](vc_utils::hash::FixedHashState) .
 #[inline(always)]
 pub fn reflect_hasher() -> vc_utils::hash::FixedHasher {

@@ -11,7 +11,11 @@ use core::any::{Any, TypeId};
 /// - [`type_name`]: Type name without module path, may be duplicated.
 /// - [`type_ident`]: The shortest type name without module path and generics.
 /// - [`module_path`]: Optional module path.
-/// - [`crate_name`]: Optional crate name.
+///
+/// We did not provide `crate_name` in `TypePath`, this can save some memory.
+///
+/// But we provide `crate_name` function in [`TypePathTable`] and other type info structs,
+/// which obtain crate name from module path.
 ///
 /// We guarantee that these names do not have the prefix `::`.
 /// Users should also ensure this when manually implementing it.
@@ -102,6 +106,8 @@ use core::any::{Any, TypeId};
 /// Users should ensure these names do not have the prefix `::`
 /// when manually implementing `TypePath`.
 ///
+///
+///
 /// For non generic types, implementation is simple.
 ///
 /// ```
@@ -147,7 +153,6 @@ use core::any::{Any, TypeId};
 /// [`type_name`]: TypePath::type_name
 /// [`type_ident`]: TypePath::type_ident
 /// [`module_path`]: TypePath::module_path
-/// [`crate_name`]: TypePath::crate_name
 /// [`GenericTypePathCell`]: crate::impls::GenericTypePathCell
 pub trait TypePath: 'static {
     /// Returns the fully qualified path with generics of the target type.
@@ -180,29 +185,6 @@ pub trait TypePath: 'static {
     /// For `Option<Vec<usize>>`, this is `Some("core::option")`.
     fn module_path() -> Option<&'static str> {
         None
-    }
-
-    /// Optional crate name where the type is defined.
-    ///
-    /// Primitive built-in types may return `None`.
-    ///
-    /// For `Option<Vec<usize>>`, this is `Some("core")`.
-    ///
-    /// Usually do not need to impl this method,
-    /// as it is auto implemented using [`module_path`](TypePath::module_path).
-    ///
-    /// Because module_path is determined in compilation.
-    /// This function can usually be optimized to return the result directly.
-    fn crate_name() -> Option<&'static str> {
-        let s = Self::module_path()?;
-        let mut index = 0;
-        for &c in s.as_bytes() {
-            if c == b':' {
-                return Some(&s[0..index]);
-            }
-            index += 1;
-        }
-        Some(s)
     }
 }
 
@@ -242,11 +224,6 @@ pub trait DynamicTypePath {
     ///
     /// See [`TypePath::module_path`].
     fn reflect_module_path(&self) -> Option<&'static str>;
-
-    /// Optional crate name where the type is defined.
-    ///
-    /// See [`TypePath::crate_name`].
-    fn reflect_crate_name(&self) -> Option<&'static str>;
 }
 
 impl<T: TypePath> DynamicTypePath for T {
@@ -268,11 +245,6 @@ impl<T: TypePath> DynamicTypePath for T {
     #[inline]
     fn reflect_module_path(&self) -> Option<&'static str> {
         Self::module_path()
-    }
-
-    #[inline]
-    fn reflect_crate_name(&self) -> Option<&'static str> {
-        Self::crate_name()
     }
 }
 
@@ -341,7 +313,7 @@ impl TypePathTable {
     }
 
     /// Parse `crate_name` from `module_path`.
-    #[inline(never)]
+    #[inline]
     pub fn crate_name(&self) -> Option<&'static str> {
         let s = (self.module_path)()?;
         let mut index = 0;

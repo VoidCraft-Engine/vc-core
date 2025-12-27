@@ -8,7 +8,7 @@ use core::fmt;
 use crate::{
     Reflect,
     impls::NonGenericTypeInfoCell,
-    info::{EnumInfo, OpaqueInfo, TypeInfo, TypePath, Typed, VariantKind},
+    info::{OpaqueInfo, TypeInfo, TypePath, Typed, VariantKind},
     ops::{
         ApplyError, DynamicStruct, DynamicTuple, DynamicVariant, ReflectCloneError, Struct, Tuple,
         VariantFieldIter,
@@ -17,6 +17,18 @@ use crate::{
 };
 
 /// A dynamic representation of an enum, allows for enums to be configured at runtime.
+///
+/// Just as Rust enumeration can only be one value at a time,
+/// `DynamicEnum` can only storage one variant data.
+///
+/// # Type Information
+///
+/// Dynamic types are special in that their `TypeInfo` is [`OpaqueInfo`],
+/// but other APIs behave like the represented type, such as [`reflect_kind`] and [`reflect_ref`].
+///
+/// A `DynamicEnum` can optionally represent a specific enum type through its
+/// [`represented_type_info`]. When set, this allows the dynamic enum to be treated
+/// as if it were a specific static enum type for reflection purposes.
 ///
 /// # Example
 ///
@@ -39,10 +51,11 @@ use crate::{
 /// assert_eq!(None, value);
 /// ```
 ///
+/// [`represented_type_info`]: Reflect::represented_type_info
 /// [`reflect_kind`]: crate::Reflect::reflect_kind
 /// [`reflect_ref`]: crate::Reflect::reflect_ref
 pub struct DynamicEnum {
-    enum_info: Option<&'static TypeInfo>,
+    info: Option<&'static TypeInfo>,
     variant_index: usize,
     variant_name: Cow<'static, str>,
     variant: DynamicVariant,
@@ -83,10 +96,10 @@ impl DynamicEnum {
     /// # Examples
     ///
     /// ```
-    /// # use vc_reflect::{Reflect, ops::DynamicEnum};
+    /// # use vc_reflect::{Reflect, ops::{DynamicEnum, DynamicVariant}};
     /// let mut dynamic_option = DynamicEnum::new(
-    ///   "None",
-    ///   DynamicVariant::Unit
+    ///     "None",
+    ///     DynamicVariant::Unit
     /// );
     /// ```
     #[inline]
@@ -95,7 +108,7 @@ impl DynamicEnum {
         variant: V,
     ) -> Self {
         Self {
-            enum_info: None,
+            info: None,
             variant_index: 0,
             variant_name: variant_name.into(),
             variant: variant.into(),
@@ -103,6 +116,17 @@ impl DynamicEnum {
     }
 
     /// Create a new [`DynamicEnum`] with a variant index to represent an enum at runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::{DynamicEnum, DynamicVariant}};
+    /// let mut dynamic_option = DynamicEnum::new_with_index(
+    ///     0,
+    ///     "None",
+    ///     DynamicVariant::Unit
+    /// );
+    /// ```
     #[inline]
     pub fn new_with_index<I: Into<Cow<'static, str>>, V: Into<DynamicVariant>>(
         variant_index: usize,
@@ -110,33 +134,50 @@ impl DynamicEnum {
         variant: V,
     ) -> Self {
         Self {
-            enum_info: None,
+            info: None,
             variant_index,
             variant_name: variant_name.into(),
             variant: variant.into(),
         }
     }
 
-    /// Sets the [`TypeInfo`] to be represented by this `DynamicEnum`.
+    /// Sets the [`TypeInfo`] that this dynamic enum represents.
     ///
-    /// # Panic
+    /// When set, [`Reflect::represented_type_info`] will return this information,
+    /// allowing the dynamic enum to be treated as if it were a specific static enum type.
     ///
-    /// If the input is not enum info or None.
+    /// # Panics
+    ///
+    /// Panics if `info` is `Some` but does not contain enum type information.
     #[inline]
-    pub fn set_type_info(&mut self, enum_info: Option<&'static TypeInfo>) {
-        match enum_info {
-            Some(TypeInfo::Enum(_)) | None => {}
-            _ => {
-                panic!(
-                    "Call `DynamicEnum::set_type_info`, but the input is not enum information or None."
-                )
+    pub const fn set_type_info(&mut self, info: Option<&'static TypeInfo>) {
+        match info {
+            Some(info) => {
+                assert!(info.is_enum(), "`TypeInfo` mismatched.");
+                self.info = Some(info);
+            }
+            None => {
+                self.info = None;
             }
         }
-
-        self.enum_info = enum_info;
     }
 
     /// Set the current enum variant represented by this struct.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::{DynamicEnum, DynamicVariant, DynamicTuple}};
+    /// let mut dynamic_option = DynamicEnum::new(
+    ///     "None",
+    ///     DynamicVariant::Unit
+    /// );
+    ///
+    /// let mut val = DynamicTuple::new();
+    /// val.extend(1);
+    ///
+    /// dynamic_option.set_variant("Some", val);
+    /// ```
     #[inline]
     pub fn set_variant<I: Into<Cow<'static, str>>, V: Into<DynamicVariant>>(
         &mut self,
@@ -148,6 +189,21 @@ impl DynamicEnum {
     }
 
     /// Set the current enum variant represented by this struct along with its variant index.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::{DynamicEnum, DynamicVariant, DynamicTuple}};
+    /// let mut dynamic_option = DynamicEnum::new(
+    ///     "None",
+    ///     DynamicVariant::Unit
+    /// );
+    ///
+    /// let mut val = DynamicTuple::new();
+    /// val.extend(1);
+    ///
+    /// dynamic_option.set_variant_with_index(1, "Some", val);
+    /// ```
     #[inline]
     pub fn set_variant_with_index<I: Into<Cow<'static, str>>, V: Into<DynamicVariant>>(
         &mut self,
@@ -161,6 +217,20 @@ impl DynamicEnum {
     }
 
     /// Get a reference to the [`DynamicVariant`] contained in `self`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::{DynamicEnum, DynamicVariant, DynamicTuple}};
+    /// let mut val = DynamicTuple::new();
+    /// val.extend(1);
+    ///
+    /// let dynamic_option = DynamicEnum::new("Some", val);
+    ///
+    /// if let DynamicVariant::Tuple(tuple) = dynamic_option.variant() {
+    ///     /* ... */
+    /// }
+    /// ```
     #[inline]
     pub fn variant(&self) -> &DynamicVariant {
         &self.variant
@@ -173,9 +243,34 @@ impl DynamicEnum {
     ///
     /// If you want to switch variants, prefer one of the setters:
     /// [`DynamicEnum::set_variant`] or [`DynamicEnum::set_variant_with_index`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{Reflect, ops::{DynamicEnum, DynamicVariant, DynamicTuple}};
+    /// let mut val = DynamicTuple::new();
+    /// val.extend(1);
+    ///
+    /// let mut dynamic_option = DynamicEnum::new("Some", val);
+    ///
+    /// if let DynamicVariant::Tuple(tuple) = dynamic_option.variant_mut() {
+    ///     /* ... */
+    /// }
+    /// ```
     #[inline]
     pub fn variant_mut(&mut self) -> &mut DynamicVariant {
         &mut self.variant
+    }
+
+    /// Gets the index of the field with the given name.
+    ///
+    /// For non-[`VariantKind::Struct`] variants, return `None` always.
+    pub fn index_of(&self, name: &str) -> Option<usize> {
+        if let DynamicVariant::Struct(data) = &self.variant {
+            data.index_of(name)
+        } else {
+            None
+        }
     }
 
     /// Create a [`DynamicEnum`] from an existing one.
@@ -218,7 +313,7 @@ impl DynamicEnum {
             VariantKind::Tuple => {
                 let mut data = DynamicTuple::with_capacity(value.field_len());
                 for field in value.iter_fields() {
-                    data.insert(field.value().to_dynamic());
+                    data.extend_boxed(field.value().to_dynamic());
                 }
                 DynamicEnum::new_with_index(
                     value.variant_index(),
@@ -230,7 +325,7 @@ impl DynamicEnum {
                 let mut data = DynamicStruct::with_capacity(value.field_len());
                 for field in value.iter_fields() {
                     let name = field.name().unwrap();
-                    data.insert(name.to_owned(), field.value().to_dynamic());
+                    data.extend_boxed(name.to_owned(), field.value().to_dynamic());
                 }
                 DynamicEnum::new_with_index(
                     value.variant_index(),
@@ -255,7 +350,7 @@ impl Reflect for DynamicEnum {
 
     #[inline]
     fn represented_type_info(&self) -> Option<&'static TypeInfo> {
-        self.enum_info
+        self.info
     }
 
     #[inline]
@@ -275,14 +370,14 @@ impl Reflect for DynamicEnum {
                 VariantKind::Tuple => {
                     let mut dyn_tuple = DynamicTuple::with_capacity(y.field_len());
                     for y_field in y.iter_fields() {
-                        dyn_tuple.insert(y_field.value().to_dynamic());
+                        dyn_tuple.extend_boxed(y_field.value().to_dynamic());
                     }
                     DynamicVariant::Tuple(dyn_tuple)
                 }
                 VariantKind::Struct => {
                     let mut dyn_struct = DynamicStruct::with_capacity(y.field_len());
                     for y_field in y.iter_fields() {
-                        dyn_struct.insert(
+                        dyn_struct.extend_boxed(
                             y_field.name().unwrap().to_owned(),
                             y_field.value().to_dynamic(),
                         );
@@ -386,7 +481,7 @@ impl fmt::Debug for DynamicEnum {
 /// We need a way to iterate through each field in a variant, and the easiest way of achieving
 /// that is through the use of field order.
 ///
-/// The derive macro adds proper struct variant handling for [`Enum::index_of`], [`Enum::name_at`]
+/// The derive macro adds proper struct variant handling for [`Enum::name_at`]
 /// and [`Enum::field_at[_mut]`](Enum::field_at) methods.
 /// The first two methods are __required__ for all struct variant types.
 /// By convention, implementors should also handle the last method as well, but this is not
@@ -394,7 +489,7 @@ impl fmt::Debug for DynamicEnum {
 ///
 /// ## Field Names
 ///
-/// Implementors may choose to handle [`Enum::index_of`], [`Enum::name_at`], and
+/// Implementors may choose to handle  [`Enum::name_at`], and
 /// [`Enum::field[_mut]`](Enum::field) for tuple variants by considering stringified `usize`s to be
 /// valid names (such as `"3"`).
 /// This isn't wrong to do, but the convention set by the derive macro is that it isn't supported.
@@ -409,9 +504,47 @@ pub trait Enum: Reflect {
     /// Returns a reference to the value of the field (in the current variant) with the given name.
     ///
     /// For non-[`VariantKind::Struct`] variants, this should return `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{derive::Reflect, ops::Enum};
+    ///
+    /// #[derive(Reflect)]
+    /// enum Foo {
+    ///     Data{ id: u32, data: u64 },
+    ///     None,
+    /// }
+    ///
+    /// let foo = Foo::None;
+    /// assert!(foo.field("id").is_none());
+    ///
+    /// let foo = Foo::Data{ id: 0, data: 0 };
+    /// assert!(foo.field("id").is_some());
+    /// assert!(foo.field("ty").is_none());
+    /// ```
     fn field(&self, name: &str) -> Option<&dyn Reflect>;
 
     /// Returns a reference to the value of the field (in the current variant) at the given index.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{derive::Reflect, ops::Enum};
+    ///
+    /// #[derive(Reflect)]
+    /// enum Foo {
+    ///     Data{ id: u32, data: u64 },
+    ///     None,
+    /// }
+    ///
+    /// let foo = Foo::None;
+    /// assert!(foo.field_at(0).is_none());
+    ///
+    /// let foo = Foo::Data{ id: 0, data: 0 };
+    /// assert!(foo.field_at(0).is_some());
+    /// assert!(foo.field_at(2).is_none());
+    /// ```
     fn field_at(&self, index: usize) -> Option<&dyn Reflect>;
 
     /// Returns a mutable reference to the value of the field (in the current variant) with the given name.
@@ -422,10 +555,10 @@ pub trait Enum: Reflect {
     /// Returns a mutable reference to the value of the field (in the current variant) at the given index.
     fn field_at_mut(&mut self, index: usize) -> Option<&mut dyn Reflect>;
 
-    /// Returns the index of the field (in the current variant) with the given name.
-    ///
-    /// For non-[`VariantKind::Struct`] variants, this should return `None`.
-    fn index_of(&self, name: &str) -> Option<usize>;
+    // /// Returns the index of the field (in the current variant) with the given name.
+    // ///
+    // /// For non-[`VariantKind::Struct`] variants, this should return `None`.
+    // fn index_of(&self, name: &str) -> Option<usize>;
 
     /// Returns the name of the field (in the current variant) with the given index.
     ///
@@ -436,9 +569,45 @@ pub trait Enum: Reflect {
     fn iter_fields(&self) -> VariantFieldIter<'_>;
 
     /// Returns the number of fields in the current variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{derive::Reflect, ops::Enum};
+    ///
+    /// #[derive(Reflect)]
+    /// enum Foo {
+    ///     Data{ id: u32, data: u64 },
+    ///     None,
+    /// }
+    ///
+    /// let foo = Foo::None;
+    /// assert_eq!(foo.field_len(), 0);
+    ///
+    /// let foo = Foo::Data{ id: 0, data: 0 };
+    /// assert_eq!(foo.field_len(), 2);
+    /// ```
     fn field_len(&self) -> usize;
 
     /// The name of the current variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{derive::Reflect, ops::Enum};
+    ///
+    /// #[derive(Reflect)]
+    /// enum Foo {
+    ///     Data{ id: u32, data: u64 },
+    ///     None,
+    /// }
+    ///
+    /// let foo = Foo::None;
+    /// assert_eq!(foo.variant_name(), "None");
+    ///
+    /// let foo = Foo::Data{ id: 0, data: 0 };
+    /// assert_eq!(foo.variant_name(), "Data");
+    /// ```
     fn variant_name(&self) -> &str;
 
     /// Returns the full path to the current variant.
@@ -447,40 +616,79 @@ pub trait Enum: Reflect {
     /// not represented type_path + variant_name.
     ///
     /// Therefore, unexpected results may be returned when using dynamic types.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{derive::Reflect, ops::Enum};
+    ///
+    /// #[derive(Reflect)]
+    /// #[reflect(type_path = "hello::Foo")]
+    /// enum Foo {
+    ///     Data{ id: u32, data: u64 },
+    ///     None,
+    /// }
+    ///
+    /// let foo = Foo::None;
+    /// assert_eq!(foo.variant_path(), "hello::Foo::None");
+    ///
+    /// let foo = Foo::Data{ id: 0, data: 0 };
+    /// assert_eq!(foo.variant_path(), "hello::Foo::Data");
+    /// ```
     fn variant_path(&self) -> String {
         crate::impls::concat(&[self.reflect_type_path(), "::", self.variant_name()])
     }
 
     /// The index of the current variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{derive::Reflect, ops::Enum};
+    ///
+    /// #[derive(Reflect)]
+    /// enum Foo {
+    ///     Data{ id: u32, data: u64 },
+    ///     None,
+    /// }
+    ///
+    /// let foo = Foo::None;
+    /// assert_eq!(foo.variant_index(), 1);
+    ///
+    /// let foo = Foo::Data{ id: 0, data: 0 };
+    /// assert_eq!(foo.variant_index(), 0);
+    /// ```
     fn variant_index(&self) -> usize;
 
     /// The type of the current variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use vc_reflect::{derive::Reflect, ops::Enum, info::VariantKind};
+    ///
+    /// #[derive(Reflect)]
+    /// enum Foo {
+    ///     Data{ id: u32, data: u64 },
+    ///     Num(i32),
+    ///     None,
+    /// }
+    ///
+    /// let foo = Foo::None;
+    /// assert_eq!(foo.variant_kind(), VariantKind::Unit);
+    ///
+    /// let foo = Foo::Data{ id: 0, data: 0 };
+    /// assert_eq!(foo.variant_kind(), VariantKind::Struct);
+    ///
+    /// let foo = Foo::Num(0);
+    /// assert_eq!(foo.variant_kind(), VariantKind::Tuple);
+    /// ```
     fn variant_kind(&self) -> VariantKind;
 
     /// Creates a new [`DynamicEnum`] from this enum.
     #[inline]
     fn to_dynamic_enum(&self) -> DynamicEnum {
         DynamicEnum::from_ref(self)
-    }
-
-    /// Get actual [`EnumInfo`] of underlying types.
-    ///
-    /// If it is a dynamic type, it will return `None`.
-    ///
-    /// If it is not a dynamic type and the returned value is not `None` or `EnumInfo`, it will panic.
-    /// (If you want to implement dynamic types yourself, please return None.)
-    #[inline]
-    fn reflect_enum_info(&self) -> Option<&'static EnumInfo> {
-        self.reflect_type_info().as_enum().ok()
-    }
-
-    /// Get the [`EnumInfo`] of representation.
-    ///
-    /// Normal types return their own information,
-    /// while dynamic types return `None`` if they do not represent an object
-    #[inline]
-    fn represented_enum_info(&self) -> Option<&'static EnumInfo> {
-        self.represented_type_info()?.as_enum().ok()
     }
 }
 
@@ -514,14 +722,6 @@ impl Enum for DynamicEnum {
             DynamicVariant::Tuple(data) => data.field_mut(index),
             DynamicVariant::Struct(data) => data.field_at_mut(index),
             DynamicVariant::Unit => None,
-        }
-    }
-
-    fn index_of(&self, name: &str) -> Option<usize> {
-        if let DynamicVariant::Struct(data) = &self.variant {
-            data.index_of(name)
-        } else {
-            None
         }
     }
 
@@ -565,14 +765,51 @@ impl Enum for DynamicEnum {
             DynamicVariant::Struct(..) => VariantKind::Struct,
         }
     }
+}
 
+impl dyn Enum {
+    /// Returns a typed reference to the field at the given field name.
+    ///
+    /// Returns `None` if:
+    /// - The enum variant is not Struct.
+    /// - The field does not exist.
+    /// - The field cannot be downcast to type `T`
     #[inline]
-    fn reflect_enum_info(&self) -> Option<&'static EnumInfo> {
-        None
+    pub fn field_as<T: Reflect>(&self, name: &str) -> Option<&T> {
+        self.field(name).and_then(<dyn Reflect>::downcast_ref)
     }
 
+    /// Returns a typed mutable reference to the field at the given field name.
+    ///
+    /// Returns `None` if:
+    /// - The enum variant is not Struct.
+    /// - The field does not exist.
+    /// - The field cannot be downcast to type `T`
     #[inline]
-    fn represented_enum_info(&self) -> Option<&'static EnumInfo> {
-        self.enum_info?.as_enum().ok()
+    pub fn field_mut_as<T: Reflect>(&mut self, name: &str) -> Option<&mut T> {
+        self.field_mut(name).and_then(<dyn Reflect>::downcast_mut)
+    }
+
+    /// Returns a typed reference to the field at the given index.
+    ///
+    /// Returns `None` if:
+    /// - The enum variant is Unit.
+    /// - The index is out of bounds
+    /// - The field cannot be downcast to type `T`
+    #[inline]
+    pub fn field_at_as<T: Reflect>(&self, index: usize) -> Option<&T> {
+        self.field_at(index).and_then(<dyn Reflect>::downcast_ref)
+    }
+
+    /// Returns a typed mutable reference to the field at the given index.
+    ///
+    /// Returns `None` if:
+    /// - The enum variant is Unit.
+    /// - The index is out of bounds
+    /// - The field cannot be downcast to type `T`
+    #[inline]
+    pub fn field_at_mut_as<T: Reflect>(&mut self, index: usize) -> Option<&mut T> {
+        self.field_at_mut(index)
+            .and_then(<dyn Reflect>::downcast_mut)
     }
 }
