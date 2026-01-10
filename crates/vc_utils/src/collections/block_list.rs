@@ -77,12 +77,14 @@ impl<T> Block<T> {
 /// Only elements in range [head_index, tail_index) are valid.
 impl<T> Drop for Block<T> {
     fn drop(&mut self) {
-        if self.head < self.tail {
-            unsafe {
-                ptr::drop_in_place(ptr::slice_from_raw_parts_mut::<T>(
-                    self.data.as_mut_ptr().add(self.head) as *mut T,
-                    self.tail - self.head,
-                ));
+        if core::mem::needs_drop::<T>() {
+            if self.head < self.tail {
+                unsafe {
+                    ptr::drop_in_place(ptr::slice_from_raw_parts_mut::<T>(
+                        self.data.as_mut_ptr().add(self.head) as *mut T,
+                        self.tail - self.head,
+                    ));
+                }
             }
         }
     }
@@ -95,7 +97,7 @@ impl<T> Drop for Block<T> {
 ///
 /// `BlockList` provides an efficient queue implementation that:
 ///
-/// - Allocates memory in fixed-size blocks (16 elements per block)
+/// - Allocates memory in fixed-size blocks (13 elements per block)
 /// - Recycles fully popped blocks to avoid frequent allocations
 /// - Maintains a small pool of idle blocks (up to 4) for reuse
 ///

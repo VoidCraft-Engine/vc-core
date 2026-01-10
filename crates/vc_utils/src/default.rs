@@ -22,7 +22,7 @@
 /// #   ..Foo::default()
 /// # };
 ///
-/// // New
+/// // Now
 /// let foo = Foo {
 ///   a: 10,
 ///   ..default()

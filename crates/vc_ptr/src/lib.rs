@@ -1,6 +1,8 @@
 //! This crate implements several pointer wrappers on top of Rust’s standard pointer types
 //! that will be used frequently in the ECS module.
 //!
+//! Currently, this is only an internal implementation, so only basic interfaces are provided.
+//!
 //! **`ConstNonNull`**:
 //!
 //! [`ConstNonNull<T>`] is similar to [`NonNull<T>`](core::ptr::NonNull),

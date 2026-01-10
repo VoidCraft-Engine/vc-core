@@ -36,7 +36,7 @@
 //!
 //! If `std` is not supported, we fall back to spinlock-based implementations
 //! while maintaining full API compatibility with the standard library.
-//! (See [fallback](__fallback) module for no_std support)
+//! (See `fallback` module for no_std support)
 
 // -----------------------------------------------------------------------------
 // Modules

@@ -1,3 +1,5 @@
+//! Provide some extensions of `alloc::collections`.
+
 // -----------------------------------------------------------------------------
 // Modules
 

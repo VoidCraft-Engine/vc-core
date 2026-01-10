@@ -56,7 +56,7 @@ pub struct ArrayDeque<T, const N: usize> {
 
 impl<T, const N: usize> Drop for ArrayDeque<T, N> {
     fn drop(&mut self) {
-        if self.len == 0 {
+        if !core::mem::needs_drop::<T>() || self.len == 0 {
             return;
         }
         self.drop_inner();
@@ -77,6 +77,9 @@ impl<T, const N: usize> Default for ArrayDeque<T, N> {
 impl<T, const N: usize> ArrayDeque<T, N> {
     #[inline]
     fn drop_inner(&mut self) {
+        if !core::mem::needs_drop::<T>() {
+            return;
+        }
         if self.len == N {
             unsafe {
                 ptr::drop_in_place(ptr::slice_from_raw_parts_mut::<T>(

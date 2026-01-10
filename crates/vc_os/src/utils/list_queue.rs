@@ -94,14 +94,16 @@ impl<T> Block<T> {
 /// Only elements in range [head_index, tail_index) are valid.
 impl<T> Drop for Block<T> {
     fn drop(&mut self) {
-        let index = self.head_cache.0;
-        let end = self.tail_state.0;
-        if index < end {
-            unsafe {
-                ptr::drop_in_place(ptr::slice_from_raw_parts_mut::<T>(
-                    self.slots.as_mut_ptr().add(index) as *mut T,
-                    end - index,
-                ));
+        if core::mem::needs_drop::<T>() {
+            let index = self.head_cache.0;
+            let end = self.tail_state.0;
+            if index < end {
+                unsafe {
+                    ptr::drop_in_place(ptr::slice_from_raw_parts_mut::<T>(
+                        self.slots.as_mut_ptr().add(index) as *mut T,
+                        end - index,
+                    ));
+                }
             }
         }
     }

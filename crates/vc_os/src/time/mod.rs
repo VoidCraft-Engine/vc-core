@@ -4,7 +4,7 @@
 //! - In `web` environments, it re-exports `web_time` crate's implementation.
 //! - In `std` environments, it directly re-exports the standard library's contents.
 //! - In `no_std` environments, different fallback implementations are used based on the situation.<br>
-//!   (See [fallback](__fallback) module for no_std support)
+//!   (See `fallback` module for no_std support)
 //!
 //! We strive to ensure that fallback implementations maintain the same API as the standard library
 //! (only stable APIs). But some newer APIs may not be immediately available;

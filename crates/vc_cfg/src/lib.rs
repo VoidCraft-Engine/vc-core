@@ -203,14 +203,14 @@ macro_rules! define_alias {
     ( #[cfg($meta:meta)] => { $(#[$id_meta:meta])* $id:ident } $(,)? ) => {
         $crate::switch! {
             #[cfg($meta)] => {
-                #[doc = concat!("An alias for `vc_cfg::enabled` or `vc_cfg::disabled` .\n\n")]
-                #[doc = concat!("If `#[cfg(", stringify!($meta), ")]` is active, this is `enabled`. Otherwise, this is `disabled`.")]
+                #[doc = concat!("An alias for `#[cfg(", stringify!($meta), ")]` .")]
+                #[doc = concat!("\n\nSee more infomation in [`vc_cfg::define_alias`].")]
                 $(#[$id_meta])*
                 pub use $crate::enabled as $id;
             }
             _ => {
-                #[doc = concat!("An alias for `vc_cfg::enabled` or `vc_cfg::disabled` .\n\n")]
-                #[doc = concat!("If `#[cfg(", stringify!($meta), ")]` is active, this is `enabled`. Otherwise, this is `disabled`.")]
+                #[doc = concat!("An alias for `#[cfg(", stringify!($meta), ")]` .")]
+                #[doc = concat!("\n\nSee more infomation in [`vc_cfg::define_alias`].")]
                 $(#[$id_meta])*
                 pub use $crate::disabled as $id;
             }

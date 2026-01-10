@@ -24,8 +24,6 @@ use core::num::NonZero;
 ///
 /// It's similar to [`std::thread::available_parallelism`],
 /// but when this function fails or in the no_std environment, it directly returns `1`.
-///
-/// We ensure that `result > 0` .
 pub fn available_parallelism() -> NonZero<usize> {
     crate::cfg::switch! {
         crate::cfg::std => {
