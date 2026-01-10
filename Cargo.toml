@@ -61,6 +61,7 @@ vc_utils = { path = "./crates/vc_utils" }
 vc_os = { path = "./crates/vc_os", default-features = false }
 vc_reflect = { path = "./crates/vc_reflect", default-features = false }
 vc_task = { path = "./crates/vc_task", default-features = false }
+vc_ecs = { path = "./crates/vc_ecs", default-features = false }
 
 [workspace.lints.clippy]
 std_instead_of_core = "warn"
