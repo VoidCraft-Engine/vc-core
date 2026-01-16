@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use core::any::{Any, TypeId};
 use core::ops::{Deref, DerefMut};
 
-use vc_utils::TypeIdMap;
+use vc_utils::extra::TypeIdMap;
 
 use crate::Reflect;
 use crate::info::{Type, TypeInfo, Typed};

@@ -1,19 +1,14 @@
-use crate::{
-    FromReflect, Reflect,
-    derive::impl_type_path,
-    impls::{GenericTypeInfoCell, NonGenericTypeInfoCell},
-    info::{ListInfo, OpaqueInfo, TypeInfo, TypePath, Typed},
-    ops::{ApplyError, List, ListItemIter},
-    registry::{
-        FromType, GetTypeMeta, TypeMeta, TypeRegistry, TypeTraitDeserialize, TypeTraitFromPtr,
-        TypeTraitFromReflect, TypeTraitSerialize,
-    },
-};
-use alloc::{
-    borrow::{Cow, ToOwned},
-    boxed::Box,
-    vec::Vec,
-};
+use alloc::borrow::{Cow, ToOwned};
+use alloc::boxed::Box;
+use alloc::vec::Vec;
+
+use crate::derive::impl_type_path;
+use crate::impls::{GenericTypeInfoCell, NonGenericTypeInfoCell};
+use crate::info::{ListInfo, OpaqueInfo, TypeInfo, TypePath, Typed};
+use crate::ops::{ApplyError, List, ListItemIter};
+use crate::registry::{FromType, GetTypeMeta, TypeMeta, TypeRegistry, TypeTraitFromPtr};
+use crate::registry::{TypeTraitDeserialize, TypeTraitFromReflect, TypeTraitSerialize};
+use crate::{FromReflect, Reflect};
 
 impl_type_path!(::alloc::borrow::Cow<'a: 'static, T: ToOwned + ?Sized>);
 

@@ -2,29 +2,31 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 
 /// Full Path (FP) for [`core::any::Any`]
-pub(crate) struct AnyFP;
+pub struct AnyFP;
 /// Full Path (FP) for [`Clone`]
-pub(crate) struct CloneFP;
+pub struct CloneFP;
 /// Full Path (FP) for [`Default`]
-pub(crate) struct DefaultFP;
+pub struct DefaultFP;
 /// Full Path (FP) for [`Option`]
-pub(crate) struct OptionFP;
+pub struct OptionFP;
 /// Full Path (FP) for [`Result`]
-pub(crate) struct ResultFP;
+pub struct ResultFP;
 /// Full Path (FP) for [`Send`]
-pub(crate) struct SendFP;
+pub struct SendFP;
 /// Full Path (FP) for [`Sync`]
-pub(crate) struct SyncFP;
+pub struct SyncFP;
 /// Full Path (FP) for [`PartialEq`]
-pub(crate) struct PartialEqFP;
+pub struct PartialEqFP;
+/// Full Path (FP) for [`Eq`]
+pub struct EqFP;
 /// Full Path (FP) for [`Hash`](core::hash::Hash)
-pub(crate) struct HashFP;
+pub struct HashFP;
 /// Full Path (FP) for [`Hasher`](core::hash::Hasher)
-pub(crate) struct HasherFP;
+pub struct HasherFP;
 /// Full Path (FP) for [`Debug`](core::fmt::Debug)
-pub(crate) struct DebugFP;
+pub struct DebugFP;
 /// Full Path (FP) for [`Debug`](core::any::TypeId)
-pub(crate) struct TypeIdFP;
+pub struct TypeIdFP;
 
 impl ToTokens for AnyFP {
     fn to_tokens(&self, tokens: &mut TokenStream) {
@@ -71,6 +73,12 @@ impl ToTokens for SyncFP {
 impl ToTokens for PartialEqFP {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         quote!(::core::cmp::PartialEq).to_tokens(tokens);
+    }
+}
+
+impl ToTokens for EqFP {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        quote!(::core::cmp::Eq).to_tokens(tokens);
     }
 }
 

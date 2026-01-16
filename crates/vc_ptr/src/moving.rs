@@ -360,7 +360,7 @@ macro_rules! move_as_ptr {
     };
 }
 
-/// Helper macro used by [`deconstruct_moving_ptr`]
+/// Helper macro used by [`deconstruct_moving`]
 #[macro_export]
 #[doc(hidden)]
 macro_rules! get_pattern {
@@ -418,7 +418,7 @@ macro_rules! get_pattern {
 ///
 /// // The field names must match the name used in the type definition.
 /// // Each one will be a `MovingPtr` of the field's type.
-/// vc_ptr::deconstruct_moving_ptr!{
+/// vc_ptr::deconstruct_moving!{
 ///   let Foo { field_a, field_b, field_c } = foo;
 /// }
 ///
@@ -448,7 +448,7 @@ macro_rules! get_pattern {
 ///
 /// // The field names must match the name used in the type definition.
 /// // Each one will be a `MovingPtr` of the field's type.
-/// vc_ptr::deconstruct_moving_ptr!{
+/// vc_ptr::deconstruct_moving!{
 ///   let tuple { 0: field_a, 1: field_b, 2: field_c } = foo;
 /// }
 ///
@@ -488,7 +488,7 @@ macro_rules! get_pattern {
 ///
 /// // The field names must match the name used in the type definition.
 /// // Each one will be a `MovingPtr` of the field's type.
-/// vc_ptr::deconstruct_moving_ptr!{
+/// vc_ptr::deconstruct_moving!{
 ///   let MaybeUninit::<Foo> { field_a, field_b, field_c } = foo;
 /// }
 ///
@@ -503,7 +503,7 @@ macro_rules! get_pattern {
 /// }
 /// ```
 #[macro_export]
-macro_rules! deconstruct_moving_ptr {
+macro_rules! deconstruct_moving {
     { let tuple { $($field_index:tt: $pattern:pat),* $(,)? } = $ptr:expr ;} => {
         let mut ptr: $crate::MovingPtr<_> = $ptr;
         #[cfg(debug_assertions)]
@@ -518,7 +518,7 @@ macro_rules! deconstruct_moving_ptr {
         ::core::mem::forget(ptr);
     };
     { let MaybeUninit::<tuple> { $($field_index:tt: $pattern:pat),* $(,)? } = $ptr:expr ;} => {
-        let mut ptr: $crate::MovingPtr<::core::mem::MaybeUninit<_> = $ptr;
+        let mut ptr: $crate::MovingPtr<::core::mem::MaybeUninit<_>> = $ptr;
         #[cfg(debug_assertions)]
         let _ = || {
             let value = unsafe { ptr.assume_init_mut() };
@@ -545,7 +545,7 @@ macro_rules! deconstruct_moving_ptr {
         ::core::mem::forget(ptr);
     };
     { let MaybeUninit::<$struct_name:ident> { $($field_index:tt$(: $pattern:pat)?),* $(,)? } = $ptr:expr ;} => {
-        let mut ptr: $crate::MovingPtr<core::mem::MaybeUninit<_>> = $ptr;
+        let mut ptr: $crate::MovingPtr<::core::mem::MaybeUninit<_>> = $ptr;
         #[cfg(debug_assertions)]
         let _ = || {
             let value = unsafe { ptr.assume_init_mut() };

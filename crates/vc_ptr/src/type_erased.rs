@@ -482,6 +482,17 @@ impl<'a> PtrMut<'a> {
         // SAFETY: Type correct, ptr aligned and pointee valid object.
         unsafe { &mut *self.0.as_ptr().cast::<T>() }
     }
+
+    /// Convert this [`PtrMut`] into a [`OwningPtr`] with the **same** lifetime.
+    ///
+    /// This is typically used for dropping data.
+    ///
+    /// # Safety
+    /// - The caller needs to avoid double-dropped.
+    #[inline(always)]
+    pub const unsafe fn promote(self) -> OwningPtr<'a> {
+        OwningPtr(self.0, PhantomData)
+    }
 }
 
 impl<'a, T: ?Sized> From<&'a mut T> for PtrMut<'a> {

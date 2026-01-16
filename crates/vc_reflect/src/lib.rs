@@ -8,11 +8,12 @@
 
 /// Some macros used for compilation control.
 pub mod cfg {
+    pub use vc_os::cfg::std;
+
     vc_cfg::define_alias! {
-        #[cfg(feature = "std")] => std,
+        #[cfg(any(feature = "debug", all(debug_assertions, feature = "std")))] => debug,
         #[cfg(feature = "auto_register")] => auto_register,
         #[cfg(feature = "reflect_docs")] => reflect_docs,
-        #[cfg(all(debug_assertions, feature = "debug"))] => debug,
     }
 }
 

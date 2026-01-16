@@ -31,7 +31,7 @@
 //! - `i8` `i16` `i32` `i64` `i128` `isize`
 //! - `u8` `u16` `u32` `u64` `u128` `usize`
 //! - `core::num::NonZero`: I8-I128 U8-U128 Isize Usize
-//! - `Atomic`: Bool I8-I64 U8-U64 Isize Usize (without Ptr)
+//! - `Atomic`: Ordering, Bool I8-I64 U8-U64 Isize Usize (without Ptr)
 //! - `String` `&'static str` `Cow<'static, str>`
 //! - `core::any::TypeId`
 //! - `core::time::Duration`

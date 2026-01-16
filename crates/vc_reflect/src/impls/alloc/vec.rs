@@ -1,13 +1,11 @@
-use alloc::{boxed::Box, vec::Vec};
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 
-use crate::{
-    FromReflect, Reflect, impls,
-    info::{GenericInfo, Generics, ListInfo, TypeInfo, TypeParamInfo, Typed},
-    ops::{ApplyError, List, ListItemIter, ReflectCloneError},
-    registry::{
-        FromType, GetTypeMeta, TypeMeta, TypeTraitDefault, TypeTraitFromPtr, TypeTraitFromReflect,
-    },
-};
+use crate::info::{GenericInfo, Generics, ListInfo, TypeInfo, TypeParamInfo, Typed};
+use crate::ops::{ApplyError, List, ListItemIter, ReflectCloneError};
+use crate::registry::{FromType, GetTypeMeta, TypeMeta, TypeTraitDefault};
+use crate::registry::{TypeTraitFromPtr, TypeTraitFromReflect};
+use crate::{FromReflect, Reflect, impls};
 
 crate::derive::impl_type_path!(::alloc::vec::Vec<T>);
 

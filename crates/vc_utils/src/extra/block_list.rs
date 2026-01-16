@@ -105,7 +105,7 @@ impl<T> Drop for Block<T> {
 /// # Examples
 ///
 /// ```
-/// # use vc_utils::collections::BlockList;
+/// # use vc_utils::extra::BlockList;
 /// let mut queue = BlockList::new();
 /// assert!(queue.is_empty());
 ///
@@ -175,7 +175,7 @@ impl<T> BlockList<T> {
     /// # Examples
     ///
     /// ```
-    /// use vc_utils::collections::BlockList;
+    /// use vc_utils::extra::BlockList;
     ///
     /// let queue: BlockList<i32> = BlockList::new();
     /// assert!(queue.is_empty());
@@ -215,7 +215,7 @@ impl<T> BlockList<T> {
     /// # Examples
     ///
     /// ```
-    /// # use vc_utils::collections::BlockList;
+    /// # use vc_utils::extra::BlockList;
     /// let mut queue = BlockList::new();
     ///
     /// queue.push_back(1);
@@ -258,7 +258,7 @@ impl<T> BlockList<T> {
     /// # Examples
     ///
     /// ```
-    /// # use vc_utils::collections::BlockList;
+    /// # use vc_utils::extra::BlockList;
     /// let mut queue = BlockList::new();
     ///
     /// queue.push_back(1);
@@ -307,7 +307,7 @@ impl<T> BlockList<T> {
     /// # Examples
     ///
     /// ```
-    /// # use vc_utils::collections::BlockList;
+    /// # use vc_utils::extra::BlockList;
     /// let mut queue = BlockList::new();
     ///
     /// assert!(queue.is_empty());
@@ -332,7 +332,7 @@ impl<T> BlockList<T> {
     /// # Examples
     ///
     /// ```
-    /// # use vc_utils::collections::BlockList;
+    /// # use vc_utils::extra::BlockList;
     /// let mut queue = BlockList::new();
     ///
     /// queue.push_back(1);
@@ -359,7 +359,7 @@ impl<T> BlockList<T> {
     /// # Examples
     ///
     /// ```
-    /// # use vc_utils::collections::BlockList;
+    /// # use vc_utils::extra::BlockList;
     /// let mut queue = BlockList::new();
     ///
     /// queue.push_back(1);

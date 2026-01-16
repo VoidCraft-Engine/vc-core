@@ -25,7 +25,7 @@ impl<V> TypeIdMap<V> {
     /// # Examples
     ///
     /// ```
-    /// use vc_utils::TypeIdMap;
+    /// use vc_utils::extra::TypeIdMap;
     /// let map = TypeIdMap::<i32>::new();
     /// ```
     #[inline]
@@ -38,7 +38,7 @@ impl<V> TypeIdMap<V> {
     /// # Examples
     ///
     /// ```
-    /// use vc_utils::TypeIdMap;
+    /// use vc_utils::extra::TypeIdMap;
     /// let map = TypeIdMap::<i32>::with_capacity(10);
     /// ```
     #[inline]

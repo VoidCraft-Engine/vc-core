@@ -29,7 +29,8 @@ docsrs_dev = [
 # Even if turned on, it only takes effect in Debug mode.
 debug = [
     "std",
-    "vc_reflect/debug"
+    "vc_reflect/debug",
+    "vc_ecs/debug",
 ]
 
 
@@ -37,6 +38,7 @@ std = [
     "vc_os/std",
     "vc_reflect/std",
     "vc_task/std",
+    "vc_ecs/std",
 ]
 
 web = [
@@ -70,6 +72,8 @@ alloc_instead_of_core = "warn"
 
 type_complexity = "allow"
 too_many_arguments = "allow"
+new_without_default = "allow"
+module_inception = "allow"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

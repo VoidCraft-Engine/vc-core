@@ -6,7 +6,39 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+default = [ "std", "debug" ]
+
+std = [
+    "vc_os/std",
+    "vc_task/std",
+    "vc_reflect/std",
+]
+
+# Enable `MaybeLocation` and `DebugName`.
+# 
+# The `bebug` of different modules are independent, and it is possible
+# to turn off the overall `debug` and only enable specific crate's `debug`.
+debug = []
+
 [dependencies]
+vc_ecs_derive = { path = "derive" }
+
+vc_ptr = { path = "../vc_ptr" }
+vc_cfg = { path = "../vc_cfg" }
+vc_utils = { path = "../vc_utils" }
+
+vc_os = { path = "../vc_os", default-features = false }
+vc_task = { path = "../vc_task", default-features = false }
+vc_reflect = { path = "../vc_reflect", default-features = false }
+
+# -------------------- External  --------------------
+
+serde_core = { version = "1", default-features = false, features = ["alloc"] }
+nonmax = { version = "0.5", default-features = false }
+bitflags = { version = "2.10", default-features = false }
+fixedbitset = { version = "0.5", default-features = false }
+
 
 [lints]
 workspace = true

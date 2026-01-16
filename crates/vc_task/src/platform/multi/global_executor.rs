@@ -26,7 +26,7 @@ use vc_os::sync::{Mutex, PoisonError};
 use vc_os::utils::{CachePadded, ListQueue};
 use vc_os::utils::ArrayQueue;
 use vc_os::sync::atomic::{AtomicBool, Ordering};
-use vc_utils::collections::ArrayDeque;
+use vc_utils::extra::ArrayDeque;
 
 use super::XorShift64Star;
 

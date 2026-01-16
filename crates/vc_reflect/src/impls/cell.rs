@@ -23,23 +23,13 @@
 //!
 //! See [`NonGenericTypeInfoCell`], [`GenericTypeInfoCell`] and [`GenericTypePathCell`].
 //!
-
-use crate::info::TypeInfo;
 use alloc::{boxed::Box, string::String};
 use core::any::{Any, TypeId};
 use vc_os::sync::{OnceLock, PoisonError, RwLock};
-use vc_utils::TypeIdMap;
 
-mod sealed {
-    use super::TypeInfo;
-    use alloc::string::String;
-    pub trait TypedProperty: 'static {}
+use vc_utils::extra::TypeIdMap;
 
-    impl TypedProperty for String {}
-    impl TypedProperty for TypeInfo {}
-}
-
-use sealed::TypedProperty;
+use crate::info::TypeInfo;
 
 /// Container for static storage of non-generic type information.
 ///
@@ -50,7 +40,7 @@ use sealed::TypedProperty;
 /// There is no `NonGenericTypePathCell` because it can be replaced by a static string literal.
 ///
 /// See more information in [`NonGenericTypeInfoCell`].
-pub struct NonGenericTypeCell<T: TypedProperty>(OnceLock<T>);
+pub struct NonGenericTypeCell<T: 'static>(OnceLock<T>);
 
 /// Container for static storage of non-generic type information.
 ///
@@ -82,7 +72,7 @@ pub struct NonGenericTypeCell<T: TypedProperty>(OnceLock<T>);
 /// ```
 pub type NonGenericTypeInfoCell = NonGenericTypeCell<TypeInfo>;
 
-impl<T: TypedProperty> NonGenericTypeCell<T> {
+impl<T: 'static> NonGenericTypeCell<T> {
     /// Create a empty cell.
     ///
     /// See [`NonGenericTypeInfoCell`].
@@ -111,7 +101,7 @@ impl<T: TypedProperty> NonGenericTypeCell<T> {
 /// therefore, the interior of the container was used [`TypeIdMap`] and [`RwLock`].
 ///
 /// See more information in [`GenericTypeInfoCell`] and [`GenericTypePathCell`].
-pub struct GenericTypeCell<T: TypedProperty>(RwLock<TypeIdMap<&'static T>>);
+pub struct GenericTypeCell<T: 'static>(RwLock<TypeIdMap<&'static T>>);
 
 /// Container for static storage of type information with generics.
 ///
@@ -174,7 +164,7 @@ pub type GenericTypeInfoCell = GenericTypeCell<TypeInfo>;
 /// ```
 pub type GenericTypePathCell = GenericTypeCell<String>;
 
-impl<T: TypedProperty> GenericTypeCell<T> {
+impl<T: 'static> GenericTypeCell<T> {
     /// Create a empty cell.
     #[inline]
     pub const fn new() -> Self {

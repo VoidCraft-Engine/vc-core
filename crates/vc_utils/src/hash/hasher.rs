@@ -58,14 +58,35 @@ impl BuildHasher for FixedHashState {
 ///
 /// Which can be created through [`NoOpHashState::build_hasher`].
 #[derive(Copy, Clone, Default, Debug)]
+#[repr(transparent)]
 pub struct NoOpHasher {
     hash: u64,
 }
 
 impl Hasher for NoOpHasher {
-    #[inline]
+    #[inline(always)]
     fn finish(&self) -> u64 {
         self.hash
+    }
+
+    #[inline(always)]
+    fn write_u64(&mut self, i: u64) {
+        self.hash = i;
+    }
+
+    #[inline(always)]
+    fn write_u32(&mut self, i: u32) {
+        self.hash = i as u64;
+    }
+
+    #[inline(always)]
+    fn write_u16(&mut self, i: u16) {
+        self.hash = i as u64;
+    }
+
+    #[inline(always)]
+    fn write_u8(&mut self, i: u8) {
+        self.hash = i as u64;
     }
 
     fn write(&mut self, bytes: &[u8]) {
@@ -74,11 +95,6 @@ impl Hasher for NoOpHasher {
             // rotate left ensure that `write_u32(10)` is eq to `write_u64(10)`.
             self.hash = self.hash.rotate_left(8).wrapping_add(*byte as u64);
         }
-    }
-
-    #[inline]
-    fn write_u64(&mut self, i: u64) {
-        self.hash = i;
     }
 }
 
@@ -111,5 +127,43 @@ impl BuildHasher for NoOpHashState {
     #[inline(always)]
     fn build_hasher(&self) -> Self::Hasher {
         NoOpHasher { hash: 0 }
+    }
+
+    #[inline(always)]
+    fn hash_one<T: core::hash::Hash>(&self, x: T) -> u64
+    where
+        Self: Sized,
+        Self::Hasher: Hasher,
+    {
+        let mut hasher = const { NoOpHasher { hash: 0 } };
+        x.hash(&mut hasher);
+        hasher.hash
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use core::any::TypeId;
+    use core::hash::{Hash, Hasher};
+
+    #[test]
+    fn noop_typeid_hash() {
+        struct TestNoOpHasher(u64);
+        impl Hasher for TestNoOpHasher {
+            fn finish(&self) -> u64 {
+                self.0
+            }
+            fn write_u64(&mut self, i: u64) {
+                self.0 = i;
+            }
+            fn write(&mut self, _bytes: &[u8]) {
+                panic!()
+            }
+        }
+
+        let id = TypeId::of::<u32>();
+        let mut hasher = TestNoOpHasher(0);
+        id.hash(&mut hasher);
+        core::hint::black_box(id);
     }
 }

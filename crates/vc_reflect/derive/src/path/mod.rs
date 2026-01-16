@@ -27,6 +27,8 @@ pub(crate) fn vc_reflect() -> syn::Path {
     vc_macro_utils::Manifest::shared(|manifest| manifest.get_crate_path("vc_reflect"))
 }
 
+pub(crate) use vc_macro_utils::full_path as fp;
+
 // -----------------------------------------------------------------------------
 // Modules
 
@@ -34,8 +36,6 @@ mod cell;
 mod info;
 mod ops;
 mod registry;
-
-pub(crate) mod fp;
 
 // -----------------------------------------------------------------------------
 // Internal API

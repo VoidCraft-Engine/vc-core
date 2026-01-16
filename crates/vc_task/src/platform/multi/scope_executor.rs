@@ -21,7 +21,7 @@ use atomic_waker::AtomicWaker;
 
 use vc_os::utils::ListQueue;
 use vc_os::utils::CachePadded;
-use vc_utils::collections::ArrayDeque;
+use vc_utils::extra::ArrayDeque;
 
 // -----------------------------------------------------------------------------
 // Scope Executor

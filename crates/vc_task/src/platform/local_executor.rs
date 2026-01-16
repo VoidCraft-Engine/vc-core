@@ -10,7 +10,7 @@ use core::task::{Poll, Waker};
 use async_task::{Runnable, Task};
 use futures_lite::FutureExt;
 
-use vc_utils::collections::BlockList;
+use vc_utils::extra::BlockList;
 
 // -----------------------------------------------------------------------------
 // LocalExecutor

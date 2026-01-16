@@ -7,6 +7,7 @@
 //! - [`impl_type_path`]
 //! - [`impl_auto_register`]
 //! - [`reflect_trait`]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(clippy::std_instead_of_core, reason = "proc-macro lib")]
 #![allow(clippy::std_instead_of_alloc, reason = "proc-macro lib")]
 

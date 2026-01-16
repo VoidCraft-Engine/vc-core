@@ -37,6 +37,8 @@ vc_utils = { path = "../vc_utils" }
 
 vc_os = { path = "../vc_os", default-features = false }
 
+# -------------------- External  --------------------
+
 async-task = { version = "4.7", default-features = false }
 futures-lite = { version = "2.6", default-features = false, features = [ "alloc"] }
 

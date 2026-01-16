@@ -24,6 +24,7 @@ mod cache_paded;
 mod futex;
 mod list_queue;
 mod once_flag;
+mod parallel;
 mod spin_lock;
 
 // -----------------------------------------------------------------------------
@@ -39,6 +40,7 @@ pub use cache_paded::CachePadded;
 pub use futex::{Futex, FutexGuard};
 pub use list_queue::ListQueue;
 pub use once_flag::OnceFlag;
+pub use parallel::Parallel;
 pub use spin_lock::{SpinLock, SpinLockGuard};
 
 // -----------------------------------------------------------------------------

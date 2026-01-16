@@ -1,20 +1,22 @@
 //! Even if the atomic variable uses `portable_atomic`, its type path is still `core::sync::atomic::...`.
 
-use crate::derive::{impl_auto_register, impl_type_path};
-use alloc::{borrow::ToOwned, boxed::Box};
-
+use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
 use core::sync::atomic::Ordering;
 
-// impl_reflect! {
-//     #[reflect(type_path = "core::sync::atomic::Ordering")]
-//     #[reflect(mini, debug, hash, partial_eq)]
-//     pub enum Ordering {
-//         Relaxed,
-//         Acquire,
-//         AcqRel,
-//         SeqCst,
-//     }
-// }
+use crate::derive::{impl_auto_register, impl_reflect, impl_type_path};
+
+impl_reflect! {
+    #[reflect(type_path = "core::sync::atomic::Ordering")]
+    #[reflect(mini, debug, hash, partial_eq)]
+    pub enum Ordering {
+        Relaxed,
+        Release,
+        Acquire,
+        AcqRel,
+        SeqCst,
+    }
+}
 
 macro_rules! impl_reflect_for_atomic {
     ($ty:ty, $ordering:expr) => {

@@ -22,7 +22,7 @@ use core::ptr;
 /// Note that the back operation is faster than front.
 ///
 /// ```
-/// use vc_utils::collections::ArrayDeque;
+/// use vc_utils::extra::ArrayDeque;
 ///
 /// let mut deque: ArrayDeque<i32, 4> = ArrayDeque::new();
 ///
@@ -129,7 +129,7 @@ impl<T, const N: usize> ArrayDeque<T, N> {
     /// # Examples
     ///
     /// ```
-    /// use vc_utils::collections::ArrayDeque;
+    /// use vc_utils::extra::ArrayDeque;
     ///
     /// let deque: ArrayDeque<i32, 10> = ArrayDeque::new();
     /// assert!(deque.is_empty());
@@ -155,7 +155,7 @@ impl<T, const N: usize> ArrayDeque<T, N> {
     /// # Examples
     ///
     /// ```
-    /// use vc_utils::collections::ArrayDeque;
+    /// use vc_utils::extra::ArrayDeque;
     ///
     /// let mut deque: ArrayDeque<i32, 2> = ArrayDeque::new();
     /// assert!(!deque.is_full());
@@ -177,7 +177,7 @@ impl<T, const N: usize> ArrayDeque<T, N> {
     /// # Examples
     ///
     /// ```
-    /// use vc_utils::collections::ArrayDeque;
+    /// use vc_utils::extra::ArrayDeque;
     ///
     /// let mut deque: ArrayDeque<i32, 4> = ArrayDeque::new();
     /// assert!(deque.is_empty());
@@ -195,7 +195,7 @@ impl<T, const N: usize> ArrayDeque<T, N> {
     /// # Examples
     ///
     /// ```
-    /// use vc_utils::collections::ArrayDeque;
+    /// use vc_utils::extra::ArrayDeque;
     ///
     /// let mut deque: ArrayDeque<i32, 4> = ArrayDeque::new();
     /// assert_eq!(deque.len(), 0);
@@ -216,7 +216,7 @@ impl<T, const N: usize> ArrayDeque<T, N> {
     /// # Examples
     ///
     /// ```
-    /// use vc_utils::collections::ArrayDeque;
+    /// use vc_utils::extra::ArrayDeque;
     ///
     /// let mut deque: ArrayDeque<i32, 4> = ArrayDeque::new();
     /// assert_eq!(deque.front(), None);
@@ -244,7 +244,7 @@ impl<T, const N: usize> ArrayDeque<T, N> {
     /// # Examples
     ///
     /// ```
-    /// use vc_utils::collections::ArrayDeque;
+    /// use vc_utils::extra::ArrayDeque;
     ///
     /// let mut deque: ArrayDeque<i32, 4> = ArrayDeque::new();
     /// assert_eq!(deque.back(), None);
@@ -288,7 +288,7 @@ impl<T, const N: usize> ArrayDeque<T, N> {
     /// # Examples
     ///
     /// ```
-    /// use vc_utils::collections::ArrayDeque;
+    /// use vc_utils::extra::ArrayDeque;
     ///
     /// let mut deque: ArrayDeque<i32, 2> = ArrayDeque::new();
     ///
@@ -335,7 +335,7 @@ impl<T, const N: usize> ArrayDeque<T, N> {
     /// # Examples
     ///
     /// ```
-    /// use vc_utils::collections::ArrayDeque;
+    /// use vc_utils::extra::ArrayDeque;
     ///
     /// let mut deque: ArrayDeque<i32, 2> = ArrayDeque::new();
     ///
@@ -366,7 +366,7 @@ impl<T, const N: usize> ArrayDeque<T, N> {
     /// # Examples
     ///
     /// ```
-    /// use vc_utils::collections::ArrayDeque;
+    /// use vc_utils::extra::ArrayDeque;
     ///
     /// let mut deque: ArrayDeque<i32, 4> = ArrayDeque::new();
     /// deque.push_back(1).unwrap();
@@ -395,7 +395,7 @@ impl<T, const N: usize> ArrayDeque<T, N> {
     /// # Examples
     ///
     /// ```
-    /// use vc_utils::collections::ArrayDeque;
+    /// use vc_utils::extra::ArrayDeque;
     ///
     /// let mut deque: ArrayDeque<i32, 4> = ArrayDeque::new();
     /// deque.push_back(1).unwrap();

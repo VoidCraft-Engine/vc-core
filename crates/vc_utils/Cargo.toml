@@ -13,10 +13,12 @@ rayon = ["dep:rayon", "hashbrown/rayon"]
 [dependencies]
 vc_cfg = { path = "../vc_cfg" }
 
+# -------------------- External  --------------------
+
 serde_core = { version = "1", default-features = false, features = ["alloc"] }
+
 fastvec ={ version = "1", default-features = false, features = ["serde"] }
 
-# Hash Container
 foldhash = { version = "0.2.0", default-features = false }
 hashbrown = { version = "0.16.1", features = [
   "equivalent",

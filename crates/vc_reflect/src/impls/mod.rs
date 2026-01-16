@@ -17,7 +17,7 @@
 //!     - `[T; N]`
 //!     - `&'static str`, `String`
 //! - core:
-//!     - `Atomic`: I8-I64, U8-U64, Isize, Usize (without Ptr)
+//!     - `Atomic`: Ordering, I8-I64, U8-U64, Isize, Usize (without Ptr)
 //!     - `NonZero`: I8-I128, U8-U128, Isize, Usize, `Wrapping`, `Saturating`
 //!     - `core::any::TypeId`
 //!     - `PhantomData<T>`, T implemted `TypePath`.

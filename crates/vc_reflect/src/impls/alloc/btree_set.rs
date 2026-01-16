@@ -1,16 +1,14 @@
-use alloc::{boxed::Box, collections::BTreeSet, vec::Vec};
+use alloc::boxed::Box;
+use alloc::collections::BTreeSet;
+use alloc::vec::Vec;
 
-use crate::{
-    FromReflect, Reflect,
-    derive::impl_type_path,
-    impls::GenericTypeInfoCell,
-    info::{GenericInfo, Generics, SetInfo, TypeInfo, TypeParamInfo, Typed},
-    ops::{ApplyError, ReflectCloneError, Set},
-    registry::{
-        FromType, GetTypeMeta, TypeMeta, TypeRegistry, TypeTraitDefault, TypeTraitFromPtr,
-        TypeTraitFromReflect,
-    },
-};
+use crate::derive::impl_type_path;
+use crate::impls::GenericTypeInfoCell;
+use crate::info::{GenericInfo, Generics, SetInfo, TypeInfo, TypeParamInfo, Typed};
+use crate::ops::{ApplyError, ReflectCloneError, Set};
+use crate::registry::{FromType, GetTypeMeta, TypeMeta, TypeRegistry};
+use crate::registry::{TypeTraitDefault, TypeTraitFromPtr, TypeTraitFromReflect};
+use crate::{FromReflect, Reflect};
 
 impl_type_path!(::alloc::collections::BTreeSet<T>);
 

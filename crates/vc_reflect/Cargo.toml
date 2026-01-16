@@ -9,7 +9,10 @@ repository.workspace = true
 [features]
 default = [ "std", "auto_register", "debug" ]
 
-# Even if turned on, it only takes effect in Debug mode.
+# Enable Type Tracing in serialization and deserialization.
+# 
+# The `bebug` of different modules are independent, and it is possible
+# to turn off the overall `debug` and only enable specific crate's `debug`.
 debug = [ "std" ]
 
 std = [
@@ -23,11 +26,11 @@ reflect_docs = [ "vc_reflect_derive/reflect_docs" ]
 auto_register = [ "dep:inventory", "vc_reflect_derive/auto_register" ]
 
 [dependencies]
+vc_reflect_derive = { path = "derive" }
+
 vc_ptr = { path = "../vc_ptr" }
 vc_cfg = { path = "../vc_cfg" }
 vc_utils = { path = "../vc_utils" }
-
-vc_reflect_derive = { path = "derive" }
 
 vc_os = { path = "../vc_os", default-features = false }
 

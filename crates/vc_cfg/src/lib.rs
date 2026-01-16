@@ -75,22 +75,29 @@
 /// // empty -> false
 /// assert!( !cfg::disabled!() );
 ///
+/// // A -> empty (do nothing)
+/// cfg::disabled!{ x += 100; }
+///
+/// // else { A } -> A
+/// cfg::disabled!{
+///     else { x += 10; }
+/// }
+///
 /// // if { A } else { B } -> B
-/// cfg::disabled!(
+/// cfg::disabled!{
 ///     if {
 ///         panic!();
 ///     } else {
 ///         x += 1;
 ///     }
-/// );
+/// }
 ///
-/// // A -> empty (do nothing)
-/// cfg::disabled!{ x += 10; };
-/// assert_eq!(x, 1);
+/// assert_eq!(x, 11);
 /// ```
 #[macro_export]
 macro_rules! disabled {
     () => { false };
+    (else { $($p:tt)* }) => { $($p)* };
     (if { $($p:tt)* } else { $($n:tt)* }) => { $($n)* };
     ($($p:tt)*) => {};
 }
@@ -107,22 +114,29 @@ macro_rules! disabled {
 /// // empty -> true
 /// assert!( cfg::enabled!() );
 ///
+/// // A -> A
+/// cfg::enabled!{ x += 100; }
+///
+/// // else { A } -> do nothing
+/// cfg::enabled!{
+///     else { x += 10; }
+/// }
+///
 /// // if { A } else { B } -> A
-/// cfg::enabled!(
+/// cfg::enabled!{
 ///     if {
 ///         x += 1;
 ///     } else {
 ///         panic!();
 ///     }
-/// );
+/// }
 ///
-/// // A -> A
-/// cfg::enabled!{ x += 10; };
-/// assert_eq!(x, 11);
+/// assert_eq!(x, 101);
 /// ```
 #[macro_export]
 macro_rules! enabled {
     () => { true };
+    (else { $($p:tt)* }) => {};
     (if { $($p:tt)* } else { $($n:tt)* }) => { $($p)* };
     ($($p:tt)*) => { $($p)* };
 }

@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use core::any::TypeId;
 
-use vc_utils::TypeIdMap;
+use vc_utils::extra::TypeIdMap;
 
 use crate::Reflect;
 

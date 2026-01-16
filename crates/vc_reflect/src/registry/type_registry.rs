@@ -1,7 +1,7 @@
 use alloc::string::String;
 use core::any::TypeId;
 
-use vc_utils::TypeIdMap;
+use vc_utils::extra::TypeIdMap;
 use vc_utils::hash::{HashMap, HashSet};
 
 use crate::info::{TypeInfo, Typed};

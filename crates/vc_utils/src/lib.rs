@@ -22,9 +22,9 @@ extern crate alloc;
 
 mod default;
 mod range_invoke;
-mod typeid_map;
+mod unsafe_deref;
 
-pub mod collections;
+pub mod extra;
 pub mod hash;
 pub mod vec;
 
@@ -32,4 +32,4 @@ pub mod vec;
 // Top-level exports
 
 pub use default::default;
-pub use typeid_map::TypeIdMap;
+pub use unsafe_deref::UnsafeCellDeref;

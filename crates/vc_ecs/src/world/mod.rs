@@ -1,13 +1,15 @@
-//! Provide some extensions of `alloc::collections`.
-
 // -----------------------------------------------------------------------------
 // Modules
 
-mod array_deque;
-mod block_list;
+mod deferred;
+mod id;
+mod world;
+mod world_cell;
 
 // -----------------------------------------------------------------------------
 // Exports
 
-pub use array_deque::ArrayDeque;
-pub use block_list::BlockList;
+pub use deferred::DeferredWorld;
+pub use id::WorldId;
+pub use world::World;
+pub use world_cell::UnsafeWorldCell;
