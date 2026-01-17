@@ -22,14 +22,17 @@
 //! ## Examples
 //!
 //! See [`NonGenericTypeInfoCell`], [`GenericTypeInfoCell`] and [`GenericTypePathCell`].
-//!
+
 use alloc::{boxed::Box, string::String};
 use core::any::{Any, TypeId};
-use vc_os::sync::{OnceLock, PoisonError, RwLock};
 
+use vc_os::sync::{OnceLock, PoisonError, RwLock};
 use vc_utils::extra::TypeIdMap;
 
 use crate::info::TypeInfo;
+
+// -----------------------------------------------------------------------------
+// NonGenericTypeCell
 
 /// Container for static storage of non-generic type information.
 ///
@@ -94,6 +97,9 @@ impl<T: 'static> NonGenericTypeCell<T> {
         self.0.get_or_init(f)
     }
 }
+
+// -----------------------------------------------------------------------------
+// GenericTypeCell
 
 /// Container for static storage of type information with generics.
 ///

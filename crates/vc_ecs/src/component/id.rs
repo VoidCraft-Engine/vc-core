@@ -1,13 +1,10 @@
 use core::fmt;
 use core::hash;
 
-use vc_reflect::derive::Reflect;
-
 // -----------------------------------------------------------------------------
 // ComponentId
 
-#[derive(Reflect, Copy, Clone, Ord, PartialOrd, Debug)]
-#[reflect(mini, debug, hash, partial_eq)]
+#[derive(Debug, Clone, Copy, Ord, PartialOrd)]
 #[repr(transparent)]
 pub struct ComponentId(u32);
 
@@ -28,6 +25,15 @@ impl ComponentId {
     }
 }
 
+impl PartialEq for ComponentId {
+    #[inline(always)]
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for ComponentId {}
+
 impl hash::Hash for ComponentId {
     #[inline(always)]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
@@ -42,11 +48,36 @@ impl fmt::Display for ComponentId {
     }
 }
 
-impl PartialEq for ComponentId {
-    #[inline(always)]
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
+// -----------------------------------------------------------------------------
+// ComponentIdGenerator
+
+use vc_os::sync::atomic::{AtomicU32, Ordering};
+
+#[derive(Debug)]
+pub struct ComponentIdGenerator {
+    next: AtomicU32,
 }
 
-impl Eq for ComponentId {}
+impl ComponentIdGenerator {
+    pub fn peek(&self) -> ComponentId {
+        ComponentId(self.next.load(Ordering::Relaxed))
+    }
+
+    pub fn next(&self) -> ComponentId {
+        let next = self.next.fetch_add(1, Ordering::Relaxed);
+        assert!(next < u32::MAX, "too many components");
+        ComponentId(next)
+    }
+
+    pub fn peek_mut(&mut self) -> ComponentId {
+        ComponentId(*self.next.get_mut())
+    }
+
+    pub fn next_mut(&mut self) -> ComponentId {
+        let next = self.next.get_mut();
+        assert!(*next < u32::MAX, "too many components");
+        let result = ComponentId(*next);
+        *next += 1;
+        result
+    }
+}

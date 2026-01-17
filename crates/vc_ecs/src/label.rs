@@ -31,7 +31,6 @@ pub trait DynHash: DynEq {
 impl<T: Eq + Hash + Any> DynHash for T {
     fn dyn_hash(&self, mut state: &mut dyn Hasher) {
         T::hash(self, &mut state);
-        self.type_id().hash(&mut state);
     }
 }
 

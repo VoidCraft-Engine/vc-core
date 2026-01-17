@@ -1,10 +1,14 @@
 use core::alloc::Layout;
 use core::any::TypeId;
 
+use indexmap::IndexSet;
 use vc_ptr::OwningPtr;
+use vc_utils::hash::FixedHashState;
 
-use super::clone::ComponentCloneBehavior;
+use super::{ComponentCloneBehavior, RequiredComponents};
 
+use crate::component::ComponentId;
+use crate::lifecycle::ComponentHooks;
 use crate::relationship::RelationshipAccessor;
 use crate::storage::StorageType;
 use crate::utils::DebugName;
@@ -44,7 +48,12 @@ impl core::fmt::Debug for ComponentDescriptor {
 // -----------------------------------------------------------------------------
 // ComponentInfo
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ComponentInfo {
+    pub id: ComponentId,
+    pub descriptor: ComponentDescriptor,
+    pub hooks: ComponentHooks,
+    pub required_components: RequiredComponents,
+    pub required_by: IndexSet<ComponentId, FixedHashState>,
     // TODO
 }

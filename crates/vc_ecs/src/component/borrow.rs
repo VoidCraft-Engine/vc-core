@@ -468,7 +468,7 @@ macro_rules! impl_mut_methods {
             /// the contained reference.
             ///
             /// This is useful in a situation where you need to convert a
-            /// Mut<T>` to a `Mut<U>`, but only if `T` contains `U`.
+            /// `Mut<T>` to a `Mut<U>`, but only if `T` contains `U`.
             ///
             /// As with `map_unchanged`, you should never modify the argument passed to the closure.
             pub fn filter_map_unchanged<U: ?Sized>(

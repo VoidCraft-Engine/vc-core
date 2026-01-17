@@ -1,13 +1,7 @@
-//! Provide [`HashSet`] based on [hashbrown]'s implementation.
-//!
-//! Unlike [`hashbrown::HashSet`], [`HashSet`] defaults to [`FixedHashState`]
-//! instead of `RandomState`.
-//!
-//! This provides determinism by default with an acceptable compromise to denial
-//! of service resistance in the context of a game engine.
+//! Provide [`NoOpHashSet`] based on [hashbrown]'s implementation.
 
 use core::fmt::Debug;
-use core::hash::{BuildHasher, Hash};
+use core::hash::Hash;
 use core::ops::{BitAnd, BitAndAssign};
 use core::ops::{BitOr, BitOrAssign};
 use core::ops::{BitXor, BitXorAssign};
@@ -15,35 +9,25 @@ use core::ops::{Deref, DerefMut};
 use core::ops::{Sub, SubAssign};
 
 use hashbrown::{Equivalent, TryReserveError, hash_set as hb};
+use hb::{Difference, Intersection};
+use hb::{Drain, ExtractIf, Iter};
+use hb::{SymmetricDifference, Union};
 
-use crate::hash::FixedHashState;
-
-// -----------------------------------------------------------------------------
-// Re-Exports
-
-pub use hb::{Difference, Intersection, SymmetricDifference, Union};
-pub use hb::{Drain, ExtractIf, IntoIter, Iter};
-pub use hb::{OccupiedEntry, VacantEntry};
-
-/// Shortcut for [`Entry`](hb::Entry) with [`FixedHashState`] as hashing provider.
-pub type Entry<'a, T, S = FixedHashState> = hb::Entry<'a, T, S>;
+use crate::hash::NoOpHashState;
 
 // -----------------------------------------------------------------------------
-// HashSet
+// NoOpHashSet
 
-/// New-type for [`HashSet`] with [`FixedHashState`] as the default hashing provider.
-///
-/// Can be trivially converted to and from a [hashbrown] [`HashSet`] using [`From`].
-///
-/// This provides determinism by default with an acceptable compromise to denial
-/// of service resistance in the context of a game engine.
+type InternalSet<T> = hb::HashSet<T, NoOpHashState>;
+
+/// New-type for [`HashSet`] with [`NoOpHashState`] as the default hashing provider.
 ///
 /// # Examples
 ///
 /// ```
-/// use vc_utils::hash::HashSet;
+/// use vc_utils::hash::NoOpHashSet;
 ///
-/// let mut names = HashSet::new();
+/// let mut names = NoOpHashSet::new();
 ///
 /// names.insert("a");
 /// names.insert("b");
@@ -58,269 +42,191 @@ pub type Entry<'a, T, S = FixedHashState> = hb::Entry<'a, T, S>;
 ///
 /// [`HashSet`]: hb::HashSet
 #[repr(transparent)]
-pub struct HashSet<T, S = FixedHashState>(hb::HashSet<T, S>);
+pub struct NoOpHashSet<T>(InternalSet<T>);
 
 // -----------------------------------------------------------------------------
-// `FixedHashState` specific methods
+// `NoOpHashState` specific methods
 
-impl<T: Eq + Hash, const N: usize> From<[T; N]> for HashSet<T> {
+impl<T: Eq + Hash, const N: usize> From<[T; N]> for NoOpHashSet<T> {
     fn from(value: [T; N]) -> Self {
         value.into_iter().collect()
     }
 }
 
-impl<T> HashSet<T> {
-    /// Create a empty [`HashSet`]
+impl<T> NoOpHashSet<T> {
+    /// Create a empty [`NoOpHashSet`]
     ///
     /// # Example
     ///
     /// ```rust
-    /// use vc_utils::hash::HashSet;
+    /// use vc_utils::hash::NoOpHashSet;
     ///
-    /// let map = HashSet::new();
+    /// let map = NoOpHashSet::new();
     /// #
     /// # let mut map = map;
     /// # map.insert("foo");
     /// # assert_eq!(map.get("foo"), Some("foo").as_ref());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub const fn new() -> Self {
-        Self::with_hasher(FixedHashState)
+        Self(InternalSet::with_hasher(NoOpHashState))
     }
 
-    /// Create a empty [`HashSet`] with specific capacity
+    /// Create a empty [`NoOpHashSet`] with specific capacity
     ///
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
+    /// # use vc_utils::hash::NoOpHashSet;
     /// #
-    /// let map = HashSet::with_capacity(5);
+    /// let map = NoOpHashSet::with_capacity(5);
     /// #
     /// # let mut map = map;
     /// # map.insert("foo");
     /// # assert_eq!(map.get("foo"), Some("foo").as_ref());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn with_capacity(capacity: usize) -> Self {
-        Self::with_capacity_and_hasher(capacity, FixedHashState)
-    }
-}
-
-// -----------------------------------------------------------------------------
-// rayon support
-
-#[cfg(feature = "rayon")]
-use rayon::prelude::{FromParallelIterator, IntoParallelIterator, ParallelExtend};
-
-#[cfg(feature = "rayon")]
-impl<T, S, U> FromParallelIterator<U> for HashSet<T, S>
-where
-    hb::HashSet<T, S>: FromParallelIterator<U>,
-    U: Send,
-{
-    fn from_par_iter<P>(par_iter: P) -> Self
-    where
-        P: IntoParallelIterator<Item = U>,
-    {
-        Self(<hb::HashSet<T, S> as FromParallelIterator<U>>::from_par_iter(par_iter))
-    }
-}
-
-#[cfg(feature = "rayon")]
-impl<T, S> IntoParallelIterator for HashSet<T, S>
-where
-    hb::HashSet<T, S>: IntoParallelIterator,
-{
-    type Item = <hb::HashSet<T, S> as IntoParallelIterator>::Item;
-    type Iter = <hb::HashSet<T, S> as IntoParallelIterator>::Iter;
-
-    fn into_par_iter(self) -> Self::Iter {
-        self.0.into_par_iter()
-    }
-}
-
-#[cfg(feature = "rayon")]
-impl<'a, T: Sync, S> IntoParallelIterator for &'a HashSet<T, S>
-where
-    &'a hb::HashSet<T, S>: IntoParallelIterator,
-{
-    type Item = <&'a hb::HashSet<T, S> as IntoParallelIterator>::Item;
-    type Iter = <&'a hb::HashSet<T, S> as IntoParallelIterator>::Iter;
-
-    fn into_par_iter(self) -> Self::Iter {
-        (&self.0).into_par_iter()
-    }
-}
-
-#[cfg(feature = "rayon")]
-impl<T, S, U> ParallelExtend<U> for HashSet<T, S>
-where
-    hb::HashSet<T, S>: ParallelExtend<U>,
-    U: Send,
-{
-    fn par_extend<I>(&mut self, par_iter: I)
-    where
-        I: IntoParallelIterator<Item = U>,
-    {
-        <hb::HashSet<T, S> as ParallelExtend<U>>::par_extend(&mut self.0, par_iter);
+        Self(InternalSet::with_capacity_and_hasher(
+            capacity,
+            NoOpHashState,
+        ))
     }
 }
 
 // -----------------------------------------------------------------------------
 // Re-export the underlying method
 
-impl<T, S> Clone for HashSet<T, S>
+impl<T> Clone for NoOpHashSet<T>
 where
-    hb::HashSet<T, S>: Clone,
+    InternalSet<T>: Clone,
 {
-    #[inline]
+    #[inline(always)]
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 
-    #[inline]
+    #[inline(always)]
     fn clone_from(&mut self, source: &Self) {
         self.0.clone_from(&source.0);
     }
 }
 
-impl<T, S> Debug for HashSet<T, S>
+impl<T> Debug for NoOpHashSet<T>
 where
-    hb::HashSet<T, S>: Debug,
+    InternalSet<T>: Debug,
 {
-    #[inline]
+    #[inline(always)]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        <hb::HashSet<T, S> as Debug>::fmt(&self.0, f)
+        <InternalSet<T> as Debug>::fmt(&self.0, f)
     }
 }
 
-impl<T, S> Default for HashSet<T, S>
+impl<T> Default for NoOpHashSet<T>
 where
-    hb::HashSet<T, S>: Default,
+    InternalSet<T>: Default,
 {
-    #[inline]
+    #[inline(always)]
     fn default() -> Self {
         Self(Default::default())
     }
 }
 
-impl<T, S> PartialEq for HashSet<T, S>
+impl<T> PartialEq for NoOpHashSet<T>
 where
-    hb::HashSet<T, S>: PartialEq,
+    InternalSet<T>: PartialEq,
 {
-    #[inline]
+    #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         self.0.eq(&other.0)
     }
 }
 
-impl<T, S> Eq for HashSet<T, S> where hb::HashSet<T, S>: Eq {}
+impl<T> Eq for NoOpHashSet<T> where InternalSet<T>: Eq {}
 
-impl<T, S, X> FromIterator<X> for HashSet<T, S>
+impl<T, X> FromIterator<X> for NoOpHashSet<T>
 where
-    hb::HashSet<T, S>: FromIterator<X>,
+    InternalSet<T>: FromIterator<X>,
 {
-    #[inline]
+    #[inline(always)]
     fn from_iter<U: IntoIterator<Item = X>>(iter: U) -> Self {
         Self(FromIterator::from_iter(iter))
     }
 }
 
-impl<T, S> IntoIterator for HashSet<T, S>
+impl<T> IntoIterator for NoOpHashSet<T>
 where
-    hb::HashSet<T, S>: IntoIterator,
+    InternalSet<T>: IntoIterator,
 {
-    type Item = <hb::HashSet<T, S> as IntoIterator>::Item;
+    type Item = <InternalSet<T> as IntoIterator>::Item;
 
-    type IntoIter = <hb::HashSet<T, S> as IntoIterator>::IntoIter;
+    type IntoIter = <InternalSet<T> as IntoIterator>::IntoIter;
 
-    #[inline]
+    #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl<'a, T, S> IntoIterator for &'a HashSet<T, S>
+impl<'a, T> IntoIterator for &'a NoOpHashSet<T>
 where
-    &'a hb::HashSet<T, S>: IntoIterator,
+    &'a InternalSet<T>: IntoIterator,
 {
-    type Item = <&'a hb::HashSet<T, S> as IntoIterator>::Item;
+    type Item = <&'a InternalSet<T> as IntoIterator>::Item;
 
-    type IntoIter = <&'a hb::HashSet<T, S> as IntoIterator>::IntoIter;
+    type IntoIter = <&'a InternalSet<T> as IntoIterator>::IntoIter;
 
-    #[inline]
+    #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         (&self.0).into_iter()
     }
 }
 
-impl<'a, T, S> IntoIterator for &'a mut HashSet<T, S>
+impl<'a, T> IntoIterator for &'a mut NoOpHashSet<T>
 where
-    &'a mut hb::HashSet<T, S>: IntoIterator,
+    &'a mut InternalSet<T>: IntoIterator,
 {
-    type Item = <&'a mut hb::HashSet<T, S> as IntoIterator>::Item;
+    type Item = <&'a mut InternalSet<T> as IntoIterator>::Item;
 
-    type IntoIter = <&'a mut hb::HashSet<T, S> as IntoIterator>::IntoIter;
+    type IntoIter = <&'a mut InternalSet<T> as IntoIterator>::IntoIter;
 
-    #[inline]
+    #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         (&mut self.0).into_iter()
     }
 }
 
-impl<T, S, X> Extend<X> for HashSet<T, S>
+impl<T, X> Extend<X> for NoOpHashSet<T>
 where
-    hb::HashSet<T, S>: Extend<X>,
+    InternalSet<T>: Extend<X>,
 {
-    #[inline]
+    #[inline(always)]
     fn extend<U: IntoIterator<Item = X>>(&mut self, iter: U) {
         self.0.extend(iter);
     }
 }
 
-impl<T, S> From<crate::hash::HashMap<T, (), S>> for HashSet<T, S> {
-    #[inline]
-    fn from(value: crate::hash::HashMap<T, (), S>) -> Self {
-        Self(hb::HashSet::from(::hashbrown::HashMap::from(value)))
-    }
-}
+impl<T> Deref for NoOpHashSet<T> {
+    type Target = InternalSet<T>;
 
-impl<T, S> From<hb::HashSet<T, S>> for HashSet<T, S> {
-    #[inline]
-    fn from(value: hb::HashSet<T, S>) -> Self {
-        Self(value)
-    }
-}
-
-impl<T, S> From<HashSet<T, S>> for hb::HashSet<T, S> {
-    #[inline]
-    fn from(value: HashSet<T, S>) -> Self {
-        value.0
-    }
-}
-
-impl<T, S> Deref for HashSet<T, S> {
-    type Target = hb::HashSet<T, S>;
-
-    #[inline]
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<T, S> DerefMut for HashSet<T, S> {
-    #[inline]
+impl<T> DerefMut for NoOpHashSet<T> {
+    #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl<T, S> serde_core::Serialize for HashSet<T, S>
+impl<T> serde_core::Serialize for NoOpHashSet<T>
 where
-    hb::HashSet<T, S>: serde_core::Serialize,
+    InternalSet<T>: serde_core::Serialize,
 {
-    #[inline]
+    #[inline(always)]
     fn serialize<U>(&self, serializer: U) -> Result<U::Ok, U::Error>
     where
         U: serde_core::Serializer,
@@ -329,11 +235,11 @@ where
     }
 }
 
-impl<'de, T, S> serde_core::Deserialize<'de> for HashSet<T, S>
+impl<'de, T> serde_core::Deserialize<'de> for NoOpHashSet<T>
 where
-    hb::HashSet<T, S>: serde_core::Deserialize<'de>,
+    InternalSet<T>: serde_core::Deserialize<'de>,
 {
-    #[inline]
+    #[inline(always)]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde_core::Deserializer<'de>,
@@ -342,20 +248,20 @@ where
     }
 }
 
-impl<T, S> HashSet<T, S> {
+impl<T> NoOpHashSet<T> {
     /// Returns the number of elements the set can hold without reallocating.
     ///
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let map = HashSet::with_capacity(5);
+    /// # use vc_utils::hash::NoOpHashSet;
+    /// let map = NoOpHashSet::with_capacity(5);
     ///
-    /// # let map: HashSet<()> = map;
+    /// # let map: NoOpHashSet<()> = map;
     /// #
     /// assert!(map.capacity() >= 5);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn capacity(&self) -> usize {
         self.0.capacity()
     }
@@ -366,9 +272,8 @@ impl<T, S> HashSet<T, S> {
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// #
-    /// let mut map = HashSet::new();
+    /// # use vc_utils::hash::NoOpHashSet;
+    /// let mut map = NoOpHashSet::new();
     ///
     /// map.insert("foo");
     /// map.insert("bar");
@@ -377,10 +282,9 @@ impl<T, S> HashSet<T, S> {
     /// for value in map.iter() {
     ///     // "foo", "bar", "baz" (arbitrary order)
     /// }
-    /// #
     /// # assert_eq!(map.iter().count(), 3);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn iter(&self) -> Iter<'_, T> {
         self.0.iter()
     }
@@ -390,8 +294,8 @@ impl<T, S> HashSet<T, S> {
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let mut map = HashSet::new();
+    /// # use vc_utils::hash::NoOpHashSet;
+    /// let mut map = NoOpHashSet::new();
     ///
     /// assert_eq!(map.len(), 0);
     ///
@@ -399,7 +303,7 @@ impl<T, S> HashSet<T, S> {
     ///
     /// assert_eq!(map.len(), 1);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -409,8 +313,8 @@ impl<T, S> HashSet<T, S> {
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let mut map = HashSet::new();
+    /// # use vc_utils::hash::NoOpHashSet;
+    /// let mut map = NoOpHashSet::new();
     ///
     /// assert!(map.is_empty());
     ///
@@ -418,7 +322,7 @@ impl<T, S> HashSet<T, S> {
     ///
     /// assert!(!map.is_empty());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -428,9 +332,9 @@ impl<T, S> HashSet<T, S> {
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
+    /// # use vc_utils::hash::NoOpHashSet;
     /// #
-    /// let mut map = HashSet::new();
+    /// let mut map = NoOpHashSet::new();
     ///
     /// map.insert("foo");
     /// map.insert("bar");
@@ -443,7 +347,7 @@ impl<T, S> HashSet<T, S> {
     ///
     /// assert!(map.is_empty());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn drain(&mut self) -> Drain<'_, T> {
         self.0.drain()
     }
@@ -453,9 +357,9 @@ impl<T, S> HashSet<T, S> {
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
+    /// # use vc_utils::hash::NoOpHashSet;
     /// #
-    /// let mut map = HashSet::new();
+    /// let mut map = NoOpHashSet::new();
     ///
     /// map.insert("foo");
     /// map.insert("bar");
@@ -465,7 +369,7 @@ impl<T, S> HashSet<T, S> {
     ///
     /// assert_eq!(map.len(), 1);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn retain<F>(&mut self, f: F)
     where
         F: FnMut(&T) -> bool,
@@ -479,9 +383,9 @@ impl<T, S> HashSet<T, S> {
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
+    /// # use vc_utils::hash::NoOpHashSet;
     /// #
-    /// let mut map = HashSet::new();
+    /// let mut map = NoOpHashSet::new();
     ///
     /// map.insert("foo");
     /// map.insert("bar");
@@ -494,7 +398,7 @@ impl<T, S> HashSet<T, S> {
     /// assert_eq!(map.len(), 2);
     /// assert_eq!(extracted.len(), 1);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn extract_if<F>(&mut self, f: F) -> ExtractIf<'_, T, F>
     where
         F: FnMut(&T) -> bool,
@@ -507,9 +411,9 @@ impl<T, S> HashSet<T, S> {
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
+    /// # use vc_utils::hash::NoOpHashSet;
     /// #
-    /// let mut map = HashSet::new();
+    /// let mut map = NoOpHashSet::new();
     ///
     /// map.insert("foo");
     /// map.insert("bar");
@@ -519,84 +423,25 @@ impl<T, S> HashSet<T, S> {
     ///
     /// assert!(map.is_empty());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn clear(&mut self) {
         self.0.clear();
     }
-
-    /// Creates a new empty hash set which will use the given hasher to hash keys.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// # use vc_utils::hash::FixedHashState as SomeHasher;
-    ///
-    /// let map = HashSet::with_hasher(SomeHasher);
-    /// #
-    /// # let mut map = map;
-    /// # map.insert("foo");
-    /// # assert_eq!(map.get("foo"), Some("foo").as_ref());
-    /// ```
-    #[inline]
-    pub const fn with_hasher(hasher: S) -> Self {
-        Self(hb::HashSet::with_hasher(hasher))
-    }
-
-    /// Creates an empty HashSet with the specified capacity, using hasher to hash the keys.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// # use vc_utils::hash::FixedHashState as SomeHasher;
-    ///
-    /// let map = HashSet::with_capacity_and_hasher(5, SomeHasher);
-    /// #
-    /// # let mut map = map;
-    /// # map.insert("foo");
-    /// # assert_eq!(map.get("foo"), Some("foo").as_ref());
-    /// ```
-    #[inline]
-    pub fn with_capacity_and_hasher(capacity: usize, hasher: S) -> Self {
-        Self(hb::HashSet::with_capacity_and_hasher(capacity, hasher))
-    }
-
-    /// Returns a reference to the set's  [`BuildHasher`] .
-    #[inline]
-    pub fn hasher(&self) -> &S {
-        self.0.hasher()
-    }
-
-    /// Return inner [`hb::HashSet`]
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let map: HashSet<&'static str> = HashSet::new();
-    /// let map: hashbrown::HashSet<&'static str, _> = map.into_inner();
-    /// ```
-    #[inline]
-    pub fn into_inner(self) -> hb::HashSet<T, S> {
-        self.0
-    }
 }
 
-impl<T, S> HashSet<T, S>
+impl<T> NoOpHashSet<T>
 where
     T: Eq + Hash,
-    S: BuildHasher,
 {
-    /// Reserves capacity for at least additional more elements to be inserted in the HashSet.
+    /// Reserves capacity for at least additional more elements to be inserted in the NoOpHashSet.
     ///
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let mut map = HashSet::with_capacity(5);
+    /// # use vc_utils::hash::NoOpHashSet;
+    /// let mut map = NoOpHashSet::with_capacity(5);
     ///
-    /// # let mut map: HashSet<()> = map;
+    /// # let mut map: NoOpHashSet<()> = map;
     /// #
     /// assert!(map.capacity() >= 5);
     ///
@@ -604,7 +449,7 @@ where
     ///
     /// assert!(map.capacity() - map.len() >= 10);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn reserve(&mut self, additional: usize) {
         self.0.reserve(additional);
     }
@@ -614,10 +459,10 @@ where
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let mut map = HashSet::with_capacity(5);
+    /// # use vc_utils::hash::NoOpHashSet;
+    /// let mut map = NoOpHashSet::with_capacity(5);
     ///
-    /// # let mut map: HashSet<()> = map;
+    /// # let mut map: NoOpHashSet<()> = map;
     /// #
     /// assert!(map.capacity() >= 5);
     ///
@@ -625,7 +470,7 @@ where
     ///
     /// assert!(map.capacity() - map.len() >= 10);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
         self.0.try_reserve(additional)
     }
@@ -635,8 +480,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let mut map = HashSet::with_capacity(5);
+    /// # use vc_utils::hash::NoOpHashSet;
+    /// let mut map = NoOpHashSet::with_capacity(5);
     ///
     /// map.insert("foo");
     /// map.insert("bar");
@@ -648,38 +493,41 @@ where
     ///
     /// assert_eq!(map.capacity(), 3);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn shrink_to_fit(&mut self) {
         self.0.shrink_to_fit();
     }
 
     /// Shrinks the capacity of the set with a lower limit.
-    #[inline]
+    #[inline(always)]
     pub fn shrink_to(&mut self, min_capacity: usize) {
         self.0.shrink_to(min_capacity);
     }
 
     /// Visits the values representing the difference
-    #[inline]
-    pub fn difference<'a>(&'a self, other: &'a Self) -> Difference<'a, T, S> {
+    #[inline(always)]
+    pub fn difference<'a>(&'a self, other: &'a Self) -> Difference<'a, T, NoOpHashState> {
         self.0.difference(other)
     }
 
     /// Visits the values representing the symmetric difference
-    #[inline]
-    pub fn symmetric_difference<'a>(&'a self, other: &'a Self) -> SymmetricDifference<'a, T, S> {
+    #[inline(always)]
+    pub fn symmetric_difference<'a>(
+        &'a self,
+        other: &'a Self,
+    ) -> SymmetricDifference<'a, T, NoOpHashState> {
         self.0.symmetric_difference(other)
     }
 
     /// Visits the values representing the intersection
-    #[inline]
-    pub fn intersection<'a>(&'a self, other: &'a Self) -> Intersection<'a, T, S> {
+    #[inline(always)]
+    pub fn intersection<'a>(&'a self, other: &'a Self) -> Intersection<'a, T, NoOpHashState> {
         self.0.intersection(other)
     }
 
     /// Visits the values representing the union
-    #[inline]
-    pub fn union<'a>(&'a self, other: &'a Self) -> Union<'a, T, S> {
+    #[inline(always)]
+    pub fn union<'a>(&'a self, other: &'a Self) -> Union<'a, T, NoOpHashState> {
         self.0.union(other)
     }
 
@@ -688,14 +536,14 @@ where
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let mut map = HashSet::new();
+    /// # use vc_utils::hash::NoOpHashSet;
+    /// let mut map = NoOpHashSet::new();
     ///
     /// map.insert("foo");
     ///
     /// assert!(map.contains("foo"));
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn contains<Q>(&self, value: &Q) -> bool
     where
         Q: Hash + Equivalent<T> + ?Sized,
@@ -708,14 +556,14 @@ where
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let mut map = HashSet::new();
+    /// # use vc_utils::hash::NoOpHashSet;
+    /// let mut map = NoOpHashSet::new();
     ///
     /// map.insert("foo");
     ///
     /// assert_eq!(map.get("foo"), Some(&"foo"));
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn get<Q>(&self, value: &Q) -> Option<&T>
     where
         Q: Hash + Equivalent<T> + ?Sized,
@@ -729,12 +577,12 @@ where
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let mut map = HashSet::new();
+    /// # use vc_utils::hash::NoOpHashSet;
+    /// let mut map = NoOpHashSet::new();
     ///
     /// assert_eq!(map.get_or_insert("foo"), &"foo");
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn get_or_insert(&mut self, value: T) -> &T {
         self.0.get_or_insert(value)
     }
@@ -745,12 +593,12 @@ where
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let mut map = HashSet::new();
+    /// # use vc_utils::hash::NoOpHashSet;
+    /// let mut map = NoOpHashSet::new();
     ///
     /// assert_eq!(map.get_or_insert_with(&"foo", |_| "foo"), &"foo");
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn get_or_insert_with<Q, F>(&mut self, value: &Q, f: F) -> &T
     where
         Q: Hash + Equivalent<T> + ?Sized,
@@ -764,32 +612,32 @@ where
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let mut map = HashSet::new();
+    /// # use vc_utils::hash::NoOpHashSet;
+    /// let mut map = NoOpHashSet::new();
     ///
     /// let value = map.entry("foo").or_insert();
     /// #
     /// # assert_eq!(value, ());
     /// ```
-    #[inline]
-    pub fn entry(&mut self, value: T) -> Entry<'_, T, S> {
+    #[inline(always)]
+    pub fn entry(&mut self, value: T) -> hb::Entry<'_, T, NoOpHashState> {
         self.0.entry(value)
     }
 
     /// Returns true if self has no elements in common with other.
-    #[inline]
+    #[inline(always)]
     pub fn is_disjoint(&self, other: &Self) -> bool {
         self.0.is_disjoint(other)
     }
 
     /// Returns true if the set is a subset of another
-    #[inline]
+    #[inline(always)]
     pub fn is_subset(&self, other: &Self) -> bool {
         self.0.is_subset(other)
     }
 
     /// Returns true if the set is a superset of another
-    #[inline]
+    #[inline(always)]
     pub fn is_superset(&self, other: &Self) -> bool {
         self.0.is_superset(other)
     }
@@ -799,14 +647,14 @@ where
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let mut map = HashSet::new();
+    /// # use vc_utils::hash::NoOpHashSet;
+    /// let mut map = NoOpHashSet::new();
     ///
     /// map.insert("foo");
     ///
     /// assert!(map.contains("foo"));
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn insert(&mut self, value: T) -> bool {
         self.0.insert(value)
     }
@@ -817,14 +665,14 @@ where
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let mut map = HashSet::new();
+    /// # use vc_utils::hash::NoOpHashSet;
+    /// let mut map = NoOpHashSet::new();
     ///
     /// map.insert("foo");
     ///
     /// assert_eq!(map.replace("foo"), Some("foo"));
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn replace(&mut self, value: T) -> Option<T> {
         self.0.replace(value)
     }
@@ -834,8 +682,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let mut map = HashSet::new();
+    /// # use vc_utils::hash::NoOpHashSet;
+    /// let mut map = NoOpHashSet::new();
     ///
     /// map.insert("foo");
     ///
@@ -843,7 +691,7 @@ where
     ///
     /// assert!(map.is_empty());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn remove<Q>(&mut self, value: &Q) -> bool
     where
         Q: Hash + Equivalent<T> + ?Sized,
@@ -856,8 +704,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let mut map = HashSet::new();
+    /// # use vc_utils::hash::NoOpHashSet;
+    /// let mut map = NoOpHashSet::new();
     ///
     /// map.insert("foo");
     ///
@@ -865,7 +713,7 @@ where
     ///
     /// assert!(map.is_empty());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn take<Q>(&mut self, value: &Q) -> Option<T>
     where
         Q: Hash + Equivalent<T> + ?Sized,
@@ -878,8 +726,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let mut map = HashSet::new();
+    /// # use vc_utils::hash::NoOpHashSet;
+    /// let mut map = NoOpHashSet::new();
     ///
     /// assert_eq!(map.allocation_size(), 0);
     ///
@@ -887,7 +735,7 @@ where
     ///
     /// assert!(map.allocation_size() >= size_of::<&'static str>());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn allocation_size(&self) -> usize {
         self.0.allocation_size()
     }
@@ -906,105 +754,105 @@ where
     /// are guaranteed to not violate memory safety.
     ///
     /// However this operation is still unsafe
-    /// because the resulting HashSet may be passed to unsafe code
+    /// because the resulting NoOpHashSet may be passed to unsafe code
     /// which does expect the set to behave correctly,
     /// and would cause unsoundness as a result.
     #[expect(unsafe_code, reason = "re-exporting unsafe method")]
-    #[inline]
+    #[inline(always)]
     pub unsafe fn insert_unique_unchecked(&mut self, value: T) -> &T {
         // SAFETY: safety contract is ensured by the caller.
         unsafe { self.0.insert_unique_unchecked(value) }
     }
 }
 
-impl<T, S> BitOr<&HashSet<T, S>> for &HashSet<T, S>
+impl<T> BitOr<&NoOpHashSet<T>> for &NoOpHashSet<T>
 where
-    for<'a> &'a hb::HashSet<T, S>: BitOr<&'a hb::HashSet<T, S>, Output = hb::HashSet<T, S>>,
+    for<'a> &'a InternalSet<T>: BitOr<&'a InternalSet<T>, Output = InternalSet<T>>,
 {
-    type Output = HashSet<T, S>;
+    type Output = NoOpHashSet<T>;
 
     /// Performs the | operation.
-    #[inline]
-    fn bitor(self, rhs: &HashSet<T, S>) -> HashSet<T, S> {
-        HashSet(self.0.bitor(&rhs.0))
+    #[inline(always)]
+    fn bitor(self, rhs: &NoOpHashSet<T>) -> NoOpHashSet<T> {
+        NoOpHashSet(self.0.bitor(&rhs.0))
     }
 }
 
-impl<T, S> BitAnd<&HashSet<T, S>> for &HashSet<T, S>
+impl<T> BitAnd<&NoOpHashSet<T>> for &NoOpHashSet<T>
 where
-    for<'a> &'a hb::HashSet<T, S>: BitAnd<&'a hb::HashSet<T, S>, Output = hb::HashSet<T, S>>,
+    for<'a> &'a InternalSet<T>: BitAnd<&'a InternalSet<T>, Output = InternalSet<T>>,
 {
-    type Output = HashSet<T, S>;
+    type Output = NoOpHashSet<T>;
 
     /// Performs the & operation.
-    #[inline]
-    fn bitand(self, rhs: &HashSet<T, S>) -> HashSet<T, S> {
-        HashSet(self.0.bitand(&rhs.0))
+    #[inline(always)]
+    fn bitand(self, rhs: &NoOpHashSet<T>) -> NoOpHashSet<T> {
+        NoOpHashSet(self.0.bitand(&rhs.0))
     }
 }
 
-impl<T, S> BitXor<&HashSet<T, S>> for &HashSet<T, S>
+impl<T> BitXor<&NoOpHashSet<T>> for &NoOpHashSet<T>
 where
-    for<'a> &'a hb::HashSet<T, S>: BitXor<&'a hb::HashSet<T, S>, Output = hb::HashSet<T, S>>,
+    for<'a> &'a InternalSet<T>: BitXor<&'a InternalSet<T>, Output = InternalSet<T>>,
 {
-    type Output = HashSet<T, S>;
+    type Output = NoOpHashSet<T>;
 
     /// Performs the ^ operation.
-    #[inline]
-    fn bitxor(self, rhs: &HashSet<T, S>) -> HashSet<T, S> {
-        HashSet(self.0.bitxor(&rhs.0))
+    #[inline(always)]
+    fn bitxor(self, rhs: &NoOpHashSet<T>) -> NoOpHashSet<T> {
+        NoOpHashSet(self.0.bitxor(&rhs.0))
     }
 }
 
-impl<T, S> Sub<&HashSet<T, S>> for &HashSet<T, S>
+impl<T> Sub<&NoOpHashSet<T>> for &NoOpHashSet<T>
 where
-    for<'a> &'a hb::HashSet<T, S>: Sub<&'a hb::HashSet<T, S>, Output = hb::HashSet<T, S>>,
+    for<'a> &'a InternalSet<T>: Sub<&'a InternalSet<T>, Output = InternalSet<T>>,
 {
-    type Output = HashSet<T, S>;
+    type Output = NoOpHashSet<T>;
 
     /// Performs the - operation.
-    #[inline]
-    fn sub(self, rhs: &HashSet<T, S>) -> HashSet<T, S> {
-        HashSet(self.0.sub(&rhs.0))
+    #[inline(always)]
+    fn sub(self, rhs: &NoOpHashSet<T>) -> NoOpHashSet<T> {
+        NoOpHashSet(self.0.sub(&rhs.0))
     }
 }
 
-impl<T, S> BitOrAssign<&HashSet<T, S>> for HashSet<T, S>
+impl<T> BitOrAssign<&NoOpHashSet<T>> for NoOpHashSet<T>
 where
-    hb::HashSet<T, S>: for<'a> BitOrAssign<&'a hb::HashSet<T, S>>,
+    InternalSet<T>: for<'a> BitOrAssign<&'a InternalSet<T>>,
 {
-    #[inline]
-    fn bitor_assign(&mut self, rhs: &HashSet<T, S>) {
+    #[inline(always)]
+    fn bitor_assign(&mut self, rhs: &NoOpHashSet<T>) {
         self.0.bitor_assign(&rhs.0);
     }
 }
 
-impl<T, S> BitAndAssign<&HashSet<T, S>> for HashSet<T, S>
+impl<T> BitAndAssign<&NoOpHashSet<T>> for NoOpHashSet<T>
 where
-    hb::HashSet<T, S>: for<'a> BitAndAssign<&'a hb::HashSet<T, S>>,
+    InternalSet<T>: for<'a> BitAndAssign<&'a InternalSet<T>>,
 {
-    #[inline]
-    fn bitand_assign(&mut self, rhs: &HashSet<T, S>) {
+    #[inline(always)]
+    fn bitand_assign(&mut self, rhs: &NoOpHashSet<T>) {
         self.0.bitand_assign(&rhs.0);
     }
 }
 
-impl<T, S> BitXorAssign<&HashSet<T, S>> for HashSet<T, S>
+impl<T> BitXorAssign<&NoOpHashSet<T>> for NoOpHashSet<T>
 where
-    hb::HashSet<T, S>: for<'a> BitXorAssign<&'a hb::HashSet<T, S>>,
+    InternalSet<T>: for<'a> BitXorAssign<&'a InternalSet<T>>,
 {
-    #[inline]
-    fn bitxor_assign(&mut self, rhs: &HashSet<T, S>) {
+    #[inline(always)]
+    fn bitxor_assign(&mut self, rhs: &NoOpHashSet<T>) {
         self.0.bitxor_assign(&rhs.0);
     }
 }
 
-impl<T, S> SubAssign<&HashSet<T, S>> for HashSet<T, S>
+impl<T> SubAssign<&NoOpHashSet<T>> for NoOpHashSet<T>
 where
-    hb::HashSet<T, S>: for<'a> SubAssign<&'a hb::HashSet<T, S>>,
+    InternalSet<T>: for<'a> SubAssign<&'a InternalSet<T>>,
 {
-    #[inline]
-    fn sub_assign(&mut self, rhs: &HashSet<T, S>) {
+    #[inline(always)]
+    fn sub_assign(&mut self, rhs: &NoOpHashSet<T>) {
         self.0.sub_assign(&rhs.0);
     }
 }

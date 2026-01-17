@@ -9,8 +9,9 @@ pub const MAX_TICK_AGE: u32 = (u32::MAX / CHECK_CYCLE - 2) * CHECK_CYCLE - 1;
 
 use vc_reflect::derive::Reflect;
 
-#[derive(Reflect, Copy, Clone, Default, Debug, Eq, Hash, PartialEq)]
+#[derive(Reflect, Debug, Copy, Clone, Default, Eq, PartialEq)]
 #[reflect(mini, default, debug, hash, partial_eq)]
+#[repr(transparent)]
 pub struct Tick {
     tick: u32,
 }
@@ -43,7 +44,6 @@ impl Tick {
 
     #[inline]
     pub const fn is_newer_than(self, other: Tick, now: Tick) -> bool {
-        // TODO: used `Ord::min` instead if/when it's const stable.
         #[inline(always)]
         const fn min(x: u32, y: u32) -> u32 {
             if x < y { x } else { y }
@@ -67,14 +67,25 @@ impl Tick {
     }
 }
 
+impl core::hash::Hash for Tick {
+    #[inline(always)]
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        state.write_u32(self.tick);
+    }
+}
+
 // -----------------------------------------------------------------------------
 // CheckTicks
 
 #[derive(Debug, Clone, Copy)]
-pub struct CheckTicks(pub(crate) Tick);
+pub struct CheckTicks(Tick);
 
 impl CheckTicks {
-    /// Get the present `Tick` that other ticks get compared to.
+    #[inline(always)]
+    pub const fn new(tick: Tick) -> Self {
+        Self(tick)
+    }
+
     #[inline(always)]
     pub const fn tick(self) -> Tick {
         self.0

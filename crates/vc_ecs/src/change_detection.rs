@@ -71,7 +71,7 @@ pub trait DetectChangesMut: DetectChanges {
     /// Manually sets the added tick recording the time when this data was last added.
     ///
     /// # Warning
-    /// The caveats of [`set_last_changed`](DetectChangesMut::set_last_changed) apply.
+    /// The caveats of [`set_changed`](DetectChangesMut::set_changed) apply.
     /// This modifies both the added and changed ticks together.
     fn set_added_with(&mut self, added: Tick);
 

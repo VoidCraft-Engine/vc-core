@@ -36,7 +36,7 @@ impl<T: Copy> ThinArray<UnsafeCell<T>> {
 
     #[inline(always)]
     pub const unsafe fn copy_item(&self, index: usize) -> T {
-        unsafe { core::ptr::read(self.data.as_ptr().add(index)).into_inner() }
+        unsafe { core::ptr::read(self.data.as_ptr().add(index) as *const T) }
     }
 }
 
@@ -121,6 +121,18 @@ impl<T> ThinArray<T> {
             core::ptr::copy_nonoverlapping(last, removal, 1);
 
             value
+        }
+    }
+
+    #[inline(always)]
+    pub const unsafe fn copy_remove_nonoverlapping(&mut self, index: usize, last_index: usize) {
+        let base_ptr = self.data.as_ptr();
+
+        unsafe {
+            let last = base_ptr.add(last_index);
+            let removal = base_ptr.add(index);
+
+            core::ptr::copy_nonoverlapping(last, removal, 1);
         }
     }
 }

@@ -1,5 +1,9 @@
 use crate::derive::{impl_reflect_opaque, impl_type_path};
 use crate::impls::{impl_reflect_for_hashmap, impl_reflect_for_hashset};
+use crate::impls::{impl_reflect_for_noophashmap, impl_reflect_for_noophashset};
+
+// -----------------------------------------------------------------------------
+// HashState Hasher
 
 impl_type_path!(::vc_utils::hash::FixedHashState);
 impl_type_path!(::vc_utils::hash::NoOpHashState);
@@ -34,8 +38,36 @@ impl_type_path!(
     ::vc_utils::hash::hashbrown::DefaultHashBuilder
 );
 
+// -----------------------------------------------------------------------------
+// Fixed HashSet and HashMap
+
 impl_type_path!(::vc_utils::hash::HashSet<T, S>);
 impl_type_path!(::vc_utils::hash::HashMap<K, V, S>);
+
+impl_reflect_for_hashset!(
+    ::vc_utils::hash::HashSet<T, S>,
+    ::vc_utils::hash::FixedHashState,
+);
+
+impl_reflect_for_hashmap!(
+    ::vc_utils::hash::HashMap<K, V, S>,
+    ::vc_utils::hash::FixedHashState,
+);
+
+// -----------------------------------------------------------------------------
+// NoOp HashSet and HashMap
+
+impl_type_path!(::vc_utils::hash::NoOpHashSet<T>);
+impl_type_path!(::vc_utils::hash::NoOpHashMap<K, V>);
+
+impl_reflect_for_noophashset!(::vc_utils::hash::NoOpHashSet<T>);
+
+impl_reflect_for_noophashmap!(
+    ::vc_utils::hash::NoOpHashMap<K, V>
+);
+
+// -----------------------------------------------------------------------------
+// hashbrown HashSet and HashMap
 
 impl_type_path!(
     (in hashbrown as HashSet)
@@ -48,18 +80,8 @@ impl_type_path!(
 );
 
 impl_reflect_for_hashset!(
-    ::vc_utils::hash::HashSet<T, S>,
-    ::vc_utils::hash::FixedHashState,
-);
-
-impl_reflect_for_hashset!(
     ::vc_utils::hash::hashbrown::HashSet<T, S>,
     ::vc_utils::hash::hashbrown::DefaultHashBuilder,
-);
-
-impl_reflect_for_hashmap!(
-    ::vc_utils::hash::HashMap<K, V, S>,
-    ::vc_utils::hash::FixedHashState,
 );
 
 impl_reflect_for_hashmap!(

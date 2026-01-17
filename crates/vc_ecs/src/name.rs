@@ -29,6 +29,14 @@ impl Default for Name {
 }
 
 impl Name {
+    #[inline]
+    pub fn new(name: impl Into<Cow<'static, str>>) -> Self {
+        let name = name.into();
+        let mut name = Name { name, hash: 0 };
+        name.update_hash();
+        name
+    }
+
     #[inline(always)]
     fn update_hash(&mut self) {
         self.hash = FixedHashState.hash_one(&self.name);
@@ -50,14 +58,6 @@ impl Name {
         self.name = name.into();
         self.update_hash();
     }
-
-    #[inline]
-    pub fn new(name: impl Into<Cow<'static, str>>) -> Self {
-        let name = name.into();
-        let mut name = Name { name, hash: 0 };
-        name.update_hash();
-        name
-    }
 }
 
 impl Deref for Name {
@@ -71,7 +71,7 @@ impl Deref for Name {
 impl Hash for Name {
     #[inline(always)]
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.hash.hash(state);
+        state.write_u64(self.hash);
     }
 }
 

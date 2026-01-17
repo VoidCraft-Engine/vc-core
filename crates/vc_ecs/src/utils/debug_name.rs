@@ -48,7 +48,7 @@ impl fmt::Debug for DebugName {
 }
 
 impl From<Cow<'static, str>> for DebugName {
-    #[inline]
+    #[inline(always)]
     fn from(_value: Cow<'static, str>) -> Self {
         cfg::debug! {
             if { Self{ name: _value } }
@@ -58,7 +58,7 @@ impl From<Cow<'static, str>> for DebugName {
 }
 
 impl From<DebugName> for Cow<'static, str> {
-    #[inline]
+    #[inline(always)]
     fn from(_value: DebugName) -> Self {
         cfg::debug! {
             if { _value.name }
@@ -68,14 +68,14 @@ impl From<DebugName> for Cow<'static, str> {
 }
 
 impl From<String> for DebugName {
-    #[inline]
+    #[inline(always)]
     fn from(value: String) -> Self {
         Self::owned(value)
     }
 }
 
 impl From<&'static str> for DebugName {
-    #[inline]
+    #[inline(always)]
     fn from(value: &'static str) -> Self {
         Self::borrowed(value)
     }
@@ -124,7 +124,7 @@ impl DebugName {
     /// Get the [`ShortName`] corresponding to this debug name
     ///
     /// The value will be a static string if the `debug` feature is not enabled
-    #[inline]
+    #[inline(always)]
     pub fn shortname(&self) -> ShortName<'_> {
         cfg::debug! {
             if { ShortName(self.name.as_ref()) }

@@ -48,10 +48,25 @@
 //! [`TypePath`]: crate::info::TypePath
 //! [`Typed`]: crate::info::Typed
 
+// -----------------------------------------------------------------------------
+// Modules
+
 mod cell;
+mod utils;
+
+mod alloc;
+mod core;
+mod native;
+mod vc_os;
+mod vc_utils;
+
+crate::cfg::std! { mod std; }
+
+// -----------------------------------------------------------------------------
+// Exports
+
 pub use cell::{GenericTypeInfoCell, GenericTypePathCell, NonGenericTypeInfoCell};
 
-mod utils;
 pub use utils::*;
 
 /// An efficient string concatenation function.
@@ -81,11 +96,3 @@ pub fn concat(arr: &[&str]) -> ::alloc::string::String {
     }
     res
 }
-
-mod alloc;
-mod core;
-mod native;
-mod vc_os;
-mod vc_utils;
-
-crate::cfg::std! { mod std; }

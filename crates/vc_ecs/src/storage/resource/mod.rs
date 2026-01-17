@@ -1,5 +1,5 @@
 mod data;
 mod resources;
 
-pub use data::ResourceData;
-pub use resources::Resources;
+pub use data::{NoSendResourceData, ResourceData};
+pub use resources::{NoSendResources, Resources};

@@ -1,9 +1,13 @@
 //! Implement `AccessPath` for &str.
 
-use alloc::{borrow::Cow, format};
+use alloc::borrow::Cow;
+use alloc::format;
 use core::fmt::{self, Write};
 
 use crate::access::{AccessPath, Accessor, OffsetAccessor, ParseError};
+
+// -----------------------------------------------------------------------------
+// Ident
 
 struct Ident<'a>(&'a str);
 
@@ -40,6 +44,9 @@ impl<'a> Ident<'a> {
         }
     }
 }
+
+// -----------------------------------------------------------------------------
+// Token
 
 // NOTE: We use repr(u8) so that the `match byte` in `Token::symbol_from_byte`
 // becomes a "check `byte` is one of SYMBOLS and forward its value" this makes
@@ -80,6 +87,9 @@ impl fmt::Display for Token<'_> {
     }
 }
 
+// -----------------------------------------------------------------------------
+// Error
+
 // Seal visibility
 enum InnerError<'a> {
     NoIdent,
@@ -114,6 +124,9 @@ impl<'a> InnerError<'a> {
         }
     }
 }
+
+// -----------------------------------------------------------------------------
+// PathParser
 
 // A one-time path parser
 struct PathParser<'a> {
@@ -204,6 +217,9 @@ impl<'a> Iterator for PathParser<'a> {
         Some(res)
     }
 }
+
+// -----------------------------------------------------------------------------
+// Impl for &str
 
 // impl for str
 impl<'a> AccessPath<'a> for &'a str {

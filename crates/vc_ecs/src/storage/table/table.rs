@@ -14,7 +14,7 @@ use super::TableRow;
 use crate::cfg;
 use crate::component::{ComponentId, ComponentTicks};
 use crate::entity::Entity;
-use crate::storage::utils::AbortOnDrop;
+use crate::storage::utils::{AbortOnDrop, VecSwapRemove};
 use crate::storage::{Column, FixedSparseMap, SparseMap};
 use crate::tick::CheckTicks;
 use crate::tick::Tick;
@@ -54,11 +54,12 @@ impl TableBuilder {
         item_layout: Layout,
         drop_fn: Option<unsafe fn(OwningPtr<'_>)>,
     ) -> Self {
+        let col = Column::empty(item_layout, drop_fn);
+
         if let Some(column_index) = self.sparse.get_copied(id) {
             // SAFETY: dense indices stored in self.sparse always exist
             unsafe {
-                *self.columns.get_unchecked_mut(column_index.get() as usize) =
-                    Column::empty(item_layout, drop_fn);
+                *self.columns.get_unchecked_mut(column_index.get() as usize) = col;
             }
         } else {
             assert!(
@@ -66,12 +67,11 @@ impl TableBuilder {
                 "Component number in a Entity storaged in Table cannot exceed `254`"
             );
 
-            // SAFETY: already checked.
             self.sparse.insert(id, unsafe {
                 NonMaxU8::new_unchecked(self.columns.len() as u8)
             });
             self.indices.push(id);
-            self.columns.push(Column::empty(item_layout, drop_fn));
+            self.columns.push(col);
         }
 
         self
@@ -101,8 +101,8 @@ pub struct Table {
 
 impl Drop for Table {
     fn drop(&mut self) {
-        let current_capacity = self.capacity();
         let len = self.entity_count();
+        let current_capacity = self.capacity();
         self.entities.clear();
         for column in &mut self.columns {
             unsafe {
@@ -158,6 +158,8 @@ impl Table {
     }
 
     pub unsafe fn get_component(&self, id: ComponentId, row: TableRow) -> Option<Ptr<'_>> {
+        cfg::debug! { assert!(row.index() < self.entity_count()); }
+
         self.get_column(id)
             .map(|col| unsafe { col.get_data(row.index()) })
     }
@@ -167,6 +169,8 @@ impl Table {
         component_id: ComponentId,
         row: TableRow,
     ) -> OwningPtr<'_> {
+        cfg::debug! { assert!(row.index() < self.entity_count()); }
+
         unsafe {
             self.get_column_mut(component_id)
                 .debug_checked_unwrap()
@@ -203,19 +207,24 @@ impl Table {
         let removal_index = row.index();
         let last_index = self.entity_count() - 1;
 
+        cfg::debug! { assert!(removal_index <= last_index); }
+
         unsafe {
-            if removal_index == last_index {
+            if removal_index != last_index {
+                let entity = self
+                    .entities
+                    .copy_last_and_return_nonoverlapping(removal_index, last_index);
+
+                for column in &mut self.columns {
+                    column.swap_remove_and_drop_nonoverlapping(removal_index, last_index);
+                }
+                Some(entity)
+            } else {
                 self.entities.set_len(last_index);
                 for column in &mut self.columns {
                     column.drop_last(last_index);
                 }
                 None
-            } else {
-                let entity = self.entities.copy_remove_nonoverlapping(removal_index);
-                for column in &mut self.columns {
-                    column.swap_remove_and_drop_nonoverlapping(removal_index, last_index);
-                }
-                Some(entity)
             }
         }
     }
@@ -277,12 +286,11 @@ impl Table {
     }
 
     pub unsafe fn allocate(&mut self, entity: Entity) -> TableRow {
-        self.reserve_one();
-
         let len = self.entity_count();
-        cfg::debug! {
-            assert!(len < u32::MAX as usize);
-        }
+
+        cfg::debug! { assert!(len < u32::MAX as usize); }
+
+        self.reserve_one();
 
         self.entities.push(entity);
         for col in &mut self.columns {
@@ -300,34 +308,51 @@ impl Table {
         other: &mut Table,
     ) -> TableMoveResult {
         let src_index = row.index();
-        cfg::debug! {
-            assert!(src_index < self.entity_count());
-        }
-
         let last_index = self.entity_count() - 1;
 
-        let dst_row = unsafe { other.allocate(self.entities.swap_remove(src_index)) };
-        let dst_index = dst_row.index();
+        cfg::debug! { assert!(src_index < self.entity_count()); }
 
-        for (id, column) in self.indices.iter().zip(self.columns.iter_mut()) {
+        if src_index != last_index {
             unsafe {
-                if let Some(other_col) = other.get_column_mut(*id) {
-                    other_col.init_item_from(column, last_index, src_index, dst_index);
-                } else {
-                    let _ = column.swap_remove(src_index, last_index);
+                let dst_row = other.allocate(
+                    self.entities
+                        .swap_remove_nonoverlapping(src_index, last_index),
+                );
+                let dst_index = dst_row.index();
+
+                for (id, column) in self.indices.iter().zip(self.columns.iter_mut()) {
+                    if let Some(other_col) = other.get_column_mut(*id) {
+                        other_col.init_item_from_nonoverlapping(
+                            column, last_index, src_index, dst_index,
+                        );
+                    } else {
+                        let _ = column.swap_remove_nonoverlapping(src_index, last_index);
+                    }
+                }
+
+                TableMoveResult {
+                    new_row: dst_row,
+                    swapped_entity: Some(*self.entities.get_unchecked(src_index)),
                 }
             }
-        }
-
-        let swapped_entity = if src_index == last_index {
-            None
         } else {
-            unsafe { Some(*self.entities.get_unchecked(src_index)) }
-        };
+            unsafe {
+                let dst_row = other.allocate(self.entities.remove_last(last_index));
+                let dst_index = dst_row.index();
 
-        TableMoveResult {
-            new_row: dst_row,
-            swapped_entity,
+                for (id, column) in self.indices.iter().zip(self.columns.iter_mut()) {
+                    if let Some(other_col) = other.get_column_mut(*id) {
+                        other_col.init_last_item_from(column, last_index, dst_index);
+                    } else {
+                        let _ = column.remove_last(last_index);
+                    }
+                }
+
+                TableMoveResult {
+                    new_row: dst_row,
+                    swapped_entity: None,
+                }
+            }
         }
     }
 
@@ -337,65 +362,94 @@ impl Table {
         other: &mut Table,
     ) -> TableMoveResult {
         let src_index = row.index();
-        cfg::debug! {
-            assert!(src_index < self.entity_count());
-        }
-
         let last_index = self.entity_count() - 1;
 
-        let dst_row = unsafe { other.allocate(self.entities.swap_remove(src_index)) };
-        let dst_index = dst_row.index();
+        cfg::debug! { assert!(src_index < self.entity_count()); }
 
-        for (id, column) in self.indices.iter().zip(self.columns.iter_mut()) {
+        if src_index != last_index {
             unsafe {
-                if let Some(other_col) = other.get_column_mut(*id) {
-                    other_col.init_item_from(column, last_index, src_index, dst_index);
-                } else {
-                    column.swap_remove_and_drop(src_index, last_index);
+                let dst_row = other.allocate(
+                    self.entities
+                        .swap_remove_nonoverlapping(src_index, last_index),
+                );
+                let dst_index = dst_row.index();
+
+                for (id, column) in self.indices.iter().zip(self.columns.iter_mut()) {
+                    if let Some(other_col) = other.get_column_mut(*id) {
+                        other_col.init_item_from_nonoverlapping(
+                            column, last_index, src_index, dst_index,
+                        );
+                    } else {
+                        column.swap_remove_and_drop_nonoverlapping(src_index, last_index);
+                    }
+                }
+
+                TableMoveResult {
+                    new_row: dst_row,
+                    swapped_entity: Some(*self.entities.get_unchecked(src_index)),
                 }
             }
-        }
-
-        let swapped_entity = if src_index == last_index {
-            None
         } else {
-            unsafe { Some(*self.entities.get_unchecked(src_index)) }
-        };
+            unsafe {
+                let dst_row = other.allocate(self.entities.remove_last(last_index));
+                let dst_index = dst_row.index();
 
-        TableMoveResult {
-            new_row: dst_row,
-            swapped_entity,
+                for (id, column) in self.indices.iter().zip(self.columns.iter_mut()) {
+                    if let Some(other_col) = other.get_column_mut(*id) {
+                        other_col.init_last_item_from(column, last_index, dst_index);
+                    } else {
+                        column.drop_last(last_index);
+                    }
+                }
+
+                TableMoveResult {
+                    new_row: dst_row,
+                    swapped_entity: None,
+                }
+            }
         }
     }
 
     pub unsafe fn move_to_superset(&mut self, row: TableRow, other: &mut Table) -> TableMoveResult {
         let src_index = row.index();
-        cfg::debug! {
-            assert!(src_index < self.entity_count());
-        }
-
         let last_index = self.entity_count() - 1;
-        let dst_row = unsafe { other.allocate(self.entities.swap_remove(src_index)) };
-        let dst_index = dst_row.index();
 
-        for (id, column) in self.indices.iter().zip(self.columns.iter_mut()) {
+        cfg::debug! { assert!(src_index < self.entity_count()); }
+
+        if src_index != last_index {
             unsafe {
-                other
-                    .get_column_mut(*id)
-                    .debug_checked_unwrap()
-                    .init_item_from(column, last_index, src_index, dst_index);
+                let dst_row = other.allocate(
+                    self.entities
+                        .swap_remove_nonoverlapping(src_index, last_index),
+                );
+                let dst_index = dst_row.index();
+
+                for (id, column) in self.indices.iter().zip(self.columns.iter_mut()) {
+                    let other_col = other.get_column_mut(*id).debug_checked_unwrap();
+                    other_col
+                        .init_item_from_nonoverlapping(column, last_index, src_index, dst_index);
+                }
+
+                TableMoveResult {
+                    new_row: dst_row,
+                    swapped_entity: Some(*self.entities.get_unchecked(src_index)),
+                }
             }
-        }
-
-        let swapped_entity = if src_index == last_index {
-            None
         } else {
-            unsafe { Some(*self.entities.get_unchecked(src_index)) }
-        };
+            unsafe {
+                let dst_row = other.allocate(self.entities.remove_last(last_index));
+                let dst_index = dst_row.index();
 
-        TableMoveResult {
-            new_row: dst_row,
-            swapped_entity,
+                for (id, column) in self.indices.iter().zip(self.columns.iter_mut()) {
+                    let other_col = other.get_column_mut(*id).debug_checked_unwrap();
+                    other_col.init_last_item_from(column, last_index, dst_index);
+                }
+
+                TableMoveResult {
+                    new_row: dst_row,
+                    swapped_entity: None,
+                }
+            }
         }
     }
 
@@ -403,10 +457,7 @@ impl Table {
         self.get_column(component_id)?.get_drop_fn()
     }
 
-    pub unsafe fn get_data_slice_for<T>(
-        &self,
-        component_id: ComponentId,
-    ) -> Option<&[UnsafeCell<T>]> {
+    pub fn get_data_slice_for<T>(&self, component_id: ComponentId) -> Option<&[UnsafeCell<T>]> {
         self.get_column(component_id)
             .map(|col| unsafe { col.get_data_slice(self.entity_count()) })
     }
@@ -501,10 +552,10 @@ impl Table {
         component_id: ComponentId,
         row: TableRow,
     ) -> Option<ComponentTicks> {
-        let index = row.index();
+        cfg::debug! { assert!(row.index() < self.entity_count()); }
         unsafe {
             self.get_column(component_id)
-                .map(|col| col.get_component_ticks(index))
+                .map(|col| col.get_component_ticks(row.index()))
         }
     }
 }

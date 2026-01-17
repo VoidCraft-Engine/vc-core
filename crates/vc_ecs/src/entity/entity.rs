@@ -1,4 +1,4 @@
-#![expect(unsafe_code, reason = "original implementation")]
+#![expect(unsafe_code, reason = "`core::mem::transmute` for better performance.")]
 
 use core::fmt;
 use core::hash::Hash;

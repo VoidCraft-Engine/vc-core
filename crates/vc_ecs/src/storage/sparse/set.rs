@@ -119,23 +119,25 @@ impl<I: SparseIndex, V> SparseSet<I, V> {
 
         self.sparse.remove(index).map(|dense_index| {
             let index = dense_index.get() as usize;
+            let last_index = self.indices.len() - 1;
 
-            let value: V;
-
-            if index == self.dense.len() - 1 {
+            if index == last_index {
                 unsafe {
-                    value = self.dense.remove_last(index);
+                    let value = self.dense.remove_last(index);
                     self.indices.set_len(index);
+                    value
                 }
             } else {
                 unsafe {
-                    value = self.dense.swap_remove_nonoverlapping(index);
-                    let swapped_index = self.indices.copy_remove_nonoverlapping(index);
+                    let value = self.dense.swap_remove_nonoverlapping(index, last_index);
+                    let swapped_index = self
+                        .indices
+                        .copy_last_and_return_nonoverlapping(index, last_index);
+
                     *self.sparse.get_mut(swapped_index).unwrap_unchecked() = dense_index;
+                    value
                 }
             }
-
-            value
         })
     }
 

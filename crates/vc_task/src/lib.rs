@@ -6,11 +6,11 @@
 // Compilation config
 
 pub mod cfg {
-    pub use vc_os::cfg::{std, web};
-
     pub(crate) use vc_cfg::switch;
 
     vc_cfg::define_alias! {
+        #[cfg(feature = "std")] => std,
+        #[cfg(feature = "web")] => web,
         #[cfg(all(feature = "std", feature = "async_io"))] => async_io,
         #[cfg(all(feature = "std", not(feature = "web")))] => multi_thread,
         #[cfg(any(not(feature = "std"), feature = "web"))] => single_thread,

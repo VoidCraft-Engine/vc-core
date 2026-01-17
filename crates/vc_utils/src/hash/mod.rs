@@ -4,11 +4,12 @@
 // Modules
 
 mod hasher;
-mod pre_hashed;
 
 pub mod hash_map;
 pub mod hash_set;
 pub mod hash_table;
+
+mod pre_hashed;
 
 // -----------------------------------------------------------------------------
 // Exports
@@ -16,11 +17,11 @@ pub mod hash_table;
 pub use hasher::{FixedHashState, FixedHasher};
 pub use hasher::{NoOpHashState, NoOpHasher};
 
-pub use pre_hashed::{Hashed, PreHashMap};
-
-pub use hash_map::HashMap;
-pub use hash_set::HashSet;
+pub use hash_map::{HashMap, NoOpHashMap};
+pub use hash_set::{HashSet, NoOpHashSet};
 pub use hash_table::HashTable;
+
+pub use pre_hashed::{Hashed, PreHashMap};
 
 // -----------------------------------------------------------------------------
 // Re-export crates

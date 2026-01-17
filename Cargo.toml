@@ -50,8 +50,6 @@ auto_register = [ "vc_reflect/auto_register" ]
 
 reflect_docs = [ "vc_reflect/reflect_docs" ]
 
-rayon = [ "vc_utils/rayon" ]
-
 async_io = [ "vc_task/async_io" ]
 
 
@@ -74,6 +72,7 @@ type_complexity = "allow"
 too_many_arguments = "allow"
 new_without_default = "allow"
 module_inception = "allow"
+len_without_is_empty = "allow"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

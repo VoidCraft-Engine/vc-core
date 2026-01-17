@@ -23,10 +23,11 @@ pub type ComponentHook = for<'w> fn(DeferredWorld<'w>, HookContext);
 // -----------------------------------------------------------------------------
 // ComponentHooks
 
+#[derive(Clone, Copy, Debug)]
 pub struct ComponentHooks {
-    pub(crate) _on_add: Option<ComponentHook>,
-    pub(crate) _on_insert: Option<ComponentHook>,
-    pub(crate) _on_replace: Option<ComponentHook>,
-    pub(crate) _on_remove: Option<ComponentHook>,
-    pub(crate) _on_despawn: Option<ComponentHook>,
+    pub on_add: Option<ComponentHook>,
+    pub on_insert: Option<ComponentHook>,
+    pub on_replace: Option<ComponentHook>,
+    pub on_remove: Option<ComponentHook>,
+    pub on_despawn: Option<ComponentHook>,
 }

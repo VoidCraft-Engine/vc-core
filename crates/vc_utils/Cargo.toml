@@ -6,10 +6,6 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
-[features]
-
-rayon = ["dep:rayon", "hashbrown/rayon"]
-
 [dependencies]
 vc_cfg = { path = "../vc_cfg" }
 
@@ -25,8 +21,6 @@ hashbrown = { version = "0.16.1", features = [
   "raw-entry",
   "serde",
 ], default-features = false }
-
-rayon = { version = "1", default-features = false, optional = true }
 
 [lints]
 workspace = true

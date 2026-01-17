@@ -6,9 +6,14 @@ use crate::derive::impl_type_path;
 use crate::impls::{GenericTypeInfoCell, NonGenericTypeInfoCell};
 use crate::info::{ListInfo, OpaqueInfo, TypeInfo, TypePath, Typed};
 use crate::ops::{ApplyError, List, ListItemIter};
-use crate::registry::{FromType, GetTypeMeta, TypeMeta, TypeRegistry, TypeTraitFromPtr};
+use crate::registry::{
+    FromType, GetTypeMeta, TypeMeta, TypeRegistry, TypeTraitDefault, TypeTraitFromPtr,
+};
 use crate::registry::{TypeTraitDeserialize, TypeTraitFromReflect, TypeTraitSerialize};
 use crate::{FromReflect, Reflect};
+
+// -----------------------------------------------------------------------------
+// Cow<'static, str>
 
 impl_type_path!(::alloc::borrow::Cow<'a: 'static, T: ToOwned + ?Sized>);
 
@@ -63,9 +68,10 @@ impl Reflect for Cow<'static, str> {
 
 impl GetTypeMeta for Cow<'static, str> {
     fn get_type_meta() -> TypeMeta {
-        let mut meta = TypeMeta::with_capacity::<Self>(4);
+        let mut meta = TypeMeta::with_capacity::<Self>(5);
         meta.insert_trait::<TypeTraitFromPtr>(FromType::<Self>::from_type());
         meta.insert_trait::<TypeTraitFromReflect>(FromType::<Self>::from_type());
+        meta.insert_trait::<TypeTraitDefault>(FromType::<Self>::from_type());
         meta.insert_trait::<TypeTraitSerialize>(FromType::<Self>::from_type());
         meta.insert_trait::<TypeTraitDeserialize>(FromType::<Self>::from_type());
         meta
@@ -79,6 +85,9 @@ impl FromReflect for Cow<'static, str> {
 }
 
 crate::derive::impl_auto_register!(Cow<'static, str>);
+
+// -----------------------------------------------------------------------------
+// Cow<'static, [T]>
 
 impl<T: FromReflect + Typed + Clone> Typed for Cow<'static, [T]> {
     fn type_info() -> &'static TypeInfo {

@@ -59,12 +59,11 @@ impl BlobArray {
         drop_fn: Option<unsafe fn(OwningPtr<'_>)>,
     ) -> Self {
         let align = unsafe { NonZeroUsize::new_unchecked(item_layout.align()) };
-        let data: NonNull<u8> = NonNull::without_provenance(align);
 
         Self {
             item_layout,
             drop_fn,
-            data,
+            data: NonNull::without_provenance(align),
         }
     }
 
@@ -125,10 +124,11 @@ impl BlobArray {
     #[inline]
     pub unsafe fn clear(&mut self, len: usize) {
         if let Some(drop_fn) = self.drop_fn {
-            let drop_guard = AbortOnPanic;
-
             let size = self.item_layout.size();
             let mut offset: usize = 0;
+
+            let drop_guard = AbortOnPanic;
+
             for _ in 0..len {
                 unsafe {
                     drop_fn(OwningPtr::new(self.data.byte_add(offset)));
@@ -163,6 +163,30 @@ impl BlobArray {
         unsafe {
             let dst = self.data.as_ptr().byte_add(size * index);
             core::ptr::copy_nonoverlapping::<u8>(value.as_ptr(), dst, size);
+        }
+    }
+
+    #[inline]
+    pub unsafe fn replace_item(&mut self, index: usize, value: OwningPtr<'_>) {
+        // SAFETY: The caller ensures that `index` fits in this vector.
+        let size = self.item_layout.size();
+
+        let src = value.as_ptr();
+        let dst = unsafe { self.data.byte_add(size * index) };
+
+        if let Some(drop_fn) = self.drop_fn {
+            let drop_guard = AbortOnPanic;
+
+            unsafe {
+                drop_fn(OwningPtr::new(dst));
+            }
+
+            ::core::mem::forget(drop_guard);
+        }
+
+        // Overwriting the previous value.
+        unsafe {
+            core::ptr::copy_nonoverlapping::<u8>(src, dst.as_ptr(), size);
         }
     }
 
@@ -213,30 +237,6 @@ impl BlobArray {
             if let Some(drop_fn) = drop_fn {
                 drop_fn(value);
             }
-        }
-    }
-
-    #[inline]
-    pub unsafe fn replace_item(&mut self, index: usize, value: OwningPtr<'_>) {
-        // SAFETY: The caller ensures that `index` fits in this vector.
-        let size = self.item_layout.size();
-
-        let src = value.as_ptr();
-        let dst = unsafe { self.data.byte_add(size * index) };
-
-        if let Some(drop_fn) = self.drop_fn {
-            let drop_guard = AbortOnPanic;
-
-            unsafe {
-                drop_fn(OwningPtr::new(dst));
-            }
-
-            ::core::mem::forget(drop_guard);
-        }
-
-        // Overwriting the previous value.
-        unsafe {
-            core::ptr::copy_nonoverlapping::<u8>(src, dst.as_ptr(), size);
         }
     }
 }

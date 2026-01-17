@@ -14,7 +14,7 @@ use utils::{AbortOnDrop, BlobArray, VecCopyRemove, VecSwapRemove};
 // -----------------------------------------------------------------------------
 // Exports
 
-pub use resource::{ResourceData, Resources};
+pub use resource::{NoSendResourceData, NoSendResources, ResourceData, Resources};
 pub use sparse::SparseIndex;
 pub use sparse::{FixedSparseMap, SparseMap};
 pub use sparse::{SparseComponent, SparseSet, SparseSets};
@@ -34,6 +34,6 @@ pub enum StorageType {
 pub struct Storages {
     pub sparse_sets: SparseSets,
     pub tables: Tables,
-    pub resources: Resources<true>,
-    pub non_send_resources: Resources<false>,
+    pub resources: Resources,
+    pub non_send_resources: NoSendResources,
 }

@@ -54,6 +54,7 @@ impl Column {
         }
     }
 
+    #[inline]
     pub unsafe fn alloc(&mut self, new_capacity: NonZeroUsize) {
         cfg::debug! {
             assert!(self.capacity == 0);
@@ -70,6 +71,7 @@ impl Column {
         }
     }
 
+    #[inline]
     pub unsafe fn realloc(&mut self, current_capacity: NonZeroUsize, new_capacity: NonZeroUsize) {
         cfg::debug! {
             assert!(self.capacity == current_capacity.get());
@@ -86,6 +88,7 @@ impl Column {
         }
     }
 
+    #[inline]
     pub unsafe fn dealloc(&mut self, current_capacity: usize, len: usize) {
         cfg::debug! {
             assert!(self.capacity == current_capacity);
@@ -103,17 +106,11 @@ impl Column {
         }
     }
 
+    #[inline]
     pub unsafe fn clear(&mut self, len: usize) {
         cfg::debug! { assert!(len <= self.capacity); }
         unsafe {
             self.data.clear(len);
-        }
-    }
-
-    pub unsafe fn drop_last(&mut self, last_index: usize) {
-        cfg::debug! { assert!(last_index < self.capacity); }
-        unsafe {
-            self.data.drop_last(last_index);
         }
     }
 
@@ -182,7 +179,7 @@ impl Column {
         unsafe { self.changed_by.as_ref().map(|cb| cb.as_slice(len)) }
     }
 
-    #[inline(always)]
+    #[inline]
     pub unsafe fn reset_item(&mut self, index: usize) {
         cfg::debug! { assert!(index < self.capacity); }
         unsafe {
@@ -199,6 +196,7 @@ impl Column {
         }
     }
 
+    #[inline]
     pub unsafe fn init_item(
         &mut self,
         index: usize,
@@ -207,10 +205,12 @@ impl Column {
         caller: DebugLocation,
     ) {
         cfg::debug! { assert!(index < self.capacity); }
+
         unsafe {
             self.data.init_item(index, data);
             self.added_ticks.init_item(index, UnsafeCell::new(tick));
             self.changed_ticks.init_item(index, UnsafeCell::new(tick));
+
             cfg::debug! {
                 self.changed_by.as_mut()
                     .map(|cb| cb.get_item_mut(index).get_mut())
@@ -219,6 +219,7 @@ impl Column {
         }
     }
 
+    #[inline]
     pub unsafe fn replace_item(
         &mut self,
         index: usize,
@@ -227,10 +228,12 @@ impl Column {
         caller: DebugLocation,
     ) {
         cfg::debug! { assert!(index < self.capacity); }
+
         unsafe {
             self.data.replace_item(index, data);
             self.changed_ticks
                 .init_item(index, UnsafeCell::new(change_tick));
+
             cfg::debug! {
                 self.changed_by.as_mut()
                     .map(|cb| cb.get_item_mut(index).get_mut())
@@ -239,6 +242,22 @@ impl Column {
         }
     }
 
+    #[inline]
+    #[must_use = "The returned pointer should be used to drop the removed element"]
+    pub unsafe fn remove_last(&mut self, last_index: usize) -> OwningPtr<'_> {
+        cfg::debug! { assert!(last_index < self.capacity); }
+        unsafe { self.data.remove_last(last_index) }
+    }
+
+    #[inline]
+    pub unsafe fn drop_last(&mut self, last_index: usize) {
+        cfg::debug! { assert!(last_index < self.capacity); }
+        unsafe {
+            self.data.drop_last(last_index);
+        }
+    }
+
+    #[cfg_attr(not(any(debug_assertions, feature = "debug")), inline)]
     #[must_use = "The returned pointer should be used to drop the removed element"]
     pub unsafe fn swap_remove_nonoverlapping(
         &mut self,
@@ -252,14 +271,14 @@ impl Column {
         unsafe {
             let data = self.data.swap_remove_nonoverlapping(index, last_index);
             self.added_ticks
-                .swap_remove_nonoverlapping(index, last_index);
+                .copy_remove_nonoverlapping(index, last_index);
             self.changed_ticks
-                .swap_remove_nonoverlapping(index, last_index);
+                .copy_remove_nonoverlapping(index, last_index);
 
             cfg::debug! {
                 // Use `{ ..; }` to eliminate return values and reduce compilation workload.
                 self.changed_by.as_mut().map(|cb| {
-                    cb.swap_remove_nonoverlapping(index, last_index);
+                    cb.copy_remove_nonoverlapping(index, last_index);
                 });
             }
 
@@ -267,17 +286,7 @@ impl Column {
         }
     }
 
-    #[inline]
-    #[must_use = "The returned pointer should be used to drop the removed element"]
-    pub unsafe fn swap_remove(&mut self, index: usize, last_index: usize) -> OwningPtr<'_> {
-        if index != last_index {
-            return unsafe { self.swap_remove_nonoverlapping(index, last_index) };
-        }
-
-        cfg::debug! { assert!(last_index < self.capacity); }
-        unsafe { self.data.remove_last(last_index) }
-    }
-
+    #[cfg_attr(not(any(debug_assertions, feature = "debug")), inline)]
     pub unsafe fn swap_remove_and_drop_nonoverlapping(&mut self, index: usize, last_index: usize) {
         cfg::debug! {
             assert!(index < last_index && last_index < self.capacity);
@@ -287,30 +296,52 @@ impl Column {
             self.data
                 .swap_remove_and_drop_nonoverlapping(index, last_index);
             self.added_ticks
-                .swap_remove_nonoverlapping(index, last_index);
+                .copy_remove_nonoverlapping(index, last_index);
             self.changed_ticks
-                .swap_remove_nonoverlapping(index, last_index);
+                .copy_remove_nonoverlapping(index, last_index);
 
             cfg::debug! {
                 // Use `{ ..; }` to eliminate return values and reduce compilation workload.
                 self.changed_by.as_mut().map(|cb| {
-                    cb.swap_remove_nonoverlapping(index, last_index);
+                    cb.copy_remove_nonoverlapping(index, last_index);
                 });
             }
         }
     }
 
-    #[inline]
-    pub unsafe fn swap_remove_and_drop(&mut self, index: usize, last_index: usize) {
-        if index != last_index {
-            return unsafe { self.swap_remove_and_drop_nonoverlapping(index, last_index) };
+    #[cfg_attr(not(any(debug_assertions, feature = "debug")), inline)]
+    pub unsafe fn init_last_item_from(
+        &mut self,
+        other: &mut Column,
+        other_last: usize,
+        index: usize,
+    ) {
+        cfg::debug! {
+            assert_eq!(self.data.layout(), other.data.layout());
+            assert!(other_last < other.capacity);
+            assert!(index < self.capacity);
         }
+        unsafe {
+            let src_val = other.data.remove_last(other_last);
+            self.data.init_item(index, src_val);
 
-        cfg::debug! { assert!(last_index < self.capacity); }
-        unsafe { self.data.drop_last(last_index) }
+            let added_tick = other.added_ticks.remove_last(other_last);
+            self.added_ticks.init_item(index, added_tick);
+
+            let changed_tick = other.changed_ticks.remove_last(other_last);
+            self.changed_ticks.init_item(index, changed_tick);
+
+            cfg::debug! {
+                self.changed_by.as_mut().zip(other.changed_by.as_mut()).map(|(scb, ocb)| {
+                    let changed_by = ocb.remove_last(other_last);
+                    scb.init_item(index, changed_by);
+                });
+            }
+        }
     }
 
-    pub unsafe fn init_item_from(
+    #[cfg_attr(not(any(debug_assertions, feature = "debug")), inline)]
+    pub unsafe fn init_item_from_nonoverlapping(
         &mut self,
         other: &mut Column,
         other_last_index: usize,
@@ -319,54 +350,43 @@ impl Column {
     ) {
         cfg::debug! {
             assert_eq!(self.data.layout(), other.data.layout());
+            assert!(src < other_last_index && other_last_index < other.capacity);
             assert!(dst < self.capacity);
-            assert!(src <= other_last_index && other_last_index < other.capacity);
         }
-
-        let src_val: OwningPtr<'_>;
-        let added_tick: UnsafeCell<Tick>;
-        let changed_tick: UnsafeCell<Tick>;
-
         unsafe {
-            if src != other_last_index {
-                src_val = other.data.swap_remove_nonoverlapping(src, other_last_index);
-                added_tick = other
-                    .added_ticks
-                    .swap_remove_nonoverlapping(src, other_last_index);
-                changed_tick = other
-                    .changed_ticks
-                    .swap_remove_nonoverlapping(src, other_last_index);
-                cfg::debug! {
-                    self.changed_by.as_mut().zip(other.changed_by.as_mut()).map(|(scb, ocb)| {
-                        let changed_by = ocb.swap_remove_nonoverlapping(src, other_last_index);
-                        scb.init_item(dst, changed_by);
-                    });
-                }
-            } else {
-                src_val = other.data.remove_last(src);
-                added_tick = other.added_ticks.remove_last(src);
-                changed_tick = other.changed_ticks.remove_last(src);
-                cfg::debug! {
-                    self.changed_by.as_mut().zip(other.changed_by.as_mut()).map(|(scb, ocb)| {
-                        let changed_by = ocb.remove_last(src);
-                        scb.init_item(dst, changed_by);
-                    });
-                }
-            }
-
+            let src_val = other.data.swap_remove_nonoverlapping(src, other_last_index);
             self.data.init_item(dst, src_val);
+
+            let added_tick = other
+                .added_ticks
+                .swap_remove_nonoverlapping(src, other_last_index);
             self.added_ticks.init_item(dst, added_tick);
+
+            let changed_tick = other
+                .changed_ticks
+                .swap_remove_nonoverlapping(src, other_last_index);
             self.changed_ticks.init_item(dst, changed_tick);
+
+            cfg::debug! {
+                self.changed_by.as_mut().zip(other.changed_by.as_mut()).map(|(scb, ocb)| {
+                    let changed_by = ocb.swap_remove_nonoverlapping(src, other_last_index);
+                    scb.init_item(dst, changed_by);
+                });
+            }
         }
     }
 
+    #[inline]
     pub unsafe fn check_ticks(&mut self, len: usize, check: CheckTicks) {
+        cfg::debug! { assert!(len <= self.capacity); }
+
         for i in 0..len {
             unsafe {
                 self.added_ticks
                     .get_item_mut(i)
                     .get_mut()
                     .check_age(check.tick());
+
                 self.changed_ticks
                     .get_item_mut(i)
                     .get_mut()
@@ -377,6 +397,8 @@ impl Column {
 
     #[inline]
     pub unsafe fn get_component_ticks(&self, index: usize) -> crate::component::ComponentTicks {
+        cfg::debug! { assert!(index < self.capacity); }
+
         unsafe {
             crate::component::ComponentTicks {
                 added: self.added_ticks.copy_item(index),

@@ -5,7 +5,7 @@ use core::num::NonZeroU32;
 // -----------------------------------------------------------------------------
 // EntityId
 
-#[derive(Clone, Copy, PartialOrd, Ord, Debug)]
+#[derive(Debug, Clone, Copy, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct EntityId(NonZeroU32);
 
@@ -64,7 +64,7 @@ impl Eq for EntityId {}
 pub struct EntityGeneration(u32);
 
 impl EntityGeneration {
-    /// Represents the first generation of an [`EntityIndex`].
+    /// Represents the first generation of an [`EntityId`].
     pub const FIRST: Self = Self(0);
 
     /// Non-wrapping difference between two generations after which a signed interpretation becomes negative.

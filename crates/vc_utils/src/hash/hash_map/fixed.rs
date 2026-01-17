@@ -11,19 +11,11 @@ use core::hash::{BuildHasher, Hash};
 use core::ops::{Deref, DerefMut, Index};
 
 use hashbrown::{Equivalent, TryReserveError, hash_map as hb};
+use hb::{Drain, ExtractIf, Iter, IterMut};
+use hb::{EntryRef, OccupiedError};
+use hb::{IntoKeys, IntoValues, Keys, Values, ValuesMut};
 
 use crate::hash::FixedHashState;
-
-// -----------------------------------------------------------------------------
-// Re-Exports
-
-pub use hb::{Drain, ExtractIf, IntoIter, Iter, IterMut};
-pub use hb::{EntryRef, OccupiedEntry, OccupiedError, VacantEntry};
-pub use hb::{IntoKeys, IntoValues, Keys, Values, ValuesMut};
-pub use hb::{RawEntryBuilder, RawEntryBuilderMut, RawEntryMut, RawOccupiedEntryMut};
-
-/// Shortcut for [`Entry`](hb::Entry) with [`FixedHashState`] as hashing provider.
-pub type Entry<'a, K, V, S = FixedHashState> = hb::Entry<'a, K, V, S>;
 
 // -----------------------------------------------------------------------------
 // HashMap
@@ -60,12 +52,6 @@ pub struct HashMap<K, V, S = FixedHashState>(hb::HashMap<K, V, S>);
 // -----------------------------------------------------------------------------
 // `FixedHashState` specific methods
 
-impl<K: Eq + Hash, V, const N: usize> From<[(K, V); N]> for HashMap<K, V> {
-    fn from(arr: [(K, V); N]) -> Self {
-        arr.into_iter().collect()
-    }
-}
-
 impl<K, V> HashMap<K, V> {
     /// Create a empty [`HashMap`]
     ///
@@ -80,9 +66,9 @@ impl<K, V> HashMap<K, V> {
     /// # map.insert(0usize, "foo");
     /// # assert_eq!(map.get(&0), Some("foo").as_ref());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub const fn new() -> Self {
-        Self::with_hasher(FixedHashState)
+        Self(hb::HashMap::with_hasher(FixedHashState))
     }
 
     /// Create a empty [`HashMap`] with specific capacity
@@ -98,82 +84,12 @@ impl<K, V> HashMap<K, V> {
     /// # map.insert(0usize, "foo");
     /// # assert_eq!(map.get(&0), Some("foo").as_ref());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn with_capacity(capacity: usize) -> Self {
-        Self::with_capacity_and_hasher(capacity, FixedHashState)
-    }
-}
-
-// -----------------------------------------------------------------------------
-// rayon support
-
-#[cfg(feature = "rayon")]
-use rayon::prelude::{FromParallelIterator, IntoParallelIterator, ParallelExtend};
-
-#[cfg(feature = "rayon")]
-impl<K, V, S, T> FromParallelIterator<T> for HashMap<K, V, S>
-where
-    hb::HashMap<K, V, S>: FromParallelIterator<T>,
-    T: Send,
-{
-    fn from_par_iter<P>(par_iter: P) -> Self
-    where
-        P: IntoParallelIterator<Item = T>,
-    {
-        Self(<hb::HashMap<K, V, S> as FromParallelIterator<T>>::from_par_iter(par_iter))
-    }
-}
-
-#[cfg(feature = "rayon")]
-impl<K, V, S> IntoParallelIterator for HashMap<K, V, S>
-where
-    hb::HashMap<K, V, S>: IntoParallelIterator,
-{
-    type Item = <hb::HashMap<K, V, S> as IntoParallelIterator>::Item;
-    type Iter = <hb::HashMap<K, V, S> as IntoParallelIterator>::Iter;
-
-    fn into_par_iter(self) -> Self::Iter {
-        self.0.into_par_iter()
-    }
-}
-
-#[cfg(feature = "rayon")]
-impl<'a, K: Sync, V: Sync, S> IntoParallelIterator for &'a HashMap<K, V, S>
-where
-    &'a hb::HashMap<K, V, S>: IntoParallelIterator,
-{
-    type Item = <&'a hb::HashMap<K, V, S> as IntoParallelIterator>::Item;
-    type Iter = <&'a hb::HashMap<K, V, S> as IntoParallelIterator>::Iter;
-
-    fn into_par_iter(self) -> Self::Iter {
-        (&self.0).into_par_iter()
-    }
-}
-
-#[cfg(feature = "rayon")]
-impl<'a, K: Sync, V: Sync, S> IntoParallelIterator for &'a mut HashMap<K, V, S>
-where
-    &'a mut hb::HashMap<K, V, S>: IntoParallelIterator,
-{
-    type Item = <&'a mut hb::HashMap<K, V, S> as IntoParallelIterator>::Item;
-    type Iter = <&'a mut hb::HashMap<K, V, S> as IntoParallelIterator>::Iter;
-
-    fn into_par_iter(self) -> Self::Iter {
-        (&mut self.0).into_par_iter()
-    }
-}
-
-#[cfg(feature = "rayon")]
-impl<K, V, S, T> ParallelExtend<T> for HashMap<K, V, S>
-where
-    hb::HashMap<K, V, S>: ParallelExtend<T>,
-    T: Send,
-{
-    fn par_extend<I>(&mut self, par_iter: I)
-    where
-        I: IntoParallelIterator<Item = T>,
-    {
-        <hb::HashMap<K, V, S> as ParallelExtend<T>>::par_extend(&mut self.0, par_iter);
+        Self(hb::HashMap::with_capacity_and_hasher(
+            capacity,
+            FixedHashState,
+        ))
     }
 }
 
@@ -184,12 +100,12 @@ impl<K, V, S> Clone for HashMap<K, V, S>
 where
     hb::HashMap<K, V, S>: Clone,
 {
-    #[inline]
+    #[inline(always)]
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 
-    #[inline]
+    #[inline(always)]
     fn clone_from(&mut self, source: &Self) {
         self.0.clone_from(&source.0);
     }
@@ -199,7 +115,7 @@ impl<K, V, S> Debug for HashMap<K, V, S>
 where
     hb::HashMap<K, V, S>: Debug,
 {
-    #[inline]
+    #[inline(always)]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         <hb::HashMap<K, V, S> as Debug>::fmt(&self.0, f)
     }
@@ -209,7 +125,7 @@ impl<K, V, S> Default for HashMap<K, V, S>
 where
     hb::HashMap<K, V, S>: Default,
 {
-    #[inline]
+    #[inline(always)]
     fn default() -> Self {
         Self(Default::default())
     }
@@ -219,7 +135,7 @@ impl<K, V, S> PartialEq for HashMap<K, V, S>
 where
     hb::HashMap<K, V, S>: PartialEq,
 {
-    #[inline]
+    #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         self.0.eq(&other.0)
     }
@@ -231,7 +147,7 @@ impl<K, V, S, T> FromIterator<T> for HashMap<K, V, S>
 where
     hb::HashMap<K, V, S>: FromIterator<T>,
 {
-    #[inline]
+    #[inline(always)]
     fn from_iter<U: IntoIterator<Item = T>>(iter: U) -> Self {
         Self(FromIterator::from_iter(iter))
     }
@@ -243,7 +159,7 @@ where
 {
     type Output = <hb::HashMap<K, V, S> as Index<T>>::Output;
 
-    #[inline]
+    #[inline(always)]
     fn index(&self, index: T) -> &Self::Output {
         self.0.index(index)
     }
@@ -256,7 +172,7 @@ where
     type Item = <hb::HashMap<K, V, S> as IntoIterator>::Item;
     type IntoIter = <hb::HashMap<K, V, S> as IntoIterator>::IntoIter;
 
-    #[inline]
+    #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
@@ -269,7 +185,7 @@ where
     type Item = <&'a hb::HashMap<K, V, S> as IntoIterator>::Item;
     type IntoIter = <&'a hb::HashMap<K, V, S> as IntoIterator>::IntoIter;
 
-    #[inline]
+    #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         (&self.0).into_iter()
     }
@@ -282,7 +198,7 @@ where
     type Item = <&'a mut hb::HashMap<K, V, S> as IntoIterator>::Item;
     type IntoIter = <&'a mut hb::HashMap<K, V, S> as IntoIterator>::IntoIter;
 
-    #[inline]
+    #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
         (&mut self.0).into_iter()
     }
@@ -292,21 +208,21 @@ impl<K, V, S, T> Extend<T> for HashMap<K, V, S>
 where
     hb::HashMap<K, V, S>: Extend<T>,
 {
-    #[inline]
+    #[inline(always)]
     fn extend<U: IntoIterator<Item = T>>(&mut self, iter: U) {
         self.0.extend(iter);
     }
 }
 
 impl<K, V, S> From<hb::HashMap<K, V, S>> for HashMap<K, V, S> {
-    #[inline]
+    #[inline(always)]
     fn from(value: hb::HashMap<K, V, S>) -> Self {
         Self(value)
     }
 }
 
 impl<K, V, S> From<HashMap<K, V, S>> for hb::HashMap<K, V, S> {
-    #[inline]
+    #[inline(always)]
     fn from(value: HashMap<K, V, S>) -> Self {
         value.0
     }
@@ -315,14 +231,14 @@ impl<K, V, S> From<HashMap<K, V, S>> for hb::HashMap<K, V, S> {
 impl<K, V, S> Deref for HashMap<K, V, S> {
     type Target = hb::HashMap<K, V, S>;
 
-    #[inline]
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
 impl<K, V, S> DerefMut for HashMap<K, V, S> {
-    #[inline]
+    #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -332,7 +248,7 @@ impl<K, V, S> serde_core::Serialize for HashMap<K, V, S>
 where
     hb::HashMap<K, V, S>: serde_core::Serialize,
 {
-    #[inline]
+    #[inline(always)]
     fn serialize<T>(&self, serializer: T) -> Result<T::Ok, T::Error>
     where
         T: serde_core::Serializer,
@@ -345,7 +261,7 @@ impl<'de, K, V, S> serde_core::Deserialize<'de> for HashMap<K, V, S>
 where
     hb::HashMap<K, V, S>: serde_core::Deserialize<'de>,
 {
-    #[inline]
+    #[inline(always)]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde_core::Deserializer<'de>,
@@ -369,7 +285,7 @@ impl<K, V, S> HashMap<K, V, S> {
     /// # map.insert(0usize, "foo");
     /// # assert_eq!(map.get(&0), Some("foo").as_ref());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub const fn with_hasher(hash_builder: S) -> Self {
         Self(hb::HashMap::with_hasher(hash_builder))
     }
@@ -389,7 +305,7 @@ impl<K, V, S> HashMap<K, V, S> {
     /// # map.insert(0usize, "foo");
     /// # assert_eq!(map.get(&0), Some("foo").as_ref());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn with_capacity_and_hasher(capacity: usize, hash_builder: S) -> Self {
         Self(hb::HashMap::with_capacity_and_hasher(
             capacity,
@@ -398,7 +314,7 @@ impl<K, V, S> HashMap<K, V, S> {
     }
 
     /// Returns a reference to the map's [`BuildHasher`].
-    #[inline]
+    #[inline(always)]
     pub fn hasher(&self) -> &S {
         self.0.hasher()
     }
@@ -415,7 +331,7 @@ impl<K, V, S> HashMap<K, V, S> {
     /// # let map: HashMap<(), ()> = map;
     /// # assert!(map.capacity() >= 5);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn capacity(&self) -> usize {
         self.0.capacity()
     }
@@ -438,7 +354,7 @@ impl<K, V, S> HashMap<K, V, S> {
     /// }
     /// # assert_eq!(map.keys().count(), 3);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn keys(&self) -> Keys<'_, K, V> {
         self.0.keys()
     }
@@ -461,7 +377,7 @@ impl<K, V, S> HashMap<K, V, S> {
     /// }
     /// # assert_eq!(map.values().count(), 3);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn values(&self) -> Values<'_, K, V> {
         self.0.values()
     }
@@ -484,7 +400,7 @@ impl<K, V, S> HashMap<K, V, S> {
     /// }
     /// # assert_eq!(map.values_mut().count(), 3);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn values_mut(&mut self) -> ValuesMut<'_, K, V> {
         self.0.values_mut()
     }
@@ -507,7 +423,7 @@ impl<K, V, S> HashMap<K, V, S> {
     /// }
     /// # assert_eq!(map.iter().count(), 3);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn iter(&self) -> Iter<'_, K, V> {
         self.0.iter()
     }
@@ -530,7 +446,7 @@ impl<K, V, S> HashMap<K, V, S> {
     /// }
     /// # assert_eq!(map.iter_mut().count(), 3);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
         self.0.iter_mut()
     }
@@ -549,7 +465,7 @@ impl<K, V, S> HashMap<K, V, S> {
     ///
     /// assert_eq!(map.len(), 1);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -568,7 +484,7 @@ impl<K, V, S> HashMap<K, V, S> {
     ///
     /// assert!(!map.is_empty());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -592,7 +508,7 @@ impl<K, V, S> HashMap<K, V, S> {
     ///
     /// assert!(map.is_empty());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn drain(&mut self) -> Drain<'_, K, V> {
         self.0.drain()
     }
@@ -614,7 +530,7 @@ impl<K, V, S> HashMap<K, V, S> {
     ///
     /// assert_eq!(map.len(), 1);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn retain<F>(&mut self, f: F)
     where
         F: FnMut(&K, &mut V) -> bool,
@@ -642,7 +558,7 @@ impl<K, V, S> HashMap<K, V, S> {
     /// assert_eq!(map.len(), 2);
     /// assert_eq!(extracted.len(), 1);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn extract_if<F>(&mut self, f: F) -> ExtractIf<'_, K, V, F>
     where
         F: FnMut(&K, &mut V) -> bool,
@@ -667,7 +583,7 @@ impl<K, V, S> HashMap<K, V, S> {
     ///
     /// assert!(map.is_empty());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn clear(&mut self) {
         self.0.clear();
     }
@@ -690,7 +606,7 @@ impl<K, V, S> HashMap<K, V, S> {
     ///     // "foo", "bar", "baz" (arbitrary order)
     /// }
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn into_keys(self) -> IntoKeys<K, V> {
         self.0.into_keys()
     }
@@ -713,7 +629,7 @@ impl<K, V, S> HashMap<K, V, S> {
     ///     // 0, 1, 2 (arbitrary order)
     /// }
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn into_values(self) -> IntoValues<K, V> {
         self.0.into_values()
     }
@@ -727,7 +643,7 @@ impl<K, V, S> HashMap<K, V, S> {
     /// let map: HashMap<&'static str, usize> = HashMap::new();
     /// let map: hashbrown::HashMap<&'static str, usize, _> = map.into_inner();
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn into_inner(self) -> hb::HashMap<K, V, S> {
         self.0
     }
@@ -754,7 +670,7 @@ where
     ///
     /// assert!(map.capacity() - map.len() >= 10);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn reserve(&mut self, additional: usize) {
         self.0.reserve(additional);
     }
@@ -775,7 +691,7 @@ where
     ///
     /// assert!(map.capacity() - map.len() >= 10);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
         self.0.try_reserve(additional)
     }
@@ -798,7 +714,7 @@ where
     ///
     /// assert_eq!(map.capacity(), 3);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn shrink_to_fit(&mut self) {
         self.0.shrink_to_fit();
     }
@@ -807,7 +723,7 @@ where
     ///
     /// It will drop down no lower than the supplied limit while maintaining the internal rules
     /// and possibly leaving some space in accordance with the resize policy.
-    #[inline]
+    #[inline(always)]
     pub fn shrink_to(&mut self, min_capacity: usize) {
         self.0.shrink_to(min_capacity);
     }
@@ -824,8 +740,8 @@ where
     /// #
     /// # assert_eq!(*value, 0);
     /// ```
-    #[inline]
-    pub fn entry(&mut self, key: K) -> Entry<'_, K, V, S> {
+    #[inline(always)]
+    pub fn entry(&mut self, key: K) -> hb::Entry<'_, K, V, S> {
         self.0.entry(key)
     }
 
@@ -844,7 +760,7 @@ where
     /// #
     /// # assert_eq!(*value, 0);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn entry_ref<'a, 'b, Q>(&'a mut self, key: &'b Q) -> EntryRef<'a, 'b, K, Q, V, S>
     where
         Q: Hash + Equivalent<K> + ?Sized,
@@ -864,7 +780,7 @@ where
     ///
     /// assert_eq!(map.get("foo"), Some(&0));
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn get<Q>(&self, k: &Q) -> Option<&V>
     where
         Q: Hash + Equivalent<K> + ?Sized,
@@ -886,7 +802,7 @@ where
     ///
     /// assert_eq!(map.get_key_value("foo"), Some((&"foo", &0)));
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn get_key_value<Q>(&self, k: &Q) -> Option<(&K, &V)>
     where
         Q: Hash + Equivalent<K> + ?Sized,
@@ -906,7 +822,7 @@ where
     ///
     /// assert_eq!(map.get_key_value_mut("foo"), Some((&"foo", &mut 0)));
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn get_key_value_mut<Q>(&mut self, k: &Q) -> Option<(&K, &mut V)>
     where
         Q: Hash + Equivalent<K> + ?Sized,
@@ -926,7 +842,7 @@ where
     ///
     /// assert!(map.contains_key("foo"));
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn contains_key<Q>(&self, k: &Q) -> bool
     where
         Q: Hash + Equivalent<K> + ?Sized,
@@ -946,7 +862,7 @@ where
     ///
     /// assert_eq!(map.get_mut("foo"), Some(&mut 0));
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn get_mut<Q>(&mut self, k: &Q) -> Option<&mut V>
     where
         Q: Hash + Equivalent<K> + ?Sized,
@@ -970,7 +886,7 @@ where
     ///
     /// assert_eq!(result, [Some(&mut 0), Some(&mut 1)]);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn get_disjoint_mut<Q, const N: usize>(&mut self, ks: [&Q; N]) -> [Option<&'_ mut V>; N]
     where
         Q: Hash + Equivalent<K> + ?Sized,
@@ -995,7 +911,7 @@ where
     ///
     /// assert_eq!(result, [Some((&"foo", &mut 0)), Some((&"bar", &mut 1))]);
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn get_disjoint_key_value_mut<Q, const N: usize>(
         &mut self,
         ks: [&Q; N],
@@ -1018,7 +934,7 @@ where
     ///
     /// assert_eq!(map.get("foo"), Some(&0));
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn insert(&mut self, k: K, v: V) -> Option<V> {
         self.0.insert(k, v)
     }
@@ -1035,7 +951,7 @@ where
     ///
     /// assert!(map.try_insert("foo", 1).is_err());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn try_insert(&mut self, key: K, value: V) -> Result<&mut V, OccupiedError<'_, K, V, S>> {
         self.0.try_insert(key, value)
     }
@@ -1054,7 +970,7 @@ where
     ///
     /// assert!(map.is_empty());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn remove<Q>(&mut self, k: &Q) -> Option<V>
     where
         Q: Hash + Equivalent<K> + ?Sized,
@@ -1076,7 +992,7 @@ where
     ///
     /// assert!(map.is_empty());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn remove_entry<Q>(&mut self, k: &Q) -> Option<(K, V)>
     where
         Q: Hash + Equivalent<K> + ?Sized,
@@ -1098,67 +1014,8 @@ where
     ///
     /// assert!(map.allocation_size() >= size_of::<&'static str>() + size_of::<u32>());
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn allocation_size(&self) -> usize {
         self.0.allocation_size()
-    }
-
-    /// Insert a key-value pair into the map without checking if the key already exists in the map.
-    ///
-    /// # Safety
-    /// This operation is safe if a key does not exist in the map.
-    ///
-    /// However, if a key exists in the map already, the behavior is unspecified:
-    /// this operation may panic, loop forever, or any following operation with the map may panic, loop forever or return arbitrary result.
-    ///
-    /// That said, this operation (and following operations) are guaranteed to not violate memory safety.
-    ///
-    /// However this operation is still unsafe
-    /// because the resulting HashMap may be passed to unsafe code
-    /// which does expect the map to behave correctly,
-    /// and would cause unsoundness as a result.
-    #[expect(unsafe_code, reason = "re-exporting unsafe method")]
-    #[inline]
-    pub unsafe fn insert_unique_unchecked(&mut self, key: K, value: V) -> (&K, &mut V) {
-        unsafe { self.0.insert_unique_unchecked(key, value) }
-    }
-
-    /// Attempts to get mutable references to N values in the map at once,
-    /// without validating that the values are unique.
-    ///
-    /// # Safety
-    ///
-    /// Calling this method with overlapping keys is undefined behavior
-    /// even if the resulting references are not used.
-    #[expect(unsafe_code, reason = "re-exporting unsafe method")]
-    #[inline]
-    pub unsafe fn get_disjoint_unchecked_mut<Q, const N: usize>(
-        &mut self,
-        keys: [&Q; N],
-    ) -> [Option<&'_ mut V>; N]
-    where
-        Q: Hash + Equivalent<K> + ?Sized,
-    {
-        unsafe { self.0.get_disjoint_unchecked_mut(keys) }
-    }
-
-    /// Attempts to get mutable references to N values in the map at once,
-    /// with immutable references to the corresponding keys,
-    /// without validating that the values are unique.
-    ///
-    /// # Safety
-    ///
-    /// Calling this method with overlapping keys is undefined behavior
-    /// even if the resulting references are not used.
-    #[expect(unsafe_code, reason = "re-exporting unsafe method")]
-    #[inline]
-    pub unsafe fn get_disjoint_key_value_unchecked_mut<Q, const N: usize>(
-        &mut self,
-        keys: [&Q; N],
-    ) -> [Option<(&'_ K, &'_ mut V)>; N]
-    where
-        Q: Hash + Equivalent<K> + ?Sized,
-    {
-        unsafe { self.0.get_disjoint_key_value_unchecked_mut(keys) }
     }
 }

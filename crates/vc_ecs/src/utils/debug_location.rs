@@ -17,7 +17,7 @@ cfg::debug! {
 }
 
 impl<T: fmt::Display> fmt::Display for DebugLocation<T> {
-    #[inline]
+    #[inline(always)]
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
         cfg::debug! { self.0.fmt(_f)?; }
         Ok(())
@@ -29,7 +29,7 @@ impl DebugLocation {
     ///
     /// If that function's caller is annotated then its call location will be returned,
     /// and so on up the stack to the first call within a non-tracked function body.
-    #[inline]
+    #[inline(always)]
     #[track_caller]
     pub const fn caller() -> Self {
         cfg::debug! {
@@ -40,14 +40,14 @@ impl DebugLocation {
 }
 
 impl<T> DebugLocation<T> {
-    #[inline]
+    #[inline(always)]
     pub fn new_with(_f: impl FnOnce() -> T) -> Self {
         cfg::debug! {
             if { Self(_f()) } else { Self(PhantomData) }
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn map<U>(self, _f: impl FnOnce(T) -> U) -> DebugLocation<U> {
         cfg::debug! {
             if { DebugLocation(_f(self.0)) }
@@ -55,7 +55,7 @@ impl<T> DebugLocation<T> {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn zip<U>(self, _other: DebugLocation<U>) -> DebugLocation<(T, U)> {
         cfg::debug! {
             if { DebugLocation((self.0, _other.0)) }
@@ -80,7 +80,7 @@ impl<T> DebugLocation<T> {
 }
 
 impl<T> DebugLocation<Option<T>> {
-    #[inline]
+    #[cfg_attr(not(any(debug_assertions, feature = "debug")), inline(always))]
     pub fn untranspose(_f: impl FnOnce() -> Option<DebugLocation<T>>) -> Self {
         cfg::debug! {
             if { Self(_f().map(|value| value.0)) }
@@ -88,7 +88,7 @@ impl<T> DebugLocation<Option<T>> {
         }
     }
 
-    #[inline]
+    #[cfg_attr(not(any(debug_assertions, feature = "debug")), inline(always))]
     pub fn transpose(self) -> Option<DebugLocation<T>> {
         cfg::debug! {
             if { self.0.map(|v|DebugLocation(v)) }
@@ -99,7 +99,7 @@ impl<T> DebugLocation<Option<T>> {
 
 impl<T> DebugLocation<&T> {
     /// Maps an `DebugLocation<&T>` to an `DebugLocation<T>` by copying the contents.
-    #[inline]
+    #[inline(always)]
     pub const fn copied(&self) -> DebugLocation<T>
     where
         T: Copy,
@@ -113,7 +113,7 @@ impl<T> DebugLocation<&T> {
 
 impl<T> DebugLocation<&mut T> {
     /// Maps an `DebugLocation<&mut T>` to an `DebugLocation<T>` by copying the contents.
-    #[inline]
+    #[inline(always)]
     pub const fn copied(&self) -> DebugLocation<T>
     where
         T: Copy,
@@ -125,7 +125,7 @@ impl<T> DebugLocation<&mut T> {
     }
 
     /// Assigns the contents of an `DebugLocation<T>` to an `DebugLocation<&mut T>`.
-    #[inline]
+    #[inline(always)]
     pub fn assign(&mut self, _value: DebugLocation<T>) {
         cfg::debug! {
             *self.0 = _value.0;
@@ -135,7 +135,7 @@ impl<T> DebugLocation<&mut T> {
 
 impl<T: ?Sized> DebugLocation<T> {
     /// Converts from `&DebugLocation<T>` to `DebugLocation<&T>`.
-    #[inline]
+    #[inline(always)]
     pub const fn as_ref(&self) -> DebugLocation<&T> {
         cfg::debug! {
             if { DebugLocation(&self.0) }
@@ -144,7 +144,7 @@ impl<T: ?Sized> DebugLocation<T> {
     }
 
     /// Converts from `&mut DebugLocation<T>` to `DebugLocation<&mut T>`.
-    #[inline]
+    #[inline(always)]
     pub const fn as_mut(&mut self) -> DebugLocation<&mut T> {
         cfg::debug! {
             if { DebugLocation(&mut self.0) }
@@ -153,7 +153,7 @@ impl<T: ?Sized> DebugLocation<T> {
     }
 
     /// Converts from `&DebugLocation<T>` to `DebugLocation<&T::Target>`.
-    #[inline]
+    #[inline(always)]
     pub fn as_deref(&self) -> DebugLocation<&T::Target>
     where
         T: Deref,
@@ -165,7 +165,7 @@ impl<T: ?Sized> DebugLocation<T> {
     }
 
     /// Converts from `&mut DebugLocation<T>` to `DebugLocation<&mut T::Target>`.
-    #[inline]
+    #[inline(always)]
     pub fn as_deref_mut(&mut self) -> DebugLocation<&mut T::Target>
     where
         T: DerefMut,

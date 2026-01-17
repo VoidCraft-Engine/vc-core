@@ -9,9 +9,8 @@
 
 /// Some macros used for compilation control.
 pub mod cfg {
-    pub use vc_os::cfg::{std, web};
-
     vc_cfg::define_alias! {
+        #[cfg(feature = "std")] => std,
         // In some places, `#[cfg]` is directly used instead of `debug!`.
         // When adjusting this, be sure to modify it in other places accordingly.
         #[cfg(any(feature = "debug", debug_assertions))] => debug,
@@ -43,6 +42,7 @@ pub mod utils;
 pub mod change_detection;
 
 pub mod batching;
+pub mod bundle;
 pub mod intern;
 pub mod label;
 pub mod name;

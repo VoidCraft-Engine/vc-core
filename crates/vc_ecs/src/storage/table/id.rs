@@ -1,9 +1,10 @@
+use core::fmt;
+use core::hash;
+
 // -----------------------------------------------------------------------------
 // TableId
 
-use nonmax::NonMaxU32;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
 pub struct TableId(u32);
 
@@ -26,10 +27,35 @@ impl TableId {
     }
 }
 
+impl PartialEq for TableId {
+    #[inline(always)]
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for TableId {}
+
+impl fmt::Display for TableId {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl hash::Hash for TableId {
+    #[inline(always)]
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        state.write_u32(self.0);
+    }
+}
+
 // -----------------------------------------------------------------------------
 // TableRow
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+use nonmax::NonMaxU32;
+
+#[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
 pub struct TableRow(NonMaxU32);
 
@@ -47,5 +73,28 @@ impl TableRow {
     #[inline(always)]
     pub const fn index(self) -> usize {
         self.0.get() as usize
+    }
+}
+
+impl PartialEq for TableRow {
+    #[inline(always)]
+    fn eq(&self, other: &Self) -> bool {
+        self.0.get() == other.0.get()
+    }
+}
+
+impl Eq for TableRow {}
+
+impl fmt::Display for TableRow {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0.get(), f)
+    }
+}
+
+impl hash::Hash for TableRow {
+    #[inline(always)]
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        state.write_u32(self.0.get());
     }
 }

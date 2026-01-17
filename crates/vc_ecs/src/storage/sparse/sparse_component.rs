@@ -7,7 +7,7 @@ use core::num::NonZeroUsize;
 use core::panic::Location;
 
 use vc_ptr::{OwningPtr, Ptr};
-use vc_utils::hash::{HashMap, NoOpHashState};
+use vc_utils::hash::NoOpHashMap;
 
 use crate::cfg;
 use crate::component::{ComponentTickCells, ComponentTicks};
@@ -23,7 +23,7 @@ use crate::utils::{DebugCheckedUnwrap, DebugLocation};
 pub struct SparseComponent {
     column: Column,
     entities: Vec<EntityId>,
-    sparse: HashMap<EntityId, u32, NoOpHashState>,
+    sparse: NoOpHashMap<EntityId, u32>,
 }
 
 impl SparseComponent {
@@ -32,7 +32,7 @@ impl SparseComponent {
         Self {
             column: Column::empty(item_layout, drop_fn),
             entities: Vec::new(),
-            sparse: HashMap::with_hasher(NoOpHashState),
+            sparse: NoOpHashMap::new(),
         }
     }
 
@@ -44,7 +44,7 @@ impl SparseComponent {
         Self {
             column: Column::with_capacity(item_layout, drop_fn, capacity),
             entities: Vec::with_capacity(capacity),
-            sparse: HashMap::with_capacity_and_hasher(capacity.next_power_of_two(), NoOpHashState),
+            sparse: NoOpHashMap::with_capacity(capacity.next_power_of_two()),
         }
     }
 
@@ -90,6 +90,7 @@ impl SparseComponent {
             let capacity = self.entities.capacity();
 
             cfg::debug! {
+                // SAFETY: 0 < EntityId < u32::MAX
                 assert!(last_index < u32::MAX as usize);
             }
 
@@ -128,6 +129,7 @@ impl SparseComponent {
         self.sparse.get(&id).map(|&index| {
             let index = index as usize;
             cfg::debug! { assert_eq!(id, self.entities[index]); }
+
             unsafe { self.column.get_data(index) }
         })
     }
@@ -178,7 +180,6 @@ impl SparseComponent {
 
                     unsafe { Some(self.column.get_changed_by(index)) }
                 })
-
             } else {
                 DebugLocation::new_with(|| None)
             }
@@ -207,8 +208,8 @@ impl SparseComponent {
     pub fn remove_and_forget(&mut self, id: EntityId) -> Option<OwningPtr<'_>> {
         use crate::storage::VecCopyRemove;
 
-        self.sparse.remove(&id).map(|index| {
-            let index = index as usize;
+        self.sparse.remove(&id).map(|index_u32| {
+            let index = index_u32 as usize;
             cfg::debug! { assert_eq!(id, self.entities[index]); }
 
             let last_index = self.entities.len() - 1;
@@ -220,9 +221,11 @@ impl SparseComponent {
                 }
             } else {
                 unsafe {
-                    let swapped_id = self.entities.copy_remove_nonoverlapping(index);
+                    let swapped_id = self
+                        .entities
+                        .copy_last_and_return_nonoverlapping(index, last_index);
 
-                    *self.sparse.get_mut(&swapped_id).debug_checked_unwrap() = index as u32;
+                    *self.sparse.get_mut(&swapped_id).debug_checked_unwrap() = index_u32;
                     self.column.swap_remove_nonoverlapping(index, last_index)
                 }
             }
@@ -234,8 +237,8 @@ impl SparseComponent {
 
         self.sparse
             .remove(&id)
-            .map(|index| {
-                let index = index as usize;
+            .map(|index_u32| {
+                let index = index_u32 as usize;
                 cfg::debug! { assert_eq!(id, self.entities[index]); }
 
                 let last_index = self.entities.len() - 1;
@@ -247,9 +250,11 @@ impl SparseComponent {
                     }
                 } else {
                     unsafe {
-                        let swapped_id = self.entities.copy_remove_nonoverlapping(index);
+                        let swapped_id = self
+                            .entities
+                            .copy_last_and_return_nonoverlapping(index, last_index);
 
-                        *self.sparse.get_mut(&swapped_id).debug_checked_unwrap() = index as u32;
+                        *self.sparse.get_mut(&swapped_id).debug_checked_unwrap() = index_u32;
                         self.column
                             .swap_remove_and_drop_nonoverlapping(index, last_index);
                     }
@@ -261,8 +266,8 @@ impl SparseComponent {
 
 impl Drop for SparseComponent {
     fn drop(&mut self) {
-        let len = self.entities.len();
-        let current_capacity = self.entities.capacity();
+        let len = self.len();
+        let current_capacity = self.capacity();
         self.entities.clear();
         unsafe {
             self.column.dealloc(current_capacity, len);

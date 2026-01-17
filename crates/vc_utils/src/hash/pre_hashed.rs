@@ -4,7 +4,7 @@ use core::ops::Deref;
 
 use hashbrown::hash_map::RawEntryMut;
 
-use crate::hash::{FixedHashState, HashMap, NoOpHashState};
+use crate::hash::{FixedHashState, NoOpHashMap};
 
 // -----------------------------------------------------------------------------
 // Hashed
@@ -139,8 +139,8 @@ impl<V: Copy> Copy for Hashed<V> {}
 // -----------------------------------------------------------------------------
 // PreHashMap
 
-/// A [`HashMap`] pre-configured to use [`Hashed`] keys and [`NoOpHashState`] passthrough hashing.
-pub type PreHashMap<K, V> = HashMap<Hashed<K>, V, NoOpHashState>;
+/// A [`NoOpHashMap`] pre-configured to use [`Hashed`] keys.
+pub type PreHashMap<K, V> = NoOpHashMap<Hashed<K>, V>;
 
 impl<K: Hash + Eq + Clone, V> PreHashMap<K, V> {
     /// Try to get or insert the value for the given hashed `key`.
@@ -149,7 +149,7 @@ impl<K: Hash + Eq + Clone, V> PreHashMap<K, V> {
     /// it will clone it and insert the value returned by `func`.
     #[inline]
     pub fn get_or_insert_with(&mut self, key: &Hashed<K>, func: impl FnOnce() -> V) -> &mut V {
-        let entry: RawEntryMut<'_, Hashed<K>, V, NoOpHashState> = self
+        let entry = self
             .raw_entry_mut()
             .from_key_hashed_nocheck(key.hash(), key);
 

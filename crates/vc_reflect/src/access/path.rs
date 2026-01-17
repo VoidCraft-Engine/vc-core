@@ -5,6 +5,9 @@ use core::fmt;
 
 use crate::access::OffsetAccessor;
 
+// -----------------------------------------------------------------------------
+// ParseError
+
 /// An interface for representing path parsing error information.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseError<'a> {
@@ -27,6 +30,9 @@ impl fmt::Display for ParseError<'_> {
 }
 
 impl core::error::Error for ParseError<'_> {}
+
+// -----------------------------------------------------------------------------
+// AccessPath
 
 /// An interface where the type implementing
 /// this trait can be considered as a "Path" for path access.
