@@ -228,14 +228,14 @@ impl<'a> Ptr<'a> {
 }
 
 impl<'a, T: ?Sized> From<&'a T> for Ptr<'a> {
-    #[inline]
+    #[inline(always)]
     fn from(val: &'a T) -> Self {
         Self::from_ref(val)
     }
 }
 
 impl<'a, T: ?Sized> From<&'a mut T> for Ptr<'a> {
-    #[inline]
+    #[inline(always)]
     fn from(val: &'a mut T) -> Self {
         Self::from_mut(val)
     }
@@ -446,6 +446,7 @@ impl<'a> PtrMut<'a> {
     ///
     /// foo(pm.reborrow());
     /// ```
+    #[inline(always)]
     pub const fn reborrow(&mut self) -> PtrMut<'_> {
         // '_ instead of 'a
         PtrMut(self.0, PhantomData)
@@ -496,7 +497,7 @@ impl<'a> PtrMut<'a> {
 }
 
 impl<'a, T: ?Sized> From<&'a mut T> for PtrMut<'a> {
-    #[inline]
+    #[inline(always)]
     fn from(val: &'a mut T) -> Self {
         Self::from_mut(val)
     }

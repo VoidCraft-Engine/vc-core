@@ -42,12 +42,12 @@ impl Archetype {
         self.table_id
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn edges(&self) -> &Edges {
         &self.edges
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn edges_mut(&mut self) -> &mut Edges {
         &mut self.edges
     }
@@ -107,7 +107,7 @@ impl Archetype {
             .iter()
             .zip(self.storage_types.iter())
             .filter_map(|(&component, &storage)| {
-                if storage != StorageType::Table {
+                if storage == StorageType::SparseSet {
                     Some(component)
                 } else {
                     None

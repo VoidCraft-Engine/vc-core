@@ -106,6 +106,13 @@ impl<V> Deref for Hashed<V> {
     }
 }
 
+// impl<X: PartialEq<Y>, Y> PartialEq<Hashed<Y>> for Hashed<X>{
+//     #[inline]
+//     fn eq(&self, other: &Hashed<Y>) -> bool {
+//         self.hash == other.hash && self.value.eq(&other.value)
+//     }
+// }
+
 impl<V: PartialEq> PartialEq for Hashed<V> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {

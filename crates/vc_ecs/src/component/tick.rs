@@ -57,7 +57,7 @@ pub struct ComponentTickCells<'a> {
 // -----------------------------------------------------------------------------
 // ComponentTickRef
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(crate) struct ComponentTicksRef<'w> {
     pub(crate) added: &'w Tick,
     pub(crate) changed: &'w Tick,
@@ -89,6 +89,7 @@ impl<'w> ComponentTicksRef<'w> {
 // -----------------------------------------------------------------------------
 // ComponentTicksMut
 
+#[derive(Debug)]
 pub(crate) struct ComponentTicksMut<'w> {
     pub(crate) added: &'w mut Tick,
     pub(crate) changed: &'w mut Tick,
@@ -117,7 +118,7 @@ impl<'w> ComponentTicksMut<'w> {
 }
 
 impl<'w> From<ComponentTicksMut<'w>> for ComponentTicksRef<'w> {
-    #[inline]
+    #[inline(always)]
     fn from(ticks: ComponentTicksMut<'w>) -> Self {
         ComponentTicksRef {
             added: ticks.added,

@@ -1,19 +1,26 @@
 use core::fmt;
+use core::hash::Hash;
 use core::ops::{Deref, DerefMut};
 use core::panic::Location;
 
 use crate::cfg;
 
-cfg::debug! {
-    if {
-        #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-        pub struct DebugLocation<T: ?Sized = &'static Location<'static>>(T);
-    } else {
-        use core::marker::PhantomData;
+// -----------------------------------------------------------------------------
+// DebugLocation
 
-        #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-        pub struct DebugLocation<T: ?Sized = &'static Location<'static>>(PhantomData<T>);
-    }
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DebugLocation<T: ?Sized = &'static Location<'static>>(
+    #[cfg(any(debug_assertions, feature = "debug"))] T,
+    #[cfg(not(any(debug_assertions, feature = "debug")))] PhantomData<T>,
+);
+
+// -----------------------------------------------------------------------------
+// Traits
+
+vc_reflect::derive::impl_reflect_opaque! {
+    (in vc_ecs::utils as DebugLocation)
+    DebugLocation<T: Clone + PartialEq  + Hash + fmt::Debug>
+    (clone, hash, debug, partial_eq)
 }
 
 impl<T: fmt::Display> fmt::Display for DebugLocation<T> {
@@ -24,13 +31,16 @@ impl<T: fmt::Display> fmt::Display for DebugLocation<T> {
     }
 }
 
+// -----------------------------------------------------------------------------
+// Implementation
+
 impl DebugLocation {
     /// Returns the source location of the caller of this function.
     ///
     /// If that function's caller is annotated then its call location will be returned,
     /// and so on up the stack to the first call within a non-tracked function body.
     #[inline(always)]
-    #[track_caller]
+    #[cfg_attr(any(debug_assertions, feature = "debug"), track_caller)]
     pub const fn caller() -> Self {
         cfg::debug! {
             if {  Self(Location::caller()) }

@@ -85,10 +85,6 @@ taskpool! {
 /// # Warning
 ///
 /// This function *must* be called on the main thread, or the task pools will not be updated appropriately.
-///
-/// # Panics
-///
-/// Panic if this function be used in wasm target.
 pub fn tick_local_executor_on_main_thread() {
     COMPUTE_TASK_POOL
         .get()

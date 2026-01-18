@@ -26,7 +26,6 @@ impl XorShift64Star {
         Self { state: Cell::new(FIXED_STATE) }
     }
 
-    #[inline]
     pub fn random_state(&self) {
         static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -52,6 +51,7 @@ impl XorShift64Star {
     }
 
     /// Return a value from `0..n`.
+    #[inline]
     pub fn next_usize(&self, n: usize) -> usize {
         (self.next() % n as u64) as usize
     }

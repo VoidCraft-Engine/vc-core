@@ -10,7 +10,7 @@ pub mod cfg {
 
     vc_cfg::define_alias! {
         #[cfg(feature = "std")] => std,
-        #[cfg(feature = "web")] => web,
+        #[cfg(all(target_arch = "wasm32", feature = "web"))] => web,
         #[cfg(all(feature = "std", feature = "async_io"))] => async_io,
         #[cfg(all(feature = "std", not(feature = "web")))] => multi_thread,
         #[cfg(any(not(feature = "std"), feature = "web"))] => single_thread,
