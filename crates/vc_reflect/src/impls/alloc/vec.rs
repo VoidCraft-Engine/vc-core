@@ -49,6 +49,10 @@ impl<T: Typed + FromReflect> Reflect for Vec<T> {
         impls::list_partial_eq(self, other)
     }
     #[inline]
+    fn reflect_partial_cmp(&self, other: &dyn Reflect) -> Option<core::cmp::Ordering> {
+        impls::list_partial_cmp(self, other)
+    }
+    #[inline]
     fn reflect_hash(&self) -> Option<u64> {
         impls::list_hash(self)
     }

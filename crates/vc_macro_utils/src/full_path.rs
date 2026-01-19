@@ -17,6 +17,8 @@ pub struct SendFP;
 pub struct SyncFP;
 /// Full Path (FP) for [`PartialEq`]
 pub struct PartialEqFP;
+/// Full Path (FP) for [`PartialOrd`]
+pub struct PartialOrdFP;
 /// Full Path (FP) for [`Eq`]
 pub struct EqFP;
 /// Full Path (FP) for [`Hash`](core::hash::Hash)
@@ -73,6 +75,12 @@ impl ToTokens for SyncFP {
 impl ToTokens for PartialEqFP {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         quote!(::core::cmp::PartialEq).to_tokens(tokens);
+    }
+}
+
+impl ToTokens for PartialOrdFP {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        quote!(::core::cmp::PartialOrd).to_tokens(tokens);
     }
 }
 

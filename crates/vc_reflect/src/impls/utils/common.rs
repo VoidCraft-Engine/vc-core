@@ -1,5 +1,6 @@
 use alloc::borrow::Cow;
 use alloc::format;
+use core::cmp::Ordering;
 use core::fmt;
 use core::hash::{Hash, Hasher};
 
@@ -20,7 +21,6 @@ use crate::ops::{Array, Enum, List, Map, Set, Struct, Tuple, TupleStruct};
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Array for Foo{ /* ... */ }
@@ -63,7 +63,6 @@ pub fn array_try_apply(x: &mut dyn Array, y: &dyn Reflect) -> Result<(), ApplyEr
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Array for Foo{ /* ... */ }
@@ -95,6 +94,51 @@ pub fn array_partial_eq(x: &dyn Array, y: &dyn Reflect) -> Option<bool> {
     Some(true)
 }
 
+/// A function use for implementing [`Reflect::reflect_partial_cmp`].
+///
+/// # Rules
+///
+/// 1. If `other` is not `Array`, return `None`.
+/// 2. If `self.len` != `other.len`, return `None`.
+/// 3. Call `reflect_partial_cmp` for each items,
+///    return `None` or `Some(_)` if items is not `Ordering::Equal` or return `None`.
+/// 4. Return `Some(Ordering::Equal)`.
+///
+/// # Example
+///
+/// ```ignore
+/// pub struct Foo { /* ... */ }
+///
+/// impl Array for Foo{ /* ... */ }
+/// impl Reflect for Foo {
+///     // ...
+///     fn reflect_partial_cmp(&self, other: &dyn Reflect) -> Option<Ordering> {
+///         array_partial_cmp(self, other)
+///     }
+///     // ...
+/// }
+/// ```
+#[inline(never)]
+pub fn array_partial_cmp(x: &dyn Array, y: &dyn Reflect) -> Option<Ordering> {
+    let ReflectRef::Array(y) = y.reflect_ref() else {
+        return None;
+    };
+
+    if x.len() != y.len() {
+        return None;
+    }
+
+    for (a, b) in x.iter().zip(y.iter()) {
+        match a.reflect_partial_cmp(b) {
+            None => return None,
+            Some(Ordering::Equal) => continue,
+            Some(ord) => return Some(ord),
+        }
+    }
+
+    Some(Ordering::Equal)
+}
+
 /// A function use for implementing [`Reflect::reflect_hash`] .
 ///
 /// # Rules
@@ -106,7 +150,6 @@ pub fn array_partial_eq(x: &dyn Array, y: &dyn Reflect) -> Option<bool> {
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Array for Foo{ /* ... */ }
@@ -137,7 +180,6 @@ pub fn array_hash(x: &dyn Array) -> Option<u64> {
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Array for Foo{ /* ... */ }
@@ -172,7 +214,6 @@ pub fn array_debug(dyn_array: &dyn Array, f: &mut fmt::Formatter<'_>) -> fmt::Re
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Tuple for Foo{ /* ... */ }
@@ -216,7 +257,6 @@ pub fn tuple_try_apply(x: &mut dyn Tuple, y: &dyn Reflect) -> Result<(), ApplyEr
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Tuple for Foo{ /* ... */ }
@@ -247,6 +287,51 @@ pub fn tuple_partial_eq(x: &dyn Tuple, y: &dyn Reflect) -> Option<bool> {
     Some(true)
 }
 
+/// A function use for implementing [`Reflect::reflect_partial_cmp`].
+///
+/// # Rules
+///
+/// 1. If `other` is not `Tuple`, return `None`.
+/// 2. If `self.field_len` != `other.field_len`, return `None`.
+/// 3. Call `reflect_partial_cmp` for each fields,
+///    return `None` or `Some(_)` if fields is not `Ordering::Equal` or return `None`.
+/// 4. Return `Some(Ordering::Equal)`.
+///
+/// # Example
+///
+/// ```ignore
+/// pub struct Foo { /* ... */ }
+///
+/// impl Tuple for Foo{ /* ... */ }
+/// impl Reflect for Foo {
+///     // ...
+///     fn reflect_partial_cmp(&self, other: &dyn Reflect) -> Option<Ordering> {
+///         tuple_partial_cmp(self, other)
+///     }
+///     // ...
+/// }
+/// ```
+#[inline(never)]
+pub fn tuple_partial_cmp(x: &dyn Tuple, y: &dyn Reflect) -> Option<Ordering> {
+    let ReflectRef::Tuple(y) = y.reflect_ref() else {
+        return None;
+    };
+
+    if x.field_len() != y.field_len() {
+        return None;
+    }
+
+    for (a, b) in x.iter_fields().zip(y.iter_fields()) {
+        match a.reflect_partial_cmp(b) {
+            None => return None,
+            Some(Ordering::Equal) => continue,
+            Some(ord) => return Some(ord),
+        }
+    }
+
+    Some(Ordering::Equal)
+}
+
 /// A function use for implementing [`Reflect::reflect_hash`] .
 ///
 /// # Rules
@@ -258,7 +343,6 @@ pub fn tuple_partial_eq(x: &dyn Tuple, y: &dyn Reflect) -> Option<bool> {
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Tuple for Foo{ /* ... */ }
@@ -288,7 +372,6 @@ pub fn tuple_hash(x: &dyn Tuple) -> Option<u64> {
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Tuple for Foo{ /* ... */ }
@@ -324,7 +407,6 @@ pub fn tuple_debug(dyn_tuple: &dyn Tuple, f: &mut fmt::Formatter<'_>) -> fmt::Re
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Struct for Foo{ /* ... */ }
@@ -363,7 +445,6 @@ pub fn struct_try_apply(x: &mut dyn Struct, y: &dyn Reflect) -> Result<(), Apply
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Struct for Foo{ /* ... */ }
@@ -399,6 +480,51 @@ pub fn struct_partial_eq(x: &dyn Struct, y: &dyn Reflect) -> Option<bool> {
     Some(true)
 }
 
+/// A function use for implementing [`Reflect::reflect_partial_cmp`].
+///
+/// # Rules
+///
+/// 1. If `other` is not `Struct`, return `None`.
+/// 2. If `self.field_len` != `other.field_len`, return `None`.
+/// 3. Call `reflect_partial_cmp` for each fields,
+///    return `None` or `Some(_)` if fields is not `Ordering::Equal` or return `None`.
+/// 4. Return `Some(Ordering::Equal)`.
+///
+/// # Example
+///
+/// ```ignore
+/// pub struct Foo { /* ... */ }
+///
+/// impl Struct for Foo{ /* ... */ }
+/// impl Reflect for Foo {
+///     // ...
+///     fn reflect_partial_cmp(&self, other: &dyn Reflect) -> Option<Ordering> {
+///         struct_partial_cmp(self, other)
+///     }
+///     // ...
+/// }
+/// ```
+#[inline(never)]
+pub fn struct_partial_cmp(x: &dyn Struct, y: &dyn Reflect) -> Option<Ordering> {
+    let ReflectRef::Struct(y) = y.reflect_ref() else {
+        return None;
+    };
+
+    if x.field_len() != y.field_len() {
+        return None;
+    }
+
+    for (a, b) in x.iter_fields().zip(y.iter_fields()) {
+        match a.reflect_partial_cmp(b) {
+            None => return None,
+            Some(Ordering::Equal) => continue,
+            Some(ord) => return Some(ord),
+        }
+    }
+
+    Some(Ordering::Equal)
+}
+
 /// A function use for implementing [`Reflect::reflect_hash`] .
 ///
 /// # Rules
@@ -410,7 +536,6 @@ pub fn struct_partial_eq(x: &dyn Struct, y: &dyn Reflect) -> Option<bool> {
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Struct for Foo{ /* ... */ }
@@ -441,7 +566,6 @@ pub fn struct_hash(x: &dyn Struct) -> Option<u64> {
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Struct for Foo{ /* ... */ }
@@ -534,7 +658,7 @@ pub fn enum_try_apply<'b>(
 ///
 /// # Rules
 ///
-/// 1. If `other` is not `Struct`, return `Some(false)`.
+/// 1. If `other` is not `Enum`, return `Some(false)`.
 /// 2. Return `Some(false)` if `variant_name`, `variant_kind`, `field_len` mismatched.
 /// 3. Compare all fields.
 /// 4. Return `Some(true)`.
@@ -542,7 +666,6 @@ pub fn enum_try_apply<'b>(
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Enum for Foo{ /* ... */ }
@@ -599,6 +722,79 @@ pub fn enum_partial_eq(x: &dyn Enum, y: &dyn Reflect) -> Option<bool> {
     }
 }
 
+/// A function use for implementing [`Reflect::reflect_partial_cmp`].
+///
+/// # Rules
+///
+/// 1. If `other` is not `Enum`, return `None`.
+/// 2. Return `None` if `variant_name`, `variant_kind`, `field_len` mismatched.
+/// 3. Compare all fields.
+/// 4. Return `Some(Ordering::Equal)`.
+///
+///
+/// # Example
+///
+/// ```ignore
+/// pub struct Foo { /* ... */ }
+///
+/// impl Enum for Foo{ /* ... */ }
+/// impl Reflect for Foo {
+///     // ...
+///     fn reflect_partial_cmp(&self, other: &dyn Reflect) -> Option<Ordering> {
+///         enum_partial_cmp(self, other)
+///     }
+///     // ...
+/// }
+/// ```
+#[inline(never)]
+pub fn enum_partial_cmp(x: &dyn Enum, y: &dyn Reflect) -> Option<Ordering> {
+    let ReflectRef::Enum(y) = y.reflect_ref() else {
+        return None;
+    };
+
+    if x.variant_name() != y.variant_name() {
+        return None;
+    }
+
+    if x.variant_kind() != y.variant_kind() {
+        return None;
+    }
+
+    if x.field_len() != y.field_len() {
+        return None;
+    }
+
+    if x.field_len() != y.field_len() {
+        return None;
+    }
+
+    match x.variant_kind() {
+        VariantKind::Unit => Some(Ordering::Equal),
+        VariantKind::Tuple => {
+            for (x_value, y_value) in x.iter_fields().zip(y.iter_fields()) {
+                let result = x_value.value().reflect_partial_cmp(y_value.value());
+                if result != Some(Ordering::Equal) {
+                    return result;
+                }
+            }
+            Some(Ordering::Equal)
+        }
+        VariantKind::Struct => {
+            for field in x.iter_fields() {
+                if let Some(y_field) = y.field(field.name().unwrap()) {
+                    let result = field.value().reflect_partial_cmp(y_field);
+                    if result != Some(Ordering::Equal) {
+                        return result;
+                    }
+                } else {
+                    return None;
+                }
+            }
+            Some(Ordering::Equal)
+        }
+    }
+}
+
 /// A function use for implementing [`Reflect::reflect_hash`] .
 ///
 /// # Rules
@@ -610,7 +806,6 @@ pub fn enum_partial_eq(x: &dyn Enum, y: &dyn Reflect) -> Option<bool> {
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Enum for Foo{ /* ... */ }
@@ -642,7 +837,6 @@ pub fn enum_hash(x: &dyn Enum) -> Option<u64> {
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Enum for Foo{ /* ... */ }
@@ -689,7 +883,6 @@ pub fn enum_debug(dyn_enum: &dyn Enum, f: &mut fmt::Formatter<'_>) -> fmt::Resul
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl List for Foo{ /* ... */ }
@@ -750,7 +943,6 @@ pub fn list_try_apply(x: &mut dyn List, y: &dyn Reflect) -> Result<(), ApplyErro
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl List for Foo{ /* ... */ }
@@ -782,6 +974,48 @@ pub fn list_partial_eq(x: &dyn List, y: &dyn Reflect) -> Option<bool> {
     Some(true)
 }
 
+/// A function use for implementing [`Reflect::reflect_partial_cmp`].
+///
+/// # Rules
+///
+/// 1. If `other` is not `List`, return `None`.
+/// 2. Call `reflect_partial_cmp` for each items.
+/// 3. Compare `self.len` and `other.len`.
+/// 4. Return `Some(Ordering::Equal)`.
+///
+/// # Example
+///
+/// ```ignore
+/// pub struct Foo { /* ... */ }
+///
+/// impl List for Foo{ /* ... */ }
+/// impl Reflect for Foo {
+///     // ...
+///     fn reflect_partial_cmp(&self, other: &dyn Reflect) -> Option<Ordering> {
+///         list_partial_cmp(self, other)
+///     }
+///     // ...
+/// }
+/// ```
+#[inline(never)]
+pub fn list_partial_cmp(x: &dyn List, y: &dyn Reflect) -> Option<Ordering> {
+    let ReflectRef::List(y) = y.reflect_ref() else {
+        return None;
+    };
+
+    let len = core::cmp::min(x.len(), y.len());
+
+    for (a, b) in x.iter().zip(y.iter()).take(len) {
+        match a.reflect_partial_cmp(b) {
+            None => return None,
+            Some(Ordering::Equal) => continue,
+            Some(ord) => return Some(ord),
+        }
+    }
+
+    Some(Ord::cmp(&x.len(), &y.len()))
+}
+
 /// A function use for implementing [`Reflect::reflect_hash`] .
 ///
 /// # Rules
@@ -793,7 +1027,6 @@ pub fn list_partial_eq(x: &dyn List, y: &dyn Reflect) -> Option<bool> {
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl List for Foo{ /* ... */ }
@@ -824,7 +1057,6 @@ pub fn list_hash(x: &dyn List) -> Option<u64> {
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl List for Foo{ /* ... */ }
@@ -857,7 +1089,6 @@ pub fn list_debug(dyn_list: &dyn List, f: &mut fmt::Formatter<'_>) -> fmt::Resul
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Map for Foo{ /* ... */ }
@@ -918,7 +1149,6 @@ pub fn map_try_apply(x: &mut dyn Map, y: &dyn Reflect) -> Result<(), ApplyError>
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Map for Foo{ /* ... */ }
@@ -954,6 +1184,61 @@ pub fn map_partial_eq(x: &dyn Map, y: &dyn Reflect) -> Option<bool> {
     Some(true)
 }
 
+/// A function use for implementing [`Reflect::reflect_partial_cmp`].
+///
+/// # Rules
+///
+/// 1. If `other` is not `Map`, return `None`.
+/// 2. For each entry pair `(a_k, a_v)` and `(b_k, b_v)` in the iteration order,
+///    - Compare `a_k` to `b_k` using `reflect_partial_cmp` , returning the first non-equal ordering.
+///    - Compare `a_v` to `b_v` using `reflect_partial_cmp` , returning the first non-equal ordering.
+/// 3. If all compared entries are equal, the shorter map is `Less` and longer is `Greater`.
+///
+/// # Example
+///
+/// ```ignore
+/// pub struct Foo { /* ... */ }
+///
+/// impl Map for Foo{ /* ... */ }
+/// impl Reflect for Foo {
+///     // ...
+///     fn reflect_partial_cmp(&self, other: &dyn Reflect) -> Option<Ordering> {
+///         map_partial_cmp(self, other)
+///     }
+///     // ...
+/// }
+/// ```
+#[inline(never)]
+pub fn map_partial_cmp(x: &dyn Map, y: &dyn Reflect) -> Option<Ordering> {
+    let ReflectRef::Map(y) = y.reflect_ref() else {
+        return None;
+    };
+
+    let mut a_iter = x.iter();
+    let mut b_iter = y.iter();
+
+    loop {
+        match (a_iter.next(), b_iter.next()) {
+            (Some((a_k, a_v)), Some((b_k, b_v))) => {
+                match a_k.reflect_partial_cmp(b_k) {
+                    None => return None,
+                    Some(Ordering::Equal) => {}
+                    Some(ord) => return Some(ord),
+                }
+
+                match a_v.reflect_partial_cmp(b_v) {
+                    None => return None,
+                    Some(Ordering::Equal) => {}
+                    Some(ord) => return Some(ord),
+                }
+            }
+            (None, None) => return Some(Ordering::Equal),
+            (None, Some(_)) => return Some(Ordering::Less),
+            (Some(_), None) => return Some(Ordering::Greater),
+        }
+    }
+}
+
 /// A function use for implementing [`Reflect::reflect_hash`] .
 ///
 /// # Rules
@@ -965,7 +1250,6 @@ pub fn map_partial_eq(x: &dyn Map, y: &dyn Reflect) -> Option<bool> {
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Map for Foo{ /* ... */ }
@@ -997,7 +1281,6 @@ pub fn map_hash(x: &dyn Map) -> Option<u64> {
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Map for Foo{ /* ... */ }
@@ -1030,7 +1313,6 @@ pub fn map_debug(dyn_map: &dyn Map, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Set for Foo{ /* ... */ }
@@ -1075,7 +1357,6 @@ pub fn set_try_apply(x: &mut dyn Set, y: &dyn Reflect) -> Result<(), ApplyError>
 /// 4. Return `Some(true)`.
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Set for Foo{ /* ... */ }
@@ -1109,6 +1390,51 @@ pub fn set_partial_eq(x: &dyn Set, y: &dyn Reflect) -> Option<bool> {
     Some(true)
 }
 
+/// A function use for implementing [`Reflect::reflect_partial_cmp`].
+///
+/// # Rules
+///
+/// 1. If `other` is not `Set`, return `None`.
+/// 2. For each entry pair using `reflect_partial_cmp` , returning the first non-equal ordering.
+/// 3. If all compared entries are equal, the shorter set is `Less` and longer is `Greater`.
+///
+/// # Example
+///
+/// ```ignore
+/// pub struct Foo { /* ... */ }
+///
+/// impl Set for Foo{ /* ... */ }
+/// impl Reflect for Foo {
+///     // ...
+///     fn reflect_partial_cmp(&self, other: &dyn Reflect) -> Option<Ordering> {
+///         set_partial_cmp(self, other)
+///     }
+///     // ...
+/// }
+/// ```
+#[inline(never)]
+pub fn set_partial_cmp(x: &dyn Set, y: &dyn Reflect) -> Option<Ordering> {
+    let ReflectRef::Set(y) = y.reflect_ref() else {
+        return None;
+    };
+
+    let mut a_iter = x.iter();
+    let mut b_iter = y.iter();
+
+    loop {
+        match (a_iter.next(), b_iter.next()) {
+            (Some(a), Some(b)) => match a.reflect_partial_cmp(b) {
+                None => return None,
+                Some(Ordering::Equal) => {}
+                Some(ord) => return Some(ord),
+            },
+            (None, None) => return Some(Ordering::Equal),
+            (None, Some(_)) => return Some(Ordering::Less),
+            (Some(_), None) => return Some(Ordering::Greater),
+        }
+    }
+}
+
 /// A function use for implementing [`Reflect::reflect_hash`] .
 ///
 /// # Rules
@@ -1120,7 +1446,6 @@ pub fn set_partial_eq(x: &dyn Set, y: &dyn Reflect) -> Option<bool> {
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Set for Foo{ /* ... */ }
@@ -1151,7 +1476,6 @@ pub fn set_hash(x: &dyn Set) -> Option<u64> {
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl Set for Foo{ /* ... */ }
@@ -1186,7 +1510,6 @@ pub fn set_debug(dyn_set: &dyn Set, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl TupleStruct for Foo{ /* ... */ }
@@ -1226,7 +1549,6 @@ pub fn tuple_struct_try_apply(x: &mut dyn TupleStruct, y: &dyn Reflect) -> Resul
 /// 4. Return `Some(true)`.
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl TupleStruct for Foo{ /* ... */ }
@@ -1258,6 +1580,51 @@ pub fn tuple_struct_partial_eq(x: &dyn TupleStruct, y: &dyn Reflect) -> Option<b
     Some(true)
 }
 
+/// A function use for implementing [`Reflect::reflect_partial_cmp`].
+///
+/// # Rules
+///
+/// 1. If `other` is not `TupleStruct`, return `None`.
+/// 2. If `self.field_len` != `other.field_len`, return `None`.
+/// 3. Call `reflect_partial_cmp` for each fields,
+///    return `None` or `Some(_)` if fields is not `Ordering::Equal` or return `None`.
+/// 4. Return `Some(Ordering::Equal)`.
+///
+/// # Example
+///
+/// ```ignore
+/// pub struct Foo { /* ... */ }
+///
+/// impl TupleStruct for Foo{ /* ... */ }
+/// impl Reflect for Foo {
+///     // ...
+///     fn reflect_partial_cmp(&self, other: &dyn Reflect) -> Option<Ordering> {
+///         tuple_struct_partial_cmp(self, other)
+///     }
+///     // ...
+/// }
+/// ```
+#[inline(never)]
+pub fn tuple_struct_partial_cmp(x: &dyn TupleStruct, y: &dyn Reflect) -> Option<Ordering> {
+    let ReflectRef::TupleStruct(y) = y.reflect_ref() else {
+        return None;
+    };
+
+    if x.field_len() != y.field_len() {
+        return None;
+    }
+
+    for (a, b) in x.iter_fields().zip(y.iter_fields()) {
+        match a.reflect_partial_cmp(b) {
+            None => return None,
+            Some(Ordering::Equal) => continue,
+            Some(ord) => return Some(ord),
+        }
+    }
+
+    Some(Ordering::Equal)
+}
+
 /// A function use for implementing [`Reflect::reflect_hash`] .
 ///
 /// # Rules
@@ -1269,7 +1636,6 @@ pub fn tuple_struct_partial_eq(x: &dyn TupleStruct, y: &dyn Reflect) -> Option<b
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl TupleStruct for Foo{ /* ... */ }
@@ -1300,7 +1666,6 @@ pub fn tuple_struct_hash(x: &dyn TupleStruct) -> Option<u64> {
 /// # Example
 ///
 /// ```ignore
-///
 /// pub struct Foo { /* ... */ }
 ///
 /// impl TupleStruct for Foo{ /* ... */ }

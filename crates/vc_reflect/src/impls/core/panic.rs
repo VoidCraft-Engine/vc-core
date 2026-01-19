@@ -53,12 +53,18 @@ impl Reflect for &'static Location<'static> {
         Ok(Box::new(*self))
     }
 
-    fn reflect_partial_eq(&self, value: &dyn Reflect) -> Option<bool> {
-        if let Some(value) = value.downcast_ref::<Self>() {
-            Some(PartialEq::eq(self, value))
+    fn reflect_partial_eq(&self, other: &dyn Reflect) -> Option<bool> {
+        if let Some(other) = other.downcast_ref::<Self>() {
+            Some(PartialEq::eq(self, other))
         } else {
             Some(false)
         }
+    }
+
+    fn reflect_partial_cmp(&self, other: &dyn Reflect) -> Option<core::cmp::Ordering> {
+        other
+            .downcast_ref::<Self>()
+            .map(|other| Ord::cmp(self, other))
     }
 
     fn reflect_hash(&self) -> Option<u64> {

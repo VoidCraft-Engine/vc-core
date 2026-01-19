@@ -1,6 +1,7 @@
 use alloc::borrow::{Cow, ToOwned};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
+use core::cmp::Ordering;
 
 use crate::derive::impl_type_path;
 use crate::impls::{GenericTypeInfoCell, NonGenericTypeInfoCell};
@@ -47,12 +48,18 @@ impl Reflect for Cow<'static, str> {
         Ok(Box::new(self.clone()))
     }
 
-    fn reflect_partial_eq(&self, value: &dyn Reflect) -> Option<bool> {
-        if let Some(value) = value.downcast_ref::<Self>() {
-            Some(PartialEq::eq(self, value))
+    fn reflect_partial_eq(&self, other: &dyn Reflect) -> Option<bool> {
+        if let Some(other) = other.downcast_ref::<Self>() {
+            Some(PartialEq::eq(self, other))
         } else {
             Some(false)
         }
+    }
+
+    fn reflect_partial_cmp(&self, other: &dyn Reflect) -> Option<Ordering> {
+        other
+            .downcast_ref::<Self>()
+            .map(|other| Ord::cmp(self, other))
     }
 
     fn reflect_hash(&self) -> Option<u64> {
@@ -112,6 +119,10 @@ impl<T: FromReflect + Typed + Clone> Reflect for Cow<'static, [T]> {
 
     fn reflect_partial_eq(&self, value: &dyn Reflect) -> Option<bool> {
         crate::impls::list_partial_eq(self, value)
+    }
+
+    fn reflect_partial_cmp(&self, value: &dyn Reflect) -> Option<Ordering> {
+        crate::impls::list_partial_cmp(self, value)
     }
 
     fn reflect_hash(&self) -> Option<u64> {

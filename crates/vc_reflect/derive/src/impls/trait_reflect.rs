@@ -13,6 +13,7 @@ pub(crate) fn impl_trait_reflect(
     to_dynamic_tokens: TokenStream,
     reflect_clone_tokens: TokenStream,
     reflect_partial_eq_tokens: TokenStream,
+    reflect_partial_cmp_tokens: TokenStream,
     reflect_hash_tokens: TokenStream,
     reflect_debug_tokens: TokenStream,
     add_from_reflect: bool,
@@ -64,6 +65,8 @@ pub(crate) fn impl_trait_reflect(
             #reflect_clone_tokens
 
             #reflect_partial_eq_tokens
+
+            #reflect_partial_cmp_tokens
 
             #reflect_hash_tokens
 

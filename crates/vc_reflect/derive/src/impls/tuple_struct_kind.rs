@@ -40,6 +40,7 @@ pub(crate) fn impl_tuple_struct(info: &ReflectStruct) -> TokenStream {
         let to_dynamic_tokens = get_tuple_struct_to_dynamic_impl(meta);
         let reflect_clone_tokens = get_struct_clone_impl(info);
         let reflect_partial_eq_tokens = get_tuple_struct_partial_eq_impl(meta);
+        let reflect_partial_cmp_tokens = get_tuple_struct_partial_cmp_impl(meta);
         let reflect_hash_tokens = get_tuple_struct_hash_impl(meta);
         let reflect_debug_tokens = get_tuple_struct_debug_impl(meta);
 
@@ -50,6 +51,7 @@ pub(crate) fn impl_tuple_struct(info: &ReflectStruct) -> TokenStream {
             to_dynamic_tokens,
             reflect_clone_tokens,
             reflect_partial_eq_tokens,
+            reflect_partial_cmp_tokens,
             reflect_hash_tokens,
             reflect_debug_tokens,
             false,
@@ -207,6 +209,33 @@ fn get_tuple_struct_partial_eq_impl(meta: &ReflectMeta) -> TokenStream {
             #[inline]
             fn reflect_partial_eq(&self, other: &dyn #reflect_) -> #OptionFP<bool> {
                 #tuple_struct_partial_eq_(self, other)
+            }
+        }
+    }
+}
+
+/// Generate `Reflect::reflect_partial_cmp` implementation tokens.
+fn get_tuple_struct_partial_cmp_impl(meta: &ReflectMeta) -> TokenStream {
+    use crate::path::fp::{OptionFP, PartialOrdFP};
+    let vc_reflect_path = meta.vc_reflect_path();
+    let reflect_ = crate::path::reflect_(vc_reflect_path);
+
+    if let Some(span) = meta.attrs().avail_traits.partial_cmp {
+        quote_spanned! { span =>
+            #[inline]
+            fn reflect_partial_cmp(&self, __input: &dyn #reflect_) -> #OptionFP<::core::cmp::Ordering> {
+                if let #OptionFP::Some(__input) = <dyn #reflect_>::downcast_ref::<Self>(__input) {
+                    return #PartialOrdFP::partial_cmp(self, __input);
+                }
+                #OptionFP::None
+            }
+        }
+    } else {
+        let tuple_struct_partial_cmp_ = crate::path::tuple_struct_partial_cmp_(vc_reflect_path);
+        quote! {
+            #[inline]
+            fn reflect_partial_cmp(&self, other: &dyn #reflect_) -> #OptionFP<::core::cmp::Ordering> {
+                #tuple_struct_partial_cmp_(self, other)
             }
         }
     }

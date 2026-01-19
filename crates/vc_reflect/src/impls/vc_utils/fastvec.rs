@@ -111,6 +111,10 @@ impl<T: FromReflect + Typed, const N: usize> Reflect for StackVec<T, N> {
         crate::impls::list_partial_eq(self, other)
     }
 
+    fn reflect_partial_cmp(&self, value: &dyn Reflect) -> Option<::core::cmp::Ordering> {
+        crate::impls::list_partial_cmp(self, value)
+    }
+
     fn reflect_hash(&self) -> Option<u64> {
         crate::impls::list_hash(self)
     }
@@ -229,6 +233,10 @@ impl<T: FromReflect + Typed, const N: usize> Reflect for AutoVec<T, N> {
 
     fn reflect_partial_eq(&self, other: &dyn Reflect) -> Option<bool> {
         crate::impls::list_partial_eq(self, other)
+    }
+
+    fn reflect_partial_cmp(&self, value: &dyn Reflect) -> Option<::core::cmp::Ordering> {
+        crate::impls::list_partial_cmp(self, value)
     }
 
     fn reflect_hash(&self) -> Option<u64> {

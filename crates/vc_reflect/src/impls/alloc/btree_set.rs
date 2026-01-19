@@ -59,6 +59,11 @@ impl<T: FromReflect + Typed + Ord + Eq> Reflect for BTreeSet<T> {
     }
 
     #[inline]
+    fn reflect_partial_cmp(&self, value: &dyn Reflect) -> Option<core::cmp::Ordering> {
+        crate::impls::set_partial_cmp(self, value)
+    }
+
+    #[inline]
     fn reflect_debug(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         crate::impls::set_debug(self, f)
     }

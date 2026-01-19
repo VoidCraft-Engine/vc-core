@@ -41,6 +41,17 @@ macro_rules! impl_simple_type_reflect {
             }
         }
 
+        fn reflect_partial_cmp(
+            &self,
+            value: &dyn $crate::Reflect,
+        ) -> Option<::core::cmp::Ordering> {
+            if let Some(value) = <dyn $crate::Reflect>::downcast_ref::<Self>(value) {
+                Some(Ord::cmp(self, value))
+            } else {
+                None
+            }
+        }
+
         fn reflect_hash(&self) -> Option<u64> {
             let mut hasher = $crate::reflect_hasher();
             <Self as ::core::hash::Hash>::hash(self, &mut hasher);

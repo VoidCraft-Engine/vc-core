@@ -10,19 +10,19 @@
 //! [`DynamicTypePath`]: crate::info::DynamicTypePath
 //! [`DynamicTyped`]: crate::info::DynamicTyped
 
-use crate::{
-    FromReflect, Reflect,
-    impls::{GenericTypeInfoCell, GenericTypePathCell, NonGenericTypeInfoCell},
-    info::{TupleInfo, TypeInfo, TypePath, Typed, UnnamedField},
-    ops::{ApplyError, ReflectCloneError, Tuple, TupleFieldIter},
-    registry::{
-        FromType, GetTypeMeta, TypeMeta, TypeRegistry, TypeTraitDefault, TypeTraitDeserialize,
-        TypeTraitFromPtr, TypeTraitFromReflect, TypeTraitSerialize,
-    },
-};
 use alloc::{boxed::Box, vec, vec::Vec};
+use core::cmp::Ordering;
 use core::fmt;
+
 use vc_utils::range_invoke;
+
+use crate::impls::{GenericTypeInfoCell, GenericTypePathCell, NonGenericTypeInfoCell};
+use crate::info::{TupleInfo, TypeInfo, TypePath, Typed, UnnamedField};
+use crate::ops::{ApplyError, ReflectCloneError, Tuple, TupleFieldIter};
+use crate::registry::{FromType, GetTypeMeta, TypeMeta, TypeRegistry};
+use crate::registry::{TypeTraitDefault, TypeTraitFromPtr, TypeTraitFromReflect};
+use crate::registry::{TypeTraitDeserialize, TypeTraitSerialize};
+use crate::{FromReflect, Reflect};
 
 macro_rules! impl_type_path_tuple {
     (0: []) => {
@@ -151,6 +151,15 @@ macro_rules! impl_reflect_tuple {
             }
 
             #[inline]
+            fn reflect_partial_cmp(&self, other: &dyn Reflect) -> Option<Ordering> {
+                if other.is::<Self>() {
+                    Some(Ordering::Equal)
+                } else {
+                    None
+                }
+            }
+
+            #[inline]
             fn to_dynamic(&self) -> Box<dyn Reflect> {
                 Box::new(())
             }
@@ -257,6 +266,11 @@ macro_rules! impl_reflect_tuple {
             #[inline]
             fn reflect_partial_eq(&self, other: &dyn Reflect) -> Option<bool> {
                 crate::impls::tuple_partial_eq(self, other)
+            }
+
+            #[inline]
+            fn reflect_partial_cmp(&self, other: &dyn Reflect) -> Option<Ordering> {
+                crate::impls::tuple_partial_cmp(self, other)
             }
 
             fn reflect_clone(&self) -> Result<Box<dyn Reflect>, ReflectCloneError> {
@@ -367,6 +381,11 @@ macro_rules! impl_reflect_tuple {
             #[inline]
             fn reflect_partial_eq(&self, other: &dyn Reflect) -> Option<bool> {
                 crate::impls::tuple_partial_eq(self, other)
+            }
+
+            #[inline]
+            fn reflect_partial_cmp(&self, other: &dyn Reflect) -> Option<Ordering> {
+                crate::impls::tuple_partial_cmp(self, other)
             }
 
             fn reflect_clone(&self) -> Result<Box<dyn Reflect>, ReflectCloneError> {

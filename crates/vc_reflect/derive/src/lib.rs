@@ -113,6 +113,7 @@ mod utils;
 /// - `default`: Standard `Default`
 /// - `hash`: Standard `Hash`
 /// - `partial_eq`: Standard `PartialEq`
+/// - `partial_cmp`: Standard `PartialOrd`
 /// - `serialize`: `serde::Serialize`
 /// - `deserialize`: `serde::Deserialize`
 ///
@@ -120,7 +121,7 @@ mod utils;
 ///
 /// - `mini`: `clone` + `auto_register`
 /// - `serde`: `serialize` + `deserialize` + `auto_register`
-/// - `full`: All six traits listed above + `auto_register`
+/// - `full`: All seven traits listed above + `auto_register`
 ///
 /// These attributes can only be applied at the type level.
 ///

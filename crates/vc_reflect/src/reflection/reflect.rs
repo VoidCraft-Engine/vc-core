@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use core::any::{Any, TypeId};
+use core::cmp::Ordering;
 
 use crate::impls::NonGenericTypeInfoCell;
 use crate::info::{DynamicTypePath, DynamicTyped, TypePath, Typed};
@@ -129,6 +130,7 @@ use crate::ops::{ReflectMut, ReflectOwned, ReflectRef};
 ///
 /// - [`struct_try_apply`](crate::impls::struct_try_apply)
 /// - [`struct_partial_eq`](crate::impls::struct_partial_eq)
+/// - [`struct_partial_cmp`](crate::impls::struct_partial_cmp)
 /// - [`struct_debug`](crate::impls::struct_debug)
 /// - [`struct_hash`](crate::impls::struct_hash)
 /// - Similar functions for tuples, enums, arrays ...
@@ -539,6 +541,42 @@ pub trait Reflect: DynamicTypePath + DynamicTyped + Send + Sync + Any {
     #[inline]
     fn reflect_partial_eq(&self, _other: &dyn Reflect) -> Option<bool> {
         // Only Inline for default implement
+        None
+    }
+
+    /// Returns a "partial compare" result.
+    ///
+    /// If the underlying type does not support PartialOrd, returns `None`.
+    ///
+    /// In the default implementation, this always returns `None` for opaque types,
+    /// while unit structs are compared by checking their type IDs directly.
+    ///
+    /// However, for composite types, this performs a field-by-field comparison
+    /// using `reflect_partial_cmp`, which may not be efficient.
+    ///
+    /// See:
+    /// - [`crate::impls::array_partial_cmp`]
+    /// - [`crate::impls::list_partial_cmp`]
+    /// - [`crate::impls::struct_partial_cmp`]
+    /// - [`crate::impls::tuple_struct_partial_cmp`]
+    /// - [`crate::impls::tuple_partial_cmp`]
+    /// - [`crate::impls::enum_partial_cmp`]
+    /// - [`crate::impls::set_partial_cmp`]
+    /// - [`crate::impls::map_partial_cmp`]
+    ///
+    /// If the type implements [`PartialOrd`], consider marking it with the
+    /// `#[reflect(partial_cmp)]` attribute. When this attribute is present,
+    /// the function uses the type's own implementation instead, and types that
+    /// differ immediately return `None`.
+    ///
+    /// ```
+    /// use vc_reflect::derive::Reflect;
+    ///
+    /// #[derive(Reflect, PartialOrd, PartialEq)]
+    /// #[reflect(partial_cmp)]
+    /// struct A { /* ... */ }
+    /// ```
+    fn reflect_partial_cmp(&self, _other: &dyn Reflect) -> Option<Ordering> {
         None
     }
 

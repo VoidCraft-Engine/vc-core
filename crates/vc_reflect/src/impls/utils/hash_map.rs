@@ -54,6 +54,11 @@ macro_rules! impl_reflect_for_hashmap {
             }
 
             #[inline]
+            fn reflect_partial_cmp(&self, value: &dyn $crate::Reflect) -> Option<::core::cmp::Ordering> {
+                $crate::impls::map_partial_cmp(self, value)
+            }
+
+            #[inline]
             fn try_apply(&mut self, value: &dyn $crate::Reflect) -> Result<(), $crate::ops::ApplyError> {
                 $crate::impls::map_try_apply(self, value)
             }
@@ -268,6 +273,14 @@ macro_rules! impl_reflect_for_fixedhashmap {
             #[inline]
             fn reflect_partial_eq(&self, value: &dyn $crate::Reflect) -> Option<bool> {
                 $crate::impls::map_partial_eq(self, value)
+            }
+
+            #[inline]
+            fn reflect_partial_cmp(
+                &self,
+                value: &dyn $crate::Reflect,
+            ) -> Option<::core::cmp::Ordering> {
+                $crate::impls::map_partial_cmp(self, value)
             }
 
             #[inline]

@@ -161,10 +161,10 @@ pub struct SparseHasher {
 /// From `bevy_ecs`.
 ///
 /// SwissTable (and thus `hashbrown`) cares about two things from the hash:
-/// 
+///
 /// - H1: low bits (masked by `2ⁿ-1`) to pick the slot in which to store the item.
 /// - H2: high 7 bits are used to SIMD optimize hash collision probing.
-/// 
+///
 /// For more see <https://abseil.io/about/design/swisstables#metadata-layout>.
 ///
 /// This hash function assumes that the entity ids are still well-distributed,

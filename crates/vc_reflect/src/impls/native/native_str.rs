@@ -1,11 +1,8 @@
-use crate::{
-    FromReflect, Reflect,
-    impls::NonGenericTypeInfoCell,
-    info::{OpaqueInfo, TypeInfo, TypePath, Typed},
-    registry::{
-        FromType, GetTypeMeta, TypeMeta, TypeTraitFromPtr, TypeTraitFromReflect, TypeTraitSerialize,
-    },
-};
+use crate::impls::NonGenericTypeInfoCell;
+use crate::info::{OpaqueInfo, TypeInfo, TypePath, Typed};
+use crate::registry::{FromType, GetTypeMeta, TypeMeta};
+use crate::registry::{TypeTraitFromPtr, TypeTraitFromReflect, TypeTraitSerialize};
+use crate::{FromReflect, Reflect};
 
 impl TypePath for str {
     #[inline]

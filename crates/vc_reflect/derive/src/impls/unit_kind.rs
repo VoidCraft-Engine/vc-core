@@ -27,6 +27,7 @@ pub(crate) fn impl_unit(meta: &ReflectMeta) -> proc_macro2::TokenStream {
         let to_dynamic_tokens = get_unit_to_dynamic_impl(meta);
         let reflect_clone_tokens = get_unit_clone_impl(meta);
         let reflect_partial_eq_tokens = get_unit_partial_eq_impl(meta);
+        let reflect_partial_cmp_tokens = get_unit_partial_cmp_impl(meta);
         let reflect_hash_tokens = get_unit_hash_impl(meta);
         let reflect_debug_tokens = get_unit_debug_impl(meta);
 
@@ -37,6 +38,7 @@ pub(crate) fn impl_unit(meta: &ReflectMeta) -> proc_macro2::TokenStream {
             to_dynamic_tokens,
             reflect_clone_tokens,
             reflect_partial_eq_tokens,
+            reflect_partial_cmp_tokens,
             reflect_hash_tokens,
             reflect_debug_tokens,
             false,
@@ -194,6 +196,36 @@ fn get_unit_partial_eq_impl(meta: &ReflectMeta) -> proc_macro2::TokenStream {
                     #OptionFP::Some( true )
                 } else {
                     #OptionFP::Some( false )
+                }
+            }
+        }
+    }
+}
+
+/// Generate `Reflect::reflect_partial_eq` implementation tokens.
+fn get_unit_partial_cmp_impl(meta: &ReflectMeta) -> proc_macro2::TokenStream {
+    use crate::path::fp::{OptionFP, PartialOrdFP};
+    let vc_reflect_path = meta.vc_reflect_path();
+    let reflect_ = crate::path::reflect_(vc_reflect_path);
+
+    if let Some(span) = meta.attrs().avail_traits.partial_cmp {
+        quote_spanned! { span =>
+            #[inline]
+            fn reflect_partial_cmp(&self, __input: &dyn #reflect_) -> #OptionFP<::core::cmp::Ordering> {
+                if let #OptionFP::Some(__input) = <dyn #reflect_>::downcast_ref::<Self>(__input) {
+                    return #PartialOrdFP::partial_cmp(self, __input);
+                }
+                #OptionFP::None
+            }
+        }
+    } else {
+        quote! {
+            #[inline]
+            fn reflect_partial_cmp(&self, __input: &dyn #reflect_) -> #OptionFP<::core::cmp::Ordering> {
+                if <dyn #reflect_>::is::<Self>(__input) {
+                    #OptionFP::Some( ::core::cmp::Ordering::Equal )
+                } else {
+                    #OptionFP::None
                 }
             }
         }

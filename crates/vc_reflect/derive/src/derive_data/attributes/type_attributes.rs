@@ -24,13 +24,14 @@ mod kw {
     syn::custom_keyword!(debug);
     syn::custom_keyword!(hash);
     syn::custom_keyword!(partial_eq);
+    syn::custom_keyword!(partial_cmp);
     syn::custom_keyword!(serialize);
     syn::custom_keyword!(deserialize);
     syn::custom_keyword!(mini); // clone + auto_register
     syn::custom_keyword!(serde); // serialize + deserialize + auto_register
     syn::custom_keyword!(type_path);
     syn::custom_keyword!(doc);
-    syn::custom_keyword!(full); // serde + clone + debug + hash + partial_eq + default
+    syn::custom_keyword!(full); // serde + clone + debug + hash + partial_eq + partial_cmp + default
     syn::custom_keyword!(type_trait);
 }
 
@@ -148,6 +149,8 @@ impl TypeAttributes {
             self.parse_hash(input)
         } else if lookahead.peek(kw::partial_eq) {
             self.parse_patrial_eq(input)
+        } else if lookahead.peek(kw::partial_cmp) {
+            self.parse_patrial_cmp(input)
         } else if lookahead.peek(kw::debug) {
             self.parse_debug(input)
         } else if lookahead.peek(kw::auto_register) {
@@ -223,6 +226,7 @@ impl TypeAttributes {
         self.avail_traits.debug = Some(s);
         self.avail_traits.hash = Some(s);
         self.avail_traits.partial_eq = Some(s);
+        self.avail_traits.partial_cmp = Some(s);
         self.avail_traits.serialize = Some(s);
         self.avail_traits.deserialize = Some(s);
         self.auto_register = Some(s);
@@ -254,6 +258,13 @@ impl TypeAttributes {
     fn parse_patrial_eq(&mut self, input: ParseStream) -> syn::Result<()> {
         let s = input.parse::<kw::partial_eq>()?.span;
         self.avail_traits.partial_eq = Some(s);
+        Ok(())
+    }
+
+    // #[reflect(partial_cmp)]
+    fn parse_patrial_cmp(&mut self, input: ParseStream) -> syn::Result<()> {
+        let s = input.parse::<kw::partial_cmp>()?.span;
+        self.avail_traits.partial_cmp = Some(s);
         Ok(())
     }
 

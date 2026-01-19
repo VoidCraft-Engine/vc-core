@@ -72,6 +72,11 @@ where
     }
 
     #[inline]
+    fn reflect_partial_cmp(&self, value: &dyn Reflect) -> Option<core::cmp::Ordering> {
+        crate::impls::map_partial_cmp(self, value)
+    }
+
+    #[inline]
     fn reflect_debug(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         crate::impls::map_debug(self, f)
     }

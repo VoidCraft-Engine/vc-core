@@ -50,6 +50,11 @@ macro_rules! impl_reflect_for_hashset {
             }
 
             #[inline]
+            fn reflect_partial_cmp(&self, value: &dyn $crate::Reflect) -> Option<::core::cmp::Ordering> {
+                $crate::impls::set_partial_cmp(self, value)
+            }
+
+            #[inline]
             fn try_apply(&mut self, value: &dyn $crate::Reflect) -> Result<(), $crate::ops::ApplyError> {
                 $crate::impls::set_try_apply(self, value)
             }
@@ -238,6 +243,14 @@ macro_rules! impl_reflect_for_fixedhashset {
             #[inline]
             fn reflect_partial_eq(&self, value: &dyn $crate::Reflect) -> Option<bool> {
                 $crate::impls::set_partial_eq(self, value)
+            }
+
+            #[inline]
+            fn reflect_partial_cmp(
+                &self,
+                value: &dyn $crate::Reflect,
+            ) -> Option<::core::cmp::Ordering> {
+                $crate::impls::set_partial_cmp(self, value)
             }
 
             #[inline]

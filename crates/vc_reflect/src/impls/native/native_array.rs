@@ -100,6 +100,11 @@ impl<T: Reflect + Typed, const N: usize> Reflect for [T; N] {
     }
 
     #[inline]
+    fn reflect_partial_cmp(&self, value: &dyn Reflect) -> Option<core::cmp::Ordering> {
+        crate::impls::array_partial_cmp(self, value)
+    }
+
+    #[inline]
     fn reflect_debug(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         crate::impls::array_debug(self, f)
     }
