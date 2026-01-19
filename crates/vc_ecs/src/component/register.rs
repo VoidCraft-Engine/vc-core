@@ -12,8 +12,7 @@ pub struct ComponentsRegistrator<'w> {
 }
 
 pub struct QueuedRegistration {
-    pub registrator:
-        Box<dyn FnOnce(&mut ComponentsRegistrator, ComponentIdGenerator, ComponentDescriptor)>,
+    pub registrator: Box<dyn FnOnce(&mut ComponentsRegistrator, ComponentId, ComponentDescriptor)>,
     pub id: ComponentId,
     pub descriptor: ComponentDescriptor,
 }

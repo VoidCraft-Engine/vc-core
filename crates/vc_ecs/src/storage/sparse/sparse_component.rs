@@ -7,7 +7,7 @@ use core::num::NonZeroUsize;
 use core::panic::Location;
 
 use vc_ptr::{OwningPtr, Ptr};
-use vc_utils::hash::NoOpHashMap;
+use vc_utils::hash::SparseHashMap;
 
 use crate::cfg;
 use crate::component::{ComponentTickCells, ComponentTicks};
@@ -23,7 +23,7 @@ use crate::utils::{DebugCheckedUnwrap, DebugLocation};
 pub struct SparseComponent {
     column: Column,
     entities: Vec<EntityId>,
-    sparse: NoOpHashMap<EntityId, u32>,
+    sparse: SparseHashMap<EntityId, u32>,
 }
 
 impl SparseComponent {
@@ -32,7 +32,7 @@ impl SparseComponent {
         Self {
             column: Column::empty(item_layout, drop_fn),
             entities: Vec::new(),
-            sparse: NoOpHashMap::new(),
+            sparse: SparseHashMap::new(),
         }
     }
 
@@ -41,21 +41,19 @@ impl SparseComponent {
         drop_fn: Option<unsafe fn(OwningPtr<'_>)>,
         capacity: usize,
     ) -> Self {
+        let mut hash_capacity = capacity + (capacity >> 1);
+        hash_capacity = hash_capacity.next_power_of_two();
+
         Self {
             column: Column::with_capacity(item_layout, drop_fn, capacity),
             entities: Vec::with_capacity(capacity),
-            sparse: NoOpHashMap::with_capacity(capacity.next_power_of_two()),
+            sparse: SparseHashMap::with_capacity(hash_capacity),
         }
     }
 
     #[inline(always)]
-    pub fn len(&self) -> usize {
+    pub fn entity_count(&self) -> usize {
         self.entities.len()
-    }
-
-    #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.entities.is_empty()
     }
 
     #[inline(always)]
@@ -63,11 +61,54 @@ impl SparseComponent {
         self.entities.capacity()
     }
 
-    pub fn clear(&mut self) {
-        // SAFETY: This is using the size of the ComponentSparseSet.
-        unsafe { self.column.clear(self.entities.len()) };
+    pub fn clear_entities(&mut self) {
+        let len = self.entity_count();
         self.entities.clear();
         self.sparse.clear();
+        unsafe {
+            self.column.clear(len);
+        }
+    }
+
+    pub fn dealloc(&mut self) {
+        let len = self.entity_count();
+        let capacity = self.capacity();
+
+        self.entities = Vec::new();
+        self.sparse = SparseHashMap::new();
+
+        unsafe {
+            self.column.dealloc(capacity, len);
+        }
+
+        cfg::debug! { assert!(self.entities.capacity() == 0); }
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn reserve_one(&mut self) {
+        let _guard = AbortOnDrop;
+
+        let old_capacity = self.capacity();
+
+        self.entities.reserve(1);
+
+        let new_capacity = self.entities.capacity();
+
+        // Provide redundant space to reduce hash collisions.
+        self.sparse.reserve(new_capacity);
+
+        unsafe {
+            let new_capacity = NonZeroUsize::new_unchecked(new_capacity);
+            if old_capacity != 0 {
+                let current_capacity = NonZeroUsize::new_unchecked(old_capacity);
+                self.column.realloc(current_capacity, new_capacity);
+            } else {
+                self.column.alloc(new_capacity);
+            }
+        }
+
+        ::core::mem::forget(_guard);
     }
 
     pub fn insert(
@@ -86,36 +127,19 @@ impl SparseComponent {
                 self.column.replace_item(index, data, change_tick, caller);
             }
         } else {
+            // SAFETY: `0 < EntityId < u32::MAX`, so `len < u32::MAX`.
             let last_index = self.entities.len();
-            let capacity = self.entities.capacity();
 
-            cfg::debug! {
-                // SAFETY: 0 < EntityId < u32::MAX
-                assert!(last_index < u32::MAX as usize);
+            if last_index == self.entities.capacity() {
+                self.reserve_one();
             }
-
-            let _guard = AbortOnDrop;
 
             self.entities.push(id);
-
-            if capacity != self.entities.capacity() {
-                unsafe {
-                    let new_capacity = NonZeroUsize::new_unchecked(self.entities.capacity());
-                    if capacity != 0 {
-                        let current_capacity = NonZeroUsize::new_unchecked(capacity);
-                        self.column.realloc(current_capacity, new_capacity);
-                    } else {
-                        self.column.alloc(new_capacity);
-                    }
-                }
-            }
 
             unsafe {
                 self.column.init_item(last_index, data, change_tick, caller);
                 self.sparse.insert(id, last_index as u32);
             }
-
-            ::core::mem::forget(_guard);
         }
     }
 
@@ -266,7 +290,7 @@ impl SparseComponent {
 
 impl Drop for SparseComponent {
     fn drop(&mut self) {
-        let len = self.len();
+        let len = self.entity_count();
         let current_capacity = self.capacity();
         self.entities.clear();
         unsafe {

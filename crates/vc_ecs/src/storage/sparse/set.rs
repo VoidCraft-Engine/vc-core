@@ -1,11 +1,10 @@
-#![expect(unsafe_code, reason = "For better performance.")]
+#![expect(unsafe_code, reason = "original implementation need unsafe codes.")]
 
 use alloc::vec::Vec;
 
 use nonmax::NonMaxU32;
 
 use crate::cfg;
-use crate::storage::utils::VecCopyRemove;
 
 use super::SparseIndex;
 use super::SparseMap;
@@ -62,6 +61,11 @@ impl<I: SparseIndex, V> SparseSet<I, V> {
     }
 
     #[inline]
+    pub fn get_raw_index(&self, index: I) -> Option<u32> {
+        self.sparse.get_copied(index).map(|v| v.get())
+    }
+
+    #[inline]
     pub fn indices(&self) -> &[I] {
         &self.indices
     }
@@ -80,6 +84,18 @@ impl<I: SparseIndex, V> SparseSet<I, V> {
             .map(|dense_index| unsafe { self.dense.get_unchecked_mut(dense_index.get() as usize) })
     }
 
+    #[inline(always)]
+    pub unsafe fn get_raw(&self, raw_index: u32) -> &V {
+        cfg::debug! { assert!((raw_index as usize) < self.dense.len()); }
+        unsafe { self.dense.get_unchecked(raw_index as usize) }
+    }
+
+    #[inline(always)]
+    pub unsafe fn get_mut_raw(&mut self, raw_index: u32) -> &mut V {
+        cfg::debug! { assert!((raw_index as usize) < self.dense.len()); }
+        unsafe { self.dense.get_unchecked_mut(raw_index as usize) }
+    }
+
     pub fn values(&self) -> impl Iterator<Item = &V> {
         self.dense.iter()
     }
@@ -96,54 +112,58 @@ impl<I: SparseIndex, V> SparseSet<I, V> {
         self.indices.iter().zip(self.dense.iter_mut())
     }
 
-    pub fn insert(&mut self, index: I, value: V) {
+    pub fn insert(&mut self, index: I, value: V) -> u32 {
         if let Some(dense_index) = self.sparse.get_copied(index) {
+            let raw_index = dense_index.get();
             unsafe {
-                *self.dense.get_unchecked_mut(dense_index.get() as usize) = value;
+                *self.dense.get_unchecked_mut(raw_index as usize) = value;
             }
+            raw_index
         } else {
             let len = self.dense.len();
+
             cfg::debug! {
                 assert!(len < u32::MAX as usize);
             }
 
+            let raw_index = len as u32;
+
             self.sparse
-                .insert(index, unsafe { NonMaxU32::new_unchecked(len as u32) });
+                .insert(index, unsafe { NonMaxU32::new_unchecked(raw_index) });
             self.indices.push(index);
             self.dense.push(value);
+
+            raw_index
         }
-    }
-
-    pub fn remove(&mut self, index: I) -> Option<V> {
-        use crate::storage::VecSwapRemove;
-
-        self.sparse.remove(index).map(|dense_index| {
-            let index = dense_index.get() as usize;
-            let last_index = self.indices.len() - 1;
-
-            if index == last_index {
-                unsafe {
-                    let value = self.dense.remove_last(index);
-                    self.indices.set_len(index);
-                    value
-                }
-            } else {
-                unsafe {
-                    let value = self.dense.swap_remove_nonoverlapping(index, last_index);
-                    let swapped_index = self
-                        .indices
-                        .copy_last_and_return_nonoverlapping(index, last_index);
-
-                    *self.sparse.get_mut(swapped_index).unwrap_unchecked() = dense_index;
-                    value
-                }
-            }
-        })
     }
 
     pub fn clear(&mut self) {
         self.dense.clear();
         self.indices.clear();
         self.sparse.clear();
+    }
+
+    pub fn get_or_insert_with(&mut self, index: I, func: impl FnOnce() -> V) -> &mut V {
+        if let Some(dense_index) = self.sparse.get_copied(index) {
+            // SAFETY: dense indices stored in self.sparse always exist
+            unsafe { self.dense.get_unchecked_mut(dense_index.get() as usize) }
+        } else {
+            let dense_index = self.dense.len();
+
+            cfg::debug! {
+                assert!(dense_index < u32::MAX as usize);
+            }
+
+            let value = func();
+
+            self.sparse.insert(index, unsafe {
+                NonMaxU32::new_unchecked(dense_index as u32)
+            });
+            self.indices.push(index);
+            self.dense.push(value);
+
+            // SAFETY: dense index was just populated above
+            unsafe { self.dense.get_unchecked_mut(dense_index) }
+        }
     }
 }

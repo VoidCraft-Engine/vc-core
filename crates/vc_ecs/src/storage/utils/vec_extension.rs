@@ -52,8 +52,8 @@ impl<T: Copy> VecCopyRemove<T> for alloc::vec::Vec<T> {
         let base_ptr = self.as_mut_ptr();
 
         unsafe {
-            let dst = base_ptr.add(index);
             let src = base_ptr.add(last_index);
+            let dst = base_ptr.add(index);
 
             ptr::copy_nonoverlapping(src, dst, 1);
 

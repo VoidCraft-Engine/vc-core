@@ -7,15 +7,15 @@ use core::cell::UnsafeCell;
 use core::num::NonZeroUsize;
 use core::panic::Location;
 
-use nonmax::{NonMaxU8, NonMaxU32};
+use nonmax::NonMaxU32;
 use vc_ptr::{OwningPtr, Ptr};
+use vc_utils::hash::SparseHashMap;
 
 use super::TableRow;
 use crate::cfg;
 use crate::component::{ComponentId, ComponentTicks};
 use crate::entity::Entity;
-use crate::storage::utils::{AbortOnDrop, VecSwapRemove};
-use crate::storage::{Column, FixedSparseMap, SparseMap};
+use crate::storage::{AbortOnDrop, Column, VecSwapRemove};
 use crate::tick::CheckTicks;
 use crate::tick::Tick;
 use crate::utils::{DebugCheckedUnwrap, DebugLocation};
@@ -33,48 +33,45 @@ pub struct TableMoveResult {
 pub struct TableBuilder {
     columns: Vec<Column>,
     indices: Vec<ComponentId>,
-    sparse: SparseMap<ComponentId, NonMaxU8>,
-    entities: Vec<Entity>,
+    sparse: SparseHashMap<ComponentId, u32>,
 }
 
 impl TableBuilder {
     pub fn new(column_count: usize) -> Self {
+        let mut hash_capacity = column_count + (column_count >> 1);
+        hash_capacity = hash_capacity.next_power_of_two();
+
         Self {
             columns: Vec::with_capacity(column_count),
             indices: Vec::with_capacity(column_count),
-            sparse: SparseMap::empty(),
-            entities: Vec::new(),
+            sparse: SparseHashMap::with_capacity(hash_capacity),
         }
     }
 
-    #[must_use]
-    pub fn add_column(
-        mut self,
+    pub fn insert(
+        &mut self,
         id: ComponentId,
         item_layout: Layout,
         drop_fn: Option<unsafe fn(OwningPtr<'_>)>,
-    ) -> Self {
+    ) -> u32 {
         let col = Column::empty(item_layout, drop_fn);
 
-        if let Some(column_index) = self.sparse.get_copied(id) {
+        if let Some(&raw_index) = self.sparse.get(&id) {
             // SAFETY: dense indices stored in self.sparse always exist
             unsafe {
-                *self.columns.get_unchecked_mut(column_index.get() as usize) = col;
+                *self.columns.get_unchecked_mut(raw_index as usize) = col;
             }
+            raw_index
         } else {
-            assert!(
-                self.columns.len() < u8::MAX as usize,
-                "Component number in a Entity storaged in Table cannot exceed `254`"
-            );
+            // SAFETY: `0 < ComponentId < u32::MAX`, so `raw_index < u32::MAX`
+            let raw_index = self.columns.len() as u32;
 
-            self.sparse.insert(id, unsafe {
-                NonMaxU8::new_unchecked(self.columns.len() as u8)
-            });
-            self.indices.push(id);
+            self.sparse.insert(id, raw_index);
             self.columns.push(col);
-        }
+            self.indices.push(id);
 
-        self
+            raw_index
+        }
     }
 
     #[must_use]
@@ -83,8 +80,9 @@ impl TableBuilder {
         Table {
             columns: self.columns.into_boxed_slice(),
             indices: self.indices.into_boxed_slice(),
-            sparse: self.sparse.into_fixed(),
-            entities: self.entities,
+            sparse: self.sparse,
+            // SAFETY: `capacity` must be `0`, because columns is unallocated.
+            entities: Vec::new(),
         }
     }
 }
@@ -95,7 +93,7 @@ impl TableBuilder {
 pub struct Table {
     columns: Box<[Column]>,
     indices: Box<[ComponentId]>,
-    sparse: FixedSparseMap<ComponentId, NonMaxU8>,
+    sparse: SparseHashMap<ComponentId, u32>,
     entities: Vec<Entity>,
 }
 
@@ -113,33 +111,9 @@ impl Drop for Table {
 }
 
 impl Table {
-    #[inline]
-    pub fn get_column(&self, id: ComponentId) -> Option<&Column> {
-        self.sparse
-            .get_copied(id)
-            .map(|index| unsafe { self.columns.get_unchecked(index.get() as usize) })
-    }
-
-    #[inline]
-    pub fn get_column_mut(&mut self, id: ComponentId) -> Option<&mut Column> {
-        self.sparse
-            .get_copied(id)
-            .map(|index| unsafe { self.columns.get_unchecked_mut(index.get() as usize) })
-    }
-
-    #[inline(always)]
-    pub fn entities(&self) -> &[Entity] {
-        &self.entities
-    }
-
     #[inline(always)]
     pub fn capacity(&self) -> usize {
         self.entities.capacity()
-    }
-
-    #[inline(always)]
-    pub fn entity_count(&self) -> usize {
-        self.entities.len()
     }
 
     #[inline(always)]
@@ -148,42 +122,176 @@ impl Table {
     }
 
     #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.entities.is_empty()
+    pub fn entity_count(&self) -> usize {
+        self.entities.len()
+    }
+
+    #[inline(always)]
+    pub fn entities(&self) -> &[Entity] {
+        &self.entities
+    }
+
+    pub fn check_ticks(&mut self, check: CheckTicks) {
+        let len = self.entity_count();
+        for column in &mut self.columns {
+            unsafe {
+                column.check_ticks(len, check);
+            }
+        }
     }
 
     #[inline]
-    pub fn has_component(&self, component_id: ComponentId) -> bool {
-        self.sparse.contains(component_id)
+    pub fn contains_component(&self, id: ComponentId) -> bool {
+        self.sparse.contains_key(&id)
     }
 
-    pub unsafe fn get_component(&self, id: ComponentId, row: TableRow) -> Option<Ptr<'_>> {
-        cfg::debug! { assert!(row.index() < self.entity_count()); }
-
-        self.get_column(id)
-            .map(|col| unsafe { col.get_data(row.index()) })
+    #[inline]
+    pub fn get_raw_index(&self, id: ComponentId) -> Option<u32> {
+        self.sparse.get(&id).copied()
     }
 
-    pub unsafe fn take_component_unchecked(
-        &mut self,
-        component_id: ComponentId,
-        row: TableRow,
-    ) -> OwningPtr<'_> {
-        cfg::debug! { assert!(row.index() < self.entity_count()); }
+    #[inline(always)]
+    pub unsafe fn get_column(&self, raw_index: u32) -> &Column {
+        cfg::debug! { assert!((raw_index as usize) < self.columns.len()); }
+        unsafe { self.columns.get_unchecked(raw_index as usize) }
+    }
 
+    #[inline(always)]
+    pub unsafe fn get_column_mut(&mut self, raw_index: u32) -> &mut Column {
+        cfg::debug! { assert!((raw_index as usize) < self.columns.len()); }
+        unsafe { self.columns.get_unchecked_mut(raw_index as usize) }
+    }
+
+    #[inline]
+    pub unsafe fn get_component(&self, raw_index: u32, row: TableRow) -> Ptr<'_> {
+        cfg::debug! { assert!(row.index() < self.entity_count()); }
+        unsafe { self.get_column(raw_index).get_data(row.index()) }
+    }
+
+    #[inline]
+    pub unsafe fn take_component(&mut self, raw_index: u32, row: TableRow) -> OwningPtr<'_> {
+        cfg::debug! { assert!(row.index() < self.entity_count()); }
         unsafe {
-            self.get_column_mut(component_id)
-                .debug_checked_unwrap()
+            self.get_column_mut(raw_index)
                 .get_data_mut(row.index())
                 .promote()
         }
     }
 
-    pub fn clear(&mut self) {
+    #[inline]
+    pub unsafe fn get_drop_fn_for(&self, raw_index: u32) -> Option<unsafe fn(OwningPtr<'_>)> {
+        unsafe { self.get_column(raw_index).get_drop_fn() }
+    }
+
+    #[inline]
+    pub unsafe fn get_data_slice_for<T>(&self, raw_index: u32) -> &[UnsafeCell<T>] {
+        unsafe {
+            self.get_column(raw_index)
+                .get_data_slice(self.entity_count())
+        }
+    }
+
+    #[inline]
+    pub unsafe fn get_added_ticks_slice_for(&self, raw_index: u32) -> &[UnsafeCell<Tick>] {
+        unsafe {
+            self.get_column(raw_index)
+                .get_added_ticks_slice(self.entity_count())
+        }
+    }
+
+    #[inline]
+    pub unsafe fn get_changed_ticks_slice_for(&self, raw_index: u32) -> &[UnsafeCell<Tick>] {
+        unsafe {
+            self.get_column(raw_index)
+                .get_changed_ticks_slice(self.entity_count())
+        }
+    }
+
+    #[inline]
+    pub unsafe fn get_changed_by_slice_for(
+        &self,
+        raw_index: u32,
+    ) -> DebugLocation<&[UnsafeCell<&'static Location<'static>>]> {
+        unsafe {
+            self.get_column(raw_index)
+                .get_changed_by_slice(self.entity_count())
+        }
+    }
+
+    #[inline]
+    pub unsafe fn get_changed_tick(
+        &self,
+        raw_index: u32,
+        row: TableRow,
+    ) -> Option<&UnsafeCell<Tick>> {
+        let index = row.index();
+        if index < self.entity_count() {
+            let ret = unsafe { self.get_column(raw_index).get_changed_tick(index) };
+            Some(ret)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    pub unsafe fn get_added_tick(
+        &self,
+        raw_index: u32,
+        row: TableRow,
+    ) -> Option<&UnsafeCell<Tick>> {
+        let index = row.index();
+        if index < self.entity_count() {
+            let ret = unsafe { self.get_column(raw_index).get_added_tick(index) };
+            Some(ret)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    pub unsafe fn get_changed_by(
+        &self,
+        _raw_index: u32,
+        _row: TableRow,
+    ) -> DebugLocation<Option<&UnsafeCell<&'static Location<'static>>>> {
+        cfg::debug! {
+            if {
+                DebugLocation::untranspose(|| {
+                    let index = _row.index();
+                    if index < self.entity_count() {
+                        let ret = unsafe {
+                            self.get_column(_raw_index)
+                                .get_changed_by(index)
+                        };
+                        Some(ret)
+                    } else {
+                        None
+                    }
+                })
+            } else {
+                DebugLocation::new_with(|| None)
+            }
+        }
+    }
+
+    #[inline]
+    pub unsafe fn get_component_ticks(
+        &self,
+        raw_index: u32,
+        row: TableRow,
+    ) -> Option<ComponentTicks> {
+        let index = row.index();
+        if index < self.entity_count() {
+            let ret = unsafe { self.get_column(raw_index).get_component_ticks(index) };
+            Some(ret)
+        } else {
+            None
+        }
+    }
+
+    pub fn clear_entities(&mut self) {
         let len = self.entity_count();
-
         self.entities.clear();
-
         for column in &mut self.columns {
             unsafe {
                 column.clear(len);
@@ -191,14 +299,19 @@ impl Table {
         }
     }
 
-    pub fn check_ticks(&mut self, check: CheckTicks) {
+    pub fn dealloc(&mut self) {
         let len = self.entity_count();
+        let current_capacity = self.capacity();
+
+        self.entities = Vec::new();
 
         for column in &mut self.columns {
             unsafe {
-                column.check_ticks(len, check);
+                column.dealloc(current_capacity, len);
             }
         }
+
+        cfg::debug! { assert!(self.entities.capacity() == 0); }
     }
 
     pub unsafe fn swap_remove(&mut self, row: TableRow) -> Option<Entity> {
@@ -231,14 +344,14 @@ impl Table {
 
     #[inline]
     unsafe fn alloc_columns(&mut self, new_capacity: NonZeroUsize) {
-        let _abort_guard = AbortOnDrop;
+        let abort_guard = AbortOnDrop;
 
         for col in &mut self.columns {
             unsafe {
                 col.alloc(new_capacity);
             }
         }
-        ::core::mem::forget(_abort_guard);
+        ::core::mem::forget(abort_guard);
     }
 
     #[inline]
@@ -247,50 +360,43 @@ impl Table {
         current_capacity: NonZeroUsize,
         new_capacity: NonZeroUsize,
     ) {
-        let _abort_guard = AbortOnDrop;
+        let abort_guard = AbortOnDrop;
 
         for col in &mut self.columns {
             unsafe {
                 col.realloc(current_capacity, new_capacity);
             }
         }
-        ::core::mem::forget(_abort_guard);
+        ::core::mem::forget(abort_guard);
     }
 
     #[cold]
     #[inline(never)]
-    unsafe fn reserve_unchecked(self: &mut Table, additional: usize) {
+    fn reserve_one(&mut self) {
         let old_capacity = self.capacity();
-        self.entities.reserve(additional);
+
+        self.entities.reserve(1);
+
         let new_capacity = self.entities.capacity();
 
-        if old_capacity == 0 {
-            unsafe { self.alloc_columns(NonZeroUsize::new_unchecked(new_capacity)) };
-        } else {
-            unsafe {
-                self.realloc_columns(
-                    NonZeroUsize::new_unchecked(old_capacity),
-                    NonZeroUsize::new_unchecked(new_capacity),
-                );
-            };
-        }
-    }
-
-    #[inline(always)]
-    fn reserve_one(&mut self) {
-        if self.capacity() == self.entity_count() {
-            unsafe {
-                self.reserve_unchecked(1);
+        unsafe {
+            let new_capacity = NonZeroUsize::new_unchecked(new_capacity);
+            if old_capacity != 0 {
+                let current_capacity = NonZeroUsize::new_unchecked(old_capacity);
+                self.realloc_columns(current_capacity, new_capacity);
+            } else {
+                self.alloc_columns(new_capacity);
             }
         }
     }
 
     pub unsafe fn allocate(&mut self, entity: Entity) -> TableRow {
+        // SAFETY: `0 < EntityId < u32::MAX`, so `len < u32::MAX`
         let len = self.entity_count();
 
-        cfg::debug! { assert!(len < u32::MAX as usize); }
-
-        self.reserve_one();
+        if len == self.entity_count() {
+            self.reserve_one();
+        }
 
         self.entities.push(entity);
         for col in &mut self.columns {
@@ -321,7 +427,8 @@ impl Table {
                 let dst_index = dst_row.index();
 
                 for (id, column) in self.indices.iter().zip(self.columns.iter_mut()) {
-                    if let Some(other_col) = other.get_column_mut(*id) {
+                    if let Some(raw_index) = other.get_raw_index(*id) {
+                        let other_col = other.get_column_mut(raw_index);
                         other_col.init_item_from_nonoverlapping(
                             column, last_index, src_index, dst_index,
                         );
@@ -341,7 +448,8 @@ impl Table {
                 let dst_index = dst_row.index();
 
                 for (id, column) in self.indices.iter().zip(self.columns.iter_mut()) {
-                    if let Some(other_col) = other.get_column_mut(*id) {
+                    if let Some(raw_index) = other.get_raw_index(*id) {
+                        let other_col = other.get_column_mut(raw_index);
                         other_col.init_last_item_from(column, last_index, dst_index);
                     } else {
                         let _ = column.remove_last(last_index);
@@ -375,7 +483,8 @@ impl Table {
                 let dst_index = dst_row.index();
 
                 for (id, column) in self.indices.iter().zip(self.columns.iter_mut()) {
-                    if let Some(other_col) = other.get_column_mut(*id) {
+                    if let Some(raw_index) = other.get_raw_index(*id) {
+                        let other_col = other.get_column_mut(raw_index);
                         other_col.init_item_from_nonoverlapping(
                             column, last_index, src_index, dst_index,
                         );
@@ -395,7 +504,8 @@ impl Table {
                 let dst_index = dst_row.index();
 
                 for (id, column) in self.indices.iter().zip(self.columns.iter_mut()) {
-                    if let Some(other_col) = other.get_column_mut(*id) {
+                    if let Some(raw_index) = other.get_raw_index(*id) {
+                        let other_col = other.get_column_mut(raw_index);
                         other_col.init_last_item_from(column, last_index, dst_index);
                     } else {
                         column.drop_last(last_index);
@@ -425,7 +535,8 @@ impl Table {
                 let dst_index = dst_row.index();
 
                 for (id, column) in self.indices.iter().zip(self.columns.iter_mut()) {
-                    let other_col = other.get_column_mut(*id).debug_checked_unwrap();
+                    let raw_index = other.get_raw_index(*id).debug_checked_unwrap();
+                    let other_col = other.get_column_mut(raw_index);
                     other_col
                         .init_item_from_nonoverlapping(column, last_index, src_index, dst_index);
                 }
@@ -441,7 +552,8 @@ impl Table {
                 let dst_index = dst_row.index();
 
                 for (id, column) in self.indices.iter().zip(self.columns.iter_mut()) {
-                    let other_col = other.get_column_mut(*id).debug_checked_unwrap();
+                    let raw_index = other.get_raw_index(*id).debug_checked_unwrap();
+                    let other_col = other.get_column_mut(raw_index);
                     other_col.init_last_item_from(column, last_index, dst_index);
                 }
 
@@ -450,112 +562,6 @@ impl Table {
                     swapped_entity: None,
                 }
             }
-        }
-    }
-
-    pub fn get_drop_fn_for(&self, component_id: ComponentId) -> Option<unsafe fn(OwningPtr<'_>)> {
-        self.get_column(component_id)?.get_drop_fn()
-    }
-
-    pub fn get_data_slice_for<T>(&self, component_id: ComponentId) -> Option<&[UnsafeCell<T>]> {
-        self.get_column(component_id)
-            .map(|col| unsafe { col.get_data_slice(self.entity_count()) })
-    }
-
-    pub fn get_added_ticks_slice_for(
-        &self,
-        component_id: ComponentId,
-    ) -> Option<&[UnsafeCell<Tick>]> {
-        self.get_column(component_id)
-            .map(|col| unsafe { col.get_added_ticks_slice(self.entity_count()) })
-    }
-
-    pub fn get_changed_ticks_slice_for(
-        &self,
-        component_id: ComponentId,
-    ) -> Option<&[UnsafeCell<Tick>]> {
-        self.get_column(component_id)
-            .map(|col| unsafe { col.get_changed_ticks_slice(self.entity_count()) })
-    }
-
-    pub fn get_changed_by_slice_for(
-        &self,
-        _component_id: ComponentId,
-    ) -> DebugLocation<Option<&[UnsafeCell<&'static Location<'static>>]>> {
-        cfg::debug! {
-            if {
-                DebugLocation::untranspose(|| {
-                    self.get_column(_component_id)
-                        .map(|col| unsafe { col.get_changed_by_slice(self.entity_count()) })
-                })
-            } else {
-                DebugLocation::new_with(|| None)
-            }
-        }
-    }
-
-    pub fn get_changed_tick(
-        &self,
-        component_id: ComponentId,
-        row: TableRow,
-    ) -> Option<&UnsafeCell<Tick>> {
-        let index = row.index();
-        if index < self.entity_count() {
-            let ret = unsafe { self.get_column(component_id)?.get_changed_tick(index) };
-            Some(ret)
-        } else {
-            None
-        }
-    }
-
-    pub fn get_added_tick(
-        &self,
-        component_id: ComponentId,
-        row: TableRow,
-    ) -> Option<&UnsafeCell<Tick>> {
-        let index = row.index();
-        if index < self.entity_count() {
-            let ret = unsafe { self.get_column(component_id)?.get_added_tick(index) };
-            Some(ret)
-        } else {
-            None
-        }
-    }
-
-    pub fn get_changed_by(
-        &self,
-        component_id: ComponentId,
-        row: TableRow,
-    ) -> DebugLocation<Option<&UnsafeCell<&'static Location<'static>>>> {
-        cfg::debug! {
-            if {
-                DebugLocation::untranspose(|| {
-                    let index = row.index();
-                    if index < self.entity_count() {
-                        let ret = unsafe {
-                            self.get_column(component_id)?
-                                .get_changed_by(index)
-                        };
-                        Some(ret)
-                    } else {
-                        None
-                    }
-                })
-            } else {
-                DebugLocation::new_with(|| None)
-            }
-        }
-    }
-
-    pub unsafe fn get_component_ticks(
-        &self,
-        component_id: ComponentId,
-        row: TableRow,
-    ) -> Option<ComponentTicks> {
-        cfg::debug! { assert!(row.index() < self.entity_count()); }
-        unsafe {
-            self.get_column(component_id)
-                .map(|col| col.get_component_ticks(row.index()))
         }
     }
 }

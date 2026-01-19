@@ -16,9 +16,10 @@ mod pre_hashed;
 
 pub use hasher::{FixedHashState, FixedHasher};
 pub use hasher::{NoOpHashState, NoOpHasher};
+pub use hasher::{SparseHashState, SparseHasher};
 
-pub use hash_map::{HashMap, NoOpHashMap};
-pub use hash_set::{HashSet, NoOpHashSet};
+pub use hash_map::{HashMap, NoOpHashMap, SparseHashMap};
+pub use hash_set::{HashSet, NoOpHashSet, SparseHashSet};
 pub use hash_table::HashTable;
 
 pub use pre_hashed::{Hashed, PreHashMap};

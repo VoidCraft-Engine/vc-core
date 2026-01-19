@@ -207,7 +207,7 @@ pub(crate) use impl_reflect_for_hashmap;
 // -----------------------------------------------------------------------------
 // For NoOpHashMap
 
-macro_rules! impl_reflect_for_noophashmap {
+macro_rules! impl_reflect_for_fixedhashmap {
     ($ty:path) => {
         impl<K, V> $crate::info::Typed for $ty
         where
@@ -460,4 +460,4 @@ macro_rules! impl_reflect_for_noophashmap {
     };
 }
 
-pub(crate) use impl_reflect_for_noophashmap;
+pub(crate) use impl_reflect_for_fixedhashmap;

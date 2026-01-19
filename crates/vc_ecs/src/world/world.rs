@@ -1,3 +1,5 @@
+use core::fmt;
+
 use vc_os::sync::atomic::AtomicU32;
 
 use super::WorldId;
@@ -20,4 +22,17 @@ pub struct World {
     last_check_tick: Tick,
     last_change_tick: Tick,
     // TODO
+}
+
+impl fmt::Debug for World {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // SAFETY: `UnsafeWorldCell` requires that this must only access metadata.
+        // Accessing any data stored in the world would be unsound.
+        f.debug_struct("World")
+            .field("id", &self.id)
+            .field("entity_count", &self.entities.count_spawned())
+            .field("archetype_count", &self.archetypes.len())
+            .field("resource_count", &self.storages.resources.len())
+            .finish()
+    }
 }

@@ -8,6 +8,7 @@ mod entities;
 mod entity;
 mod error;
 mod location;
+mod utils;
 
 // -----------------------------------------------------------------------------
 // Exports
@@ -18,3 +19,4 @@ pub use entity::Entity;
 pub use error::{InvalidEntityError, NotSpawnedError, SpawnError, ValidEntityButNotSpawnedError};
 pub use id::{EntityGeneration, EntityId};
 pub use location::EntityLocation;
+pub use utils::{EntityMapper, MapEntities};

@@ -7,7 +7,7 @@ use core::num::NonZeroUsize;
 use core::ptr::NonNull;
 
 // -----------------------------------------------------------------------------
-// ThinArrayPtr
+// ThinArray
 
 #[derive(Debug)]
 #[repr(transparent)]
@@ -16,6 +16,11 @@ pub(super) struct ThinArray<T> {
 }
 
 impl<T: Copy> ThinArray<UnsafeCell<T>> {
+    const _STATIC_ASSERT_: () = const {
+        assert!(::core::mem::size_of::<T>() == ::core::mem::size_of::<UnsafeCell<T>>());
+        assert!(::core::mem::align_of::<T>() == ::core::mem::align_of::<UnsafeCell<T>>());
+    };
+
     #[inline(always)]
     pub const fn empty() -> Self {
         Self {
@@ -26,11 +31,13 @@ impl<T: Copy> ThinArray<UnsafeCell<T>> {
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         let mut arr = Self::empty();
-        if capacity != 0 {
+
+        if let Some(capacity) = NonZeroUsize::new(capacity) {
             unsafe {
-                arr.alloc(NonZeroUsize::new_unchecked(capacity));
+                arr.alloc(capacity);
             }
         }
+
         arr
     }
 

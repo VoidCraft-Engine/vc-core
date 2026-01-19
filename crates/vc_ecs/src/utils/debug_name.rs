@@ -18,7 +18,7 @@ pub struct DebugName {
 }
 
 cfg::debug! {
-    else { const FEATURE_DISABLED: &str = "Enable the debug feature to see the name"; }
+    else { const FEATURE_DISABLED: &str = "_"; }
 }
 
 impl Deref for DebugName {

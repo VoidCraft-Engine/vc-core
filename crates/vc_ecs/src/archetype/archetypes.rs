@@ -23,6 +23,7 @@ pub struct Archetypes {
 }
 
 impl Archetypes {
+    #[inline(always)]
     pub fn len(&self) -> usize {
         self.archetypes.len()
     }
@@ -30,6 +31,11 @@ impl Archetypes {
     #[inline]
     pub fn get(&self, id: ArchetypeId) -> Option<&Archetype> {
         self.archetypes.get(id.index())
+    }
+
+    #[inline]
+    pub fn get_mut(&mut self, id: ArchetypeId) -> Option<&mut Archetype> {
+        self.archetypes.get_mut(id.index())
     }
 
     #[inline]
@@ -48,8 +54,13 @@ impl Archetypes {
     }
 
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = &Archetype> {
+    pub fn iter(&self) -> core::slice::Iter<'_, Archetype> {
         self.archetypes.iter()
+    }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> core::slice::IterMut<'_, Archetype> {
+        self.archetypes.iter_mut()
     }
 }
 

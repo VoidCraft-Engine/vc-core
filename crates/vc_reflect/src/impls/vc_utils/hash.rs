@@ -1,12 +1,13 @@
 use crate::derive::{impl_reflect_opaque, impl_type_path};
+use crate::impls::{impl_reflect_for_fixedhashmap, impl_reflect_for_fixedhashset};
 use crate::impls::{impl_reflect_for_hashmap, impl_reflect_for_hashset};
-use crate::impls::{impl_reflect_for_noophashmap, impl_reflect_for_noophashset};
 
 // -----------------------------------------------------------------------------
 // HashState Hasher
 
 impl_type_path!(::vc_utils::hash::FixedHashState);
 impl_type_path!(::vc_utils::hash::NoOpHashState);
+impl_type_path!(::vc_utils::hash::SparseHashState);
 
 impl_reflect_opaque!(
     ::vc_utils::hash::Hashed<V: Eq + PartialEq + Clone>
@@ -60,10 +61,22 @@ impl_reflect_for_hashmap!(
 impl_type_path!(::vc_utils::hash::NoOpHashSet<T>);
 impl_type_path!(::vc_utils::hash::NoOpHashMap<K, V>);
 
-impl_reflect_for_noophashset!(::vc_utils::hash::NoOpHashSet<T>);
+impl_reflect_for_fixedhashset!(::vc_utils::hash::NoOpHashSet<T>);
 
-impl_reflect_for_noophashmap!(
+impl_reflect_for_fixedhashmap!(
     ::vc_utils::hash::NoOpHashMap<K, V>
+);
+
+// -----------------------------------------------------------------------------
+// Sparse HashSet and HashMap
+
+impl_type_path!(::vc_utils::hash::SparseHashSet<T>);
+impl_type_path!(::vc_utils::hash::SparseHashMap<K, V>);
+
+impl_reflect_for_fixedhashset!(::vc_utils::hash::SparseHashSet<T>);
+
+impl_reflect_for_fixedhashmap!(
+    ::vc_utils::hash::SparseHashMap<K, V>
 );
 
 // -----------------------------------------------------------------------------

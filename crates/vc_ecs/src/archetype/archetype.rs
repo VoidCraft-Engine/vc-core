@@ -2,13 +2,15 @@
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
+
 use nonmax::NonMaxU32;
+use vc_utils::hash::SparseHashMap;
 
 use super::{ArchetypeEntity, ArchetypeFlags, ArchetypeId, Edges};
 use crate::archetype::ArchetypeRow;
 use crate::component::ComponentId;
 use crate::entity::{Entity, EntityLocation};
-use crate::storage::{FixedSparseMap, StorageType, TableId, TableRow};
+use crate::storage::{StorageIndex, StorageType, TableId, TableRow};
 
 pub struct ArchetypeSwapRemoveResult {
     pub swapped_entity: Option<Entity>,
@@ -22,8 +24,7 @@ pub struct Archetype {
     table_id: TableId,
     entities: Vec<ArchetypeEntity>,
     component_ids: Box<[ComponentId]>,
-    storage_types: Box<[StorageType]>,
-    sparse: FixedSparseMap<ComponentId, StorageType>,
+    storage_indecies: SparseHashMap<ComponentId, StorageIndex>,
 }
 
 impl Archetype {
@@ -68,7 +69,9 @@ impl Archetype {
     }
 
     #[inline]
-    pub fn entities_with_location(&self) -> impl Iterator<Item = (Entity, EntityLocation)> {
+    pub fn entities_with_location(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (Entity, EntityLocation)> {
         self.entities
             .iter()
             .enumerate()
@@ -88,41 +91,39 @@ impl Archetype {
     }
 
     #[inline]
-    pub fn table_components(&self) -> impl Iterator<Item = ComponentId> + '_ {
-        self.component_ids
+    pub fn iter_components(
+        &self,
+    ) -> impl Iterator<Item = (ComponentId, StorageIndex)> + Clone + '_ {
+        self.storage_indecies
             .iter()
-            .zip(self.storage_types.iter())
-            .filter_map(|(&component, &storage)| {
-                if storage == StorageType::Table {
-                    Some(component)
-                } else {
-                    None
-                }
-            })
+            .map(|(&id, &index)| (id, index))
     }
 
     #[inline]
-    pub fn sparse_set_components(&self) -> impl Iterator<Item = ComponentId> + '_ {
-        self.component_ids
-            .iter()
-            .zip(self.storage_types.iter())
-            .filter_map(|(&component, &storage)| {
-                if storage == StorageType::SparseSet {
-                    Some(component)
-                } else {
-                    None
-                }
-            })
+    pub fn iter_table_components(&self) -> impl Iterator<Item = (ComponentId, u32)> + '_ {
+        self.storage_indecies.iter().filter_map(|(id, index)| {
+            if index.storage_type() == StorageType::Table {
+                Some((*id, index.raw_index()))
+            } else {
+                None
+            }
+        })
+    }
+
+    #[inline]
+    pub fn iter_sparse_set_components(&self) -> impl Iterator<Item = (ComponentId, u32)> + '_ {
+        self.storage_indecies.iter().filter_map(|(id, index)| {
+            if index.storage_type() == StorageType::SparseSet {
+                Some((*id, index.raw_index()))
+            } else {
+                None
+            }
+        })
     }
 
     #[inline]
     pub fn components(&self) -> &[ComponentId] {
         &self.component_ids
-    }
-
-    #[inline]
-    pub fn iter_components(&self) -> impl Iterator<Item = ComponentId> + Clone {
-        self.component_ids.iter().copied()
     }
 
     #[inline]
@@ -185,12 +186,12 @@ impl Archetype {
 
     #[inline]
     pub fn contains(&self, component_id: ComponentId) -> bool {
-        self.sparse.contains(component_id)
+        self.storage_indecies.contains_key(&component_id)
     }
 
     #[inline]
-    pub fn get_storage_type(&self, component_id: ComponentId) -> Option<StorageType> {
-        self.sparse.get_copied(component_id)
+    pub fn get_storage_index(&self, component_id: ComponentId) -> Option<StorageIndex> {
+        self.storage_indecies.get(&component_id).copied()
     }
 
     pub fn clear_entities(&mut self) {

@@ -75,9 +75,9 @@ impl BlobArray {
     ) -> Self {
         let mut arr = unsafe { Self::empty(item_layout, drop_fn) };
 
-        if capacity > 0 {
+        if let Some(capacity) = NonZeroUsize::new(capacity) {
             unsafe {
-                arr.alloc(NonZeroUsize::new_unchecked(capacity));
+                arr.alloc(capacity);
             }
         }
 
@@ -86,7 +86,7 @@ impl BlobArray {
 
     pub unsafe fn alloc(&mut self, capacity: NonZeroUsize) {
         if !self.is_zst() {
-            let new_layout = array_layout(&self.item_layout, capacity.get());
+            let new_layout = array_layout(self.item_layout, capacity.get());
 
             self.data = NonNull::new(unsafe { malloc::alloc(new_layout) })
                 .unwrap_or_else(|| malloc::handle_alloc_error(new_layout));
@@ -95,12 +95,12 @@ impl BlobArray {
 
     pub unsafe fn realloc(&mut self, current_capacity: NonZeroUsize, new_capacity: NonZeroUsize) {
         if !self.is_zst() {
-            let new_layout = array_layout(&self.item_layout, new_capacity.get());
+            let new_layout = array_layout(self.item_layout, new_capacity.get());
 
             self.data = NonNull::new(unsafe {
                 malloc::realloc(
                     self.data.as_ptr(),
-                    array_layout_unchecked(&self.item_layout, current_capacity.get()),
+                    array_layout_unchecked(self.item_layout, current_capacity.get()),
                     new_layout.size(),
                 )
             })
@@ -112,10 +112,10 @@ impl BlobArray {
         if current_capacity != 0 {
             unsafe {
                 self.clear(len);
-                if !self.is_zst() {
-                    let layout = array_layout_unchecked(&self.item_layout, current_capacity);
 
-                    alloc::alloc::dealloc(self.data.as_ptr(), layout);
+                if !self.is_zst() {
+                    let layout = array_layout_unchecked(self.item_layout, current_capacity);
+                    malloc::dealloc(self.data.as_ptr(), layout);
                 }
             }
         }
@@ -161,7 +161,7 @@ impl BlobArray {
     pub const unsafe fn init_item(&mut self, index: usize, value: OwningPtr<'_>) {
         let size = self.item_layout.size();
         unsafe {
-            let dst = self.data.as_ptr().byte_add(size * index);
+            let dst = self.data.as_ptr().byte_add(index * size);
             core::ptr::copy_nonoverlapping::<u8>(value.as_ptr(), dst, size);
         }
     }
@@ -172,7 +172,7 @@ impl BlobArray {
         let size = self.item_layout.size();
 
         let src = value.as_ptr();
-        let dst = unsafe { self.data.byte_add(size * index) };
+        let dst = unsafe { self.data.byte_add(index * size) };
 
         if let Some(drop_fn) = self.drop_fn {
             let drop_guard = AbortOnPanic;
@@ -244,14 +244,14 @@ impl BlobArray {
 // -----------------------------------------------------------------------------
 // alloc helper
 
-#[cold]
-#[inline(never)]
-const fn invalid_size() -> ! {
-    panic!("invalid size in `Layout::from_size_align`");
-}
-
 #[inline]
-const fn array_layout(layout: &Layout, n: usize) -> Layout {
+const fn array_layout(layout: Layout, n: usize) -> Layout {
+    #[cold]
+    #[inline(never)]
+    const fn invalid_size() -> ! {
+        panic!("invalid size in `Layout::from_size_align`");
+    }
+
     let Some(alloc_size) = layout.size().checked_mul(n) else {
         invalid_size();
     };
@@ -264,6 +264,6 @@ const fn array_layout(layout: &Layout, n: usize) -> Layout {
 }
 
 #[inline]
-const unsafe fn array_layout_unchecked(layout: &Layout, n: usize) -> Layout {
+const unsafe fn array_layout_unchecked(layout: Layout, n: usize) -> Layout {
     unsafe { Layout::from_size_align_unchecked(layout.size() * n, layout.align()) }
 }

@@ -7,11 +7,11 @@ use crate::event::EventKey;
 // -----------------------------------------------------------------------------
 // EventKeys
 
-pub const ADD: EventKey = EventKey(ComponentId::new(0));
-pub const INSERT: EventKey = EventKey(ComponentId::new(1));
-pub const REPLACE: EventKey = EventKey(ComponentId::new(2));
-pub const REMOVE: EventKey = EventKey(ComponentId::new(3));
-pub const DESPAWN: EventKey = EventKey(ComponentId::new(4));
+pub const ADD: EventKey = EventKey(ComponentId::from_u32(1));
+pub const INSERT: EventKey = EventKey(ComponentId::from_u32(2));
+pub const REPLACE: EventKey = EventKey(ComponentId::from_u32(3));
+pub const REMOVE: EventKey = EventKey(ComponentId::from_u32(4));
+pub const DESPAWN: EventKey = EventKey(ComponentId::from_u32(5));
 
 // -----------------------------------------------------------------------------
 // Event - Add

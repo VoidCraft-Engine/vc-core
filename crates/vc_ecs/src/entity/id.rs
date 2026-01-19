@@ -1,3 +1,5 @@
+#![expect(unsafe_code, reason = "unchecked non-zero is unsafe.")]
+
 use core::fmt;
 use core::hash;
 use core::num::NonZeroU32;
@@ -10,6 +12,15 @@ use core::num::NonZeroU32;
 pub struct EntityId(NonZeroU32);
 
 impl EntityId {
+    const _STATIC_ASSERT_: () = const {
+        const VAL: u32 = 2026;
+        #[allow(clippy::transmute_int_to_non_zero, reason = "static_assert")]
+        const NON_ZERO: NonZeroU32 = unsafe { core::mem::transmute(VAL) };
+        const ID: EntityId = unsafe { core::mem::transmute(VAL) };
+        assert!(VAL == NON_ZERO.get());
+        assert!(VAL == ID.index_u32());
+    };
+
     pub const PLACEHOLDER: Self = Self(NonZeroU32::MAX);
 
     #[inline(always)]
@@ -24,42 +35,42 @@ impl EntityId {
 
     #[inline(always)]
     pub const fn index_u32(self) -> u32 {
-        self.0.get()
+        unsafe { core::mem::transmute(self) }
     }
 
     #[inline(always)]
     pub const fn index(self) -> usize {
-        self.0.get() as usize
-    }
-}
-
-impl fmt::Display for EntityId {
-    #[inline(always)]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self.0, f)
-    }
-}
-
-impl hash::Hash for EntityId {
-    #[inline(always)]
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        state.write_u32(self.0.get());
+        self.index_u32() as usize
     }
 }
 
 impl PartialEq for EntityId {
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
-        self.0.get() == other.0.get()
+        self.index_u32() == other.index_u32()
     }
 }
 
 impl Eq for EntityId {}
 
+impl hash::Hash for EntityId {
+    #[inline(always)]
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        state.write_u32(self.index_u32());
+    }
+}
+
+impl fmt::Display for EntityId {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.index_u32(), f)
+    }
+}
+
 // -----------------------------------------------------------------------------
 // EntityGeneration
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct EntityGeneration(u32);
 
@@ -70,7 +81,7 @@ impl EntityGeneration {
     /// Non-wrapping difference between two generations after which a signed interpretation becomes negative.
     const DIFF_MAX: u32 = 1u32 << 31;
 
-    #[inline]
+    #[inline(always)]
     pub const fn after(self, versions: u32) -> Self {
         Self(self.0.wrapping_add(versions))
     }
@@ -92,16 +103,16 @@ impl EntityGeneration {
     }
 }
 
-impl fmt::Display for EntityGeneration {
-    #[inline(always)]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self.0, f)
-    }
-}
-
 impl hash::Hash for EntityGeneration {
     #[inline(always)]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         state.write_u32(self.0);
+    }
+}
+
+impl fmt::Display for EntityGeneration {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
     }
 }

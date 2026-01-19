@@ -188,7 +188,7 @@ pub(crate) use impl_reflect_for_hashset;
 // -----------------------------------------------------------------------------
 // For NoOpHashSet
 
-macro_rules! impl_reflect_for_noophashset {
+macro_rules! impl_reflect_for_fixedhashset {
     ($ty:path) => {
         impl<T> $crate::info::Typed for $ty
         where
@@ -385,4 +385,4 @@ macro_rules! impl_reflect_for_noophashset {
     };
 }
 
-pub(crate) use impl_reflect_for_noophashset;
+pub(crate) use impl_reflect_for_fixedhashset;

@@ -242,21 +242,21 @@ impl NoSendResourceData {
 
     #[inline(always)]
     fn validate_access(&self) {
-        #[cold]
-        #[inline(never)]
-        #[cfg(feature = "std")]
-        fn invalid_access(this: &NoSendResourceData) -> ! {
-            panic!(
-                "Attempted to access or drop non-send resource {} from thread {:?} on a thread {:?}.",
-                this.name,
-                this.thread_id,
-                std::thread::current().id()
-            );
-        }
+        cfg::std! {
+            #[cold]
+            #[inline(never)]
+            fn invalid_access(this: &NoSendResourceData) -> ! {
+                panic!(
+                    "Attempted to access or drop non-send resource {} from thread {:?} on a thread {:?}.",
+                    this.name,
+                    this.thread_id,
+                    std::thread::current().id()
+                );
+            }
 
-        #[cfg(feature = "std")]
-        if self.thread_id != Some(std::thread::current().id()) {
-            invalid_access(self);
+            if self.thread_id != Some(std::thread::current().id()) {
+                invalid_access(self);
+            }
         }
 
         // Currently, no_std is single-threaded only, so this is safe to ignore.
@@ -264,8 +264,7 @@ impl NoSendResourceData {
 
     #[inline(always)]
     fn init_thread_id(&mut self) {
-        #[cfg(feature = "std")]
-        {
+        cfg::std! {
             self.thread_id = Some(std::thread::current().id());
         }
     }

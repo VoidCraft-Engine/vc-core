@@ -1,3 +1,5 @@
+#![expect(unsafe_code, reason = "original implementation need unsafe codes.")]
+
 use super::SparseSet;
 
 use crate::component::ComponentId;
@@ -32,19 +34,34 @@ impl SparseSets {
     }
 
     #[inline]
-    pub fn get(&self, id: ComponentId) -> Option<&SparseComponent> {
-        self.sets.get(id)
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (ComponentId, &mut SparseComponent)> {
+        self.sets.iter_mut().map(|(&id, data)| (id, data))
     }
 
+    // #[inline]
+    // pub fn get(&self, id: ComponentId) -> Option<&SparseComponent> {
+    //     self.sets.get(id)
+    // }
+
     #[inline]
-    pub fn get_mut(&mut self, id: ComponentId) -> Option<&mut SparseComponent> {
-        self.sets.get_mut(id)
+    pub fn get_raw_index(&self, id: ComponentId) -> Option<u32> {
+        self.sets.get_raw_index(id)
+    }
+
+    #[inline(always)]
+    pub unsafe fn get(&self, raw_index: u32) -> &SparseComponent {
+        unsafe { self.sets.get_raw(raw_index) }
+    }
+
+    #[inline(always)]
+    pub unsafe fn get_mut(&mut self, raw_index: u32) -> &mut SparseComponent {
+        unsafe { self.sets.get_mut_raw(raw_index) }
     }
 
     #[inline]
     pub fn clear_entities(&mut self) {
         for set in self.sets.values_mut() {
-            set.clear();
+            set.dealloc();
         }
     }
 
@@ -53,5 +70,32 @@ impl SparseSets {
         for set in self.sets.values_mut() {
             set.check_ticks(check);
         }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Create SparseComponent From ComponentInfo
+
+use crate::component::ComponentInfo;
+
+impl SparseSets {
+    pub fn prepare_component(&mut self, info: &ComponentInfo) {
+        if self.sets.get_raw_index(info.id()).is_none() {
+            self.sets.insert(
+                info.id(),
+                SparseComponent::empty(info.layout(), info.drop_fn()),
+            );
+        }
+    }
+
+    pub fn get_raw_index_or_insert(&mut self, info: &ComponentInfo) -> u32 {
+        if let Some(raw_index) = self.sets.get_raw_index(info.id()) {
+            return raw_index;
+        };
+
+        self.sets.insert(
+            info.id(),
+            SparseComponent::with_capacity(info.layout(), info.drop_fn(), 16),
+        )
     }
 }

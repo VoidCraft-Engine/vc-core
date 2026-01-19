@@ -16,10 +16,12 @@ mod unsafe_deref;
 
 pub mod extra;
 pub mod hash;
-pub mod vec;
 
 // -----------------------------------------------------------------------------
 // Top-level exports
+
+pub use fastvec as vec;
+pub use indexmap as index;
 
 pub use default::default;
 pub use unsafe_deref::UnsafeCellDeref;

@@ -3,6 +3,7 @@
 
 mod fixed;
 mod noop;
+mod sparse;
 
 // -----------------------------------------------------------------------------
 // Re-Exports
@@ -19,3 +20,4 @@ pub use hb::{RawEntryBuilder, RawEntryBuilderMut, RawEntryMut, RawOccupiedEntryM
 
 pub use fixed::HashMap;
 pub use noop::NoOpHashMap;
+pub use sparse::SparseHashMap;

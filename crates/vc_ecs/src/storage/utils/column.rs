@@ -180,6 +180,7 @@ impl Column {
     }
 
     #[inline]
+    #[cfg_attr(any(debug_assertions, feature = "debug"), track_caller)]
     pub unsafe fn reset_item(&mut self, index: usize) {
         cfg::debug! { assert!(index < self.capacity); }
         unsafe {
@@ -353,6 +354,7 @@ impl Column {
             assert!(src < other_last_index && other_last_index < other.capacity);
             assert!(dst < self.capacity);
         }
+
         unsafe {
             let src_val = other.data.swap_remove_nonoverlapping(src, other_last_index);
             self.data.init_item(dst, src_val);

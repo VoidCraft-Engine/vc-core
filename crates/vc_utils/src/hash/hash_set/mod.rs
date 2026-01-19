@@ -3,6 +3,7 @@
 
 mod fixed;
 mod noop;
+mod sparse;
 
 // -----------------------------------------------------------------------------
 // Re-Exports
@@ -18,3 +19,4 @@ pub use hb::{Entry, OccupiedEntry, VacantEntry};
 
 pub use fixed::HashSet;
 pub use noop::NoOpHashSet;
+pub use sparse::SparseHashSet;
