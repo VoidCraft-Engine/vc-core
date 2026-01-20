@@ -75,10 +75,12 @@ impl<T: Typed + Reflect> FromType<T> for TypeTraitFromPtr {
                 // SAFETY: `from_ptr_mut` is either called in `TypeTraitFromPtr::as_reflect`
                 // or returned by `TypeTraitFromPtr::from_ptr`, both lay out the invariants
                 // required by `deref`
+                ptr.debug_assert_aligned::<T>();
                 unsafe { ptr.as_ref::<T>() as &dyn Reflect }
             },
             from_ptr_mut: |ptr| {
                 // SAFETY: same as above
+                ptr.debug_assert_aligned::<T>();
                 unsafe { ptr.consume::<T>() as &mut dyn Reflect }
                 // unsafe { ptr.as_mut_ref::<T>() as &mut dyn Reflect }
             },

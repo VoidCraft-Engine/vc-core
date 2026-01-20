@@ -12,15 +12,15 @@ use crate::tick::Tick;
 #[allow(unused)]
 pub struct World {
     id: WorldId,
-    archetypes: Archetypes,
-    storages: Storages,
-    entities: Entities,
-    allocator: EntityAllocator,
-    components: Components,
-    generator: ComponentIdGenerator,
-    change_tick: AtomicU32,
-    last_check_tick: Tick,
-    last_change_tick: Tick,
+    pub(crate) archetypes: Archetypes,
+    pub(crate) storages: Storages,
+    pub(crate) entities: Entities,
+    pub(crate) allocator: EntityAllocator,
+    pub(crate) components: Components,
+    pub(crate) generator: ComponentIdGenerator,
+    pub(crate) change_tick: AtomicU32,
+    pub(crate) last_check_tick: Tick,
+    pub(crate) last_change_tick: Tick,
     // TODO
 }
 

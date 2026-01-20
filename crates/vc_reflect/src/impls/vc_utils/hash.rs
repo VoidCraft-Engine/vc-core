@@ -79,25 +79,25 @@ impl_reflect_for_fixedhashmap!(
     ::vc_utils::hash::SparseHashMap<K, V>
 );
 
-// -----------------------------------------------------------------------------
-// hashbrown HashSet and HashMap
-
-impl_type_path!(
-    (in hashbrown as HashSet)
-    ::vc_utils::hash::hashbrown::HashSet<T, S>
-);
-
-impl_type_path!(
-    (in hashbrown as HashMap)
-    ::vc_utils::hash::hashbrown::HashMap<K, V, S>
-);
-
-impl_reflect_for_hashset!(
-    ::vc_utils::hash::hashbrown::HashSet<T, S>,
-    ::vc_utils::hash::hashbrown::DefaultHashBuilder,
-);
-
-impl_reflect_for_hashmap!(
-    ::vc_utils::hash::hashbrown::HashMap<K, V, S>,
-    ::vc_utils::hash::hashbrown::DefaultHashBuilder,
-);
+// // -----------------------------------------------------------------------------
+// // hashbrown HashSet and HashMap
+//
+// impl_type_path!(
+//     (in hashbrown as HashSet)
+//     ::vc_utils::hash::hashbrown::HashSet<T, S>
+// );
+//
+// impl_type_path!(
+//     (in hashbrown as HashMap)
+//     ::vc_utils::hash::hashbrown::HashMap<K, V, S>
+// );
+//
+// impl_reflect_for_hashset!(
+//     ::vc_utils::hash::hashbrown::HashSet<T, S>,
+//     ::vc_utils::hash::hashbrown::DefaultHashBuilder,
+// );
+//
+// impl_reflect_for_hashmap!(
+//     ::vc_utils::hash::hashbrown::HashMap<K, V, S>,
+//     ::vc_utils::hash::hashbrown::DefaultHashBuilder,
+// );

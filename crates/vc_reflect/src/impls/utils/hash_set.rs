@@ -97,7 +97,7 @@ macro_rules! impl_reflect_for_hashset {
             }
 
             fn drain(&mut self) -> ::alloc::vec::Vec<::alloc::boxed::Box<dyn $crate::Reflect>> {
-                self.drain()
+                Self::drain(self)
                     .map($crate::Reflect::into_boxed_reflect)
                     .collect()
             }
@@ -118,10 +118,7 @@ macro_rules! impl_reflect_for_hashset {
                 &mut self,
                 value: ::alloc::boxed::Box<dyn $crate::Reflect>,
             ) -> Result<bool, ::alloc::boxed::Box<dyn $crate::Reflect>> {
-                let value = match T::take_from_reflect(value) {
-                    Ok(v) => v,
-                    Err(e) => return Err(e),
-                };
+                let value = T::take_from_reflect(value)?;
                 Ok(Self::insert(self, value))
             }
 

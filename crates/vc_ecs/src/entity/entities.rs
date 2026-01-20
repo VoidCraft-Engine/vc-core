@@ -4,9 +4,9 @@ use core::panic::Location;
 
 use alloc::vec::Vec;
 
+use super::error::{InvalidEntityError, ValidEntityButNotSpawnedError};
+use super::error::{NotSpawnedError, SpawnError};
 use super::{Entity, EntityGeneration, EntityId, EntityLocation};
-use super::{InvalidEntityError, ValidEntityButNotSpawnedError};
-use super::{NotSpawnedError, SpawnError};
 use crate::tick::{CheckTicks, Tick};
 use crate::utils::DebugLocation;
 
@@ -187,7 +187,16 @@ impl Entities {
         unsafe { self.set_location_unchecked(id, location) }
     }
 
-    pub fn update_generation(&mut self, id: EntityId, generation: u32) -> Entity {
+    /// 更新（增加）一个 Entity 的 generation，并返回其结果。
+    ///
+    /// 更新 generation，表示旧的 Entity 已经失效，调用前应当预先清理资源。
+    /// 返回的新 Entity 应当立刻通过 `EntityAllocater::free` 回收。
+    ///
+    /// # Safety
+    ///
+    /// - 无论是否具备数据，此函数调用后应当通过 `EntityAllocater::free` 回收实体编号。
+    /// - 如果实体具备数据，应当在此函数调用前先销毁表和稀疏集中的组件资源。
+    pub unsafe fn make_free(&mut self, id: EntityId, generation: u32) -> Entity {
         self.ensure_id_is_valid(id);
 
         let meta = unsafe { self.meta.get_unchecked_mut(id.index()) };

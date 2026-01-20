@@ -24,6 +24,8 @@ pub use hash_table::HashTable;
 
 pub use pre_hashed::{Hashed, PreHashMap};
 
+pub use hashbrown::Equivalent;
+
 // -----------------------------------------------------------------------------
 // Re-export crates
 

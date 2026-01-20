@@ -34,7 +34,7 @@ vc_reflect = { path = "../vc_reflect", default-features = false }
 
 # -------------------- External  --------------------
 
-serde_core = { version = "1", default-features = false, features = ["alloc"] }
+serde = { version = "1", default-features = false, features = ["alloc"] }
 nonmax = { version = "0.5", default-features = false }
 bitflags = { version = "2.10", default-features = false }
 fixedbitset = { version = "0.5", default-features = false }

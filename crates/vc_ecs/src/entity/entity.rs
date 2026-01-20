@@ -5,7 +5,7 @@ use core::hash::Hash;
 use core::mem;
 use core::num::NonZeroU32;
 
-use serde_core::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use vc_reflect::derive::Reflect;
 
 use super::{EntityGeneration, EntityId};
@@ -140,7 +140,7 @@ impl Serialize for Entity {
     #[inline(always)]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde_core::Serializer,
+        S: serde::Serializer,
     {
         serializer.serialize_u64(self.to_bits())
     }
@@ -149,9 +149,9 @@ impl Serialize for Entity {
 impl<'de> Deserialize<'de> for Entity {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde_core::Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
-        use serde_core::de::Error;
+        use serde::de::Error;
 
         let bits: u64 = Deserialize::deserialize(deserializer)?;
 

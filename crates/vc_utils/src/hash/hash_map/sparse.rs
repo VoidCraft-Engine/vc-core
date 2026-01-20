@@ -2,12 +2,13 @@
 
 use core::fmt::Debug;
 use core::hash::Hash;
-use core::ops::{Deref, DerefMut, Index};
+use core::ops::Index;
 
 use hashbrown::{Equivalent, TryReserveError, hash_map as hb};
 use hb::{Drain, ExtractIf, Iter, IterMut};
 use hb::{EntryRef, OccupiedError};
 use hb::{IntoKeys, IntoValues, Keys, Values, ValuesMut};
+use hb::{RawEntryBuilder, RawEntryBuilderMut};
 
 use crate::hash::SparseHashState;
 
@@ -43,6 +44,12 @@ pub struct SparseHashMap<K, V>(InternalMap<K, V>);
 
 // -----------------------------------------------------------------------------
 // specific methods
+
+impl<K: Eq + Hash, V, const N: usize> From<[(K, V); N]> for SparseHashMap<K, V> {
+    fn from(value: [(K, V); N]) -> Self {
+        value.into_iter().collect()
+    }
+}
 
 impl<K, V> SparseHashMap<K, V> {
     /// Create a empty [`SparseHashMap`]
@@ -84,6 +91,25 @@ impl<K, V> SparseHashMap<K, V> {
         ))
     }
 }
+
+// -----------------------------------------------------------------------------
+// Transmute
+
+// impl<K, V> Deref for SparseHashMap<K, V> {
+//     type Target = InternalMap<K, V>;
+//
+//     #[inline(always)]
+//     fn deref(&self) -> &Self::Target {
+//         &self.0
+//     }
+// }
+
+// impl<K, V> DerefMut for SparseHashMap<K, V> {
+//     #[inline(always)]
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut self.0
+//     }
+// }
 
 // -----------------------------------------------------------------------------
 // Re-export the underlying method
@@ -206,22 +232,6 @@ where
     }
 }
 
-impl<K, V> Deref for SparseHashMap<K, V> {
-    type Target = InternalMap<K, V>;
-
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<K, V> DerefMut for SparseHashMap<K, V> {
-    #[inline(always)]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 impl<K, V> serde_core::Serialize for SparseHashMap<K, V>
 where
     InternalMap<K, V>: serde_core::Serialize,
@@ -245,6 +255,20 @@ where
         D: serde_core::Deserializer<'de>,
     {
         Ok(Self(serde_core::Deserialize::deserialize(deserializer)?))
+    }
+}
+
+impl<K, V> SparseHashMap<K, V> {
+    /// Creates a raw immutable entry builder for the HashMap.
+    #[inline(always)]
+    pub fn raw_entry(&self) -> RawEntryBuilder<'_, K, V, SparseHashState> {
+        self.0.raw_entry()
+    }
+
+    /// Creates a raw entry builder for the HashMap.
+    #[inline(always)]
+    pub fn raw_entry_mut(&mut self) -> RawEntryBuilderMut<'_, K, V, SparseHashState> {
+        self.0.raw_entry_mut()
     }
 }
 

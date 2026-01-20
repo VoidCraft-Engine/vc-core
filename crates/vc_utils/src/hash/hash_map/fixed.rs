@@ -8,12 +8,13 @@
 
 use core::fmt::Debug;
 use core::hash::{BuildHasher, Hash};
-use core::ops::{Deref, DerefMut, Index};
+use core::ops::Index;
 
 use hashbrown::{Equivalent, TryReserveError, hash_map as hb};
 use hb::{Drain, ExtractIf, Iter, IterMut};
 use hb::{EntryRef, OccupiedError};
 use hb::{IntoKeys, IntoValues, Keys, Values, ValuesMut};
+use hb::{RawEntryBuilder, RawEntryBuilderMut};
 
 use crate::hash::FixedHashState;
 
@@ -51,6 +52,12 @@ pub struct HashMap<K, V, S = FixedHashState>(hb::HashMap<K, V, S>);
 
 // -----------------------------------------------------------------------------
 // `FixedHashState` specific methods
+
+impl<K: Eq + Hash, V, const N: usize> From<[(K, V); N]> for HashMap<K, V> {
+    fn from(value: [(K, V); N]) -> Self {
+        value.into_iter().collect()
+    }
+}
 
 impl<K, V> HashMap<K, V> {
     /// Create a empty [`HashMap`]
@@ -92,6 +99,47 @@ impl<K, V> HashMap<K, V> {
         ))
     }
 }
+
+// -----------------------------------------------------------------------------
+// Transmute
+
+impl<K, V, S> HashMap<K, V, S> {
+    /// Return inner [`hashbrown::HashMap`] .
+    #[inline(always)]
+    pub fn into_inner(self) -> hb::HashMap<K, V, S> {
+        self.0
+    }
+}
+
+impl<K, V, S> From<hb::HashMap<K, V, S>> for HashMap<K, V, S> {
+    #[inline(always)]
+    fn from(value: hb::HashMap<K, V, S>) -> Self {
+        Self(value)
+    }
+}
+
+impl<K, V, S> From<HashMap<K, V, S>> for hb::HashMap<K, V, S> {
+    #[inline(always)]
+    fn from(value: HashMap<K, V, S>) -> Self {
+        value.0
+    }
+}
+
+// impl<K, V, S> Deref for HashMap<K, V, S> {
+//     type Target = hb::HashMap<K, V, S>;
+//
+//     #[inline(always)]
+//     fn deref(&self) -> &Self::Target {
+//         &self.0
+//     }
+// }
+
+// impl<K, V, S> DerefMut for HashMap<K, V, S> {
+//     #[inline(always)]
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut self.0
+//     }
+// }
 
 // -----------------------------------------------------------------------------
 // Re-export the underlying method
@@ -214,36 +262,6 @@ where
     }
 }
 
-impl<K, V, S> From<hb::HashMap<K, V, S>> for HashMap<K, V, S> {
-    #[inline(always)]
-    fn from(value: hb::HashMap<K, V, S>) -> Self {
-        Self(value)
-    }
-}
-
-impl<K, V, S> From<HashMap<K, V, S>> for hb::HashMap<K, V, S> {
-    #[inline(always)]
-    fn from(value: HashMap<K, V, S>) -> Self {
-        value.0
-    }
-}
-
-impl<K, V, S> Deref for HashMap<K, V, S> {
-    type Target = hb::HashMap<K, V, S>;
-
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<K, V, S> DerefMut for HashMap<K, V, S> {
-    #[inline(always)]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 impl<K, V, S> serde_core::Serialize for HashMap<K, V, S>
 where
     hb::HashMap<K, V, S>: serde_core::Serialize,
@@ -267,6 +285,20 @@ where
         D: serde_core::Deserializer<'de>,
     {
         Ok(Self(serde_core::Deserialize::deserialize(deserializer)?))
+    }
+}
+
+impl<K, V, S> HashMap<K, V, S> {
+    /// Creates a raw immutable entry builder for the HashMap.
+    #[inline(always)]
+    pub fn raw_entry(&self) -> RawEntryBuilder<'_, K, V, S> {
+        self.0.raw_entry()
+    }
+
+    /// Creates a raw entry builder for the HashMap.
+    #[inline(always)]
+    pub fn raw_entry_mut(&mut self) -> RawEntryBuilderMut<'_, K, V, S> {
+        self.0.raw_entry_mut()
     }
 }
 
@@ -632,20 +664,6 @@ impl<K, V, S> HashMap<K, V, S> {
     #[inline(always)]
     pub fn into_values(self) -> IntoValues<K, V> {
         self.0.into_values()
-    }
-
-    /// Return inner [`HashMap`](hb::HashMap)
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use vc_utils::hash::HashMap;
-    /// let map: HashMap<&'static str, usize> = HashMap::new();
-    /// let map: hashbrown::HashMap<&'static str, usize, _> = map.into_inner();
-    /// ```
-    #[inline(always)]
-    pub fn into_inner(self) -> hb::HashMap<K, V, S> {
-        self.0
     }
 }
 

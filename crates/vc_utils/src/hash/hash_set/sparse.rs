@@ -5,7 +5,6 @@ use core::hash::Hash;
 use core::ops::{BitAnd, BitAndAssign};
 use core::ops::{BitOr, BitOrAssign};
 use core::ops::{BitXor, BitXorAssign};
-use core::ops::{Deref, DerefMut};
 use core::ops::{Sub, SubAssign};
 
 use hashbrown::{Equivalent, TryReserveError, hash_set as hb};
@@ -93,6 +92,25 @@ impl<T> SparseHashSet<T> {
         ))
     }
 }
+
+// -----------------------------------------------------------------------------
+// Transmute
+
+// impl<T> Deref for SparseHashSet<T> {
+//     type Target = InternalSet<T>;
+//
+//     #[inline(always)]
+//     fn deref(&self) -> &Self::Target {
+//         &self.0
+//     }
+// }
+
+// impl<T> DerefMut for SparseHashSet<T> {
+//     #[inline(always)]
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut self.0
+//     }
+// }
 
 // -----------------------------------------------------------------------------
 // Re-export the underlying method
@@ -203,22 +221,6 @@ where
     #[inline(always)]
     fn extend<U: IntoIterator<Item = X>>(&mut self, iter: U) {
         self.0.extend(iter);
-    }
-}
-
-impl<T> Deref for SparseHashSet<T> {
-    type Target = InternalSet<T>;
-
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<T> DerefMut for SparseHashSet<T> {
-    #[inline(always)]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 
@@ -507,7 +509,7 @@ where
     /// Visits the values representing the difference
     #[inline(always)]
     pub fn difference<'a>(&'a self, other: &'a Self) -> Difference<'a, T, SparseHashState> {
-        self.0.difference(other)
+        self.0.difference(&other.0)
     }
 
     /// Visits the values representing the symmetric difference
@@ -516,19 +518,19 @@ where
         &'a self,
         other: &'a Self,
     ) -> SymmetricDifference<'a, T, SparseHashState> {
-        self.0.symmetric_difference(other)
+        self.0.symmetric_difference(&other.0)
     }
 
     /// Visits the values representing the intersection
     #[inline(always)]
     pub fn intersection<'a>(&'a self, other: &'a Self) -> Intersection<'a, T, SparseHashState> {
-        self.0.intersection(other)
+        self.0.intersection(&other.0)
     }
 
     /// Visits the values representing the union
     #[inline(always)]
     pub fn union<'a>(&'a self, other: &'a Self) -> Union<'a, T, SparseHashState> {
-        self.0.union(other)
+        self.0.union(&other.0)
     }
 
     /// Returns true if the set contains a value.
@@ -627,19 +629,19 @@ where
     /// Returns true if self has no elements in common with other.
     #[inline(always)]
     pub fn is_disjoint(&self, other: &Self) -> bool {
-        self.0.is_disjoint(other)
+        self.0.is_disjoint(&other.0)
     }
 
     /// Returns true if the set is a subset of another
     #[inline(always)]
     pub fn is_subset(&self, other: &Self) -> bool {
-        self.0.is_subset(other)
+        self.0.is_subset(&other.0)
     }
 
     /// Returns true if the set is a superset of another
     #[inline(always)]
     pub fn is_superset(&self, other: &Self) -> bool {
-        self.0.is_superset(other)
+        self.0.is_superset(&other.0)
     }
 
     /// Adds a value to the set.

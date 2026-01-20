@@ -4,9 +4,9 @@ use core::fmt;
 use core::hash::{BuildHasher, Hash, Hasher};
 use core::ops::Deref;
 
-use serde_core::de::{Error, Visitor};
-use serde_core::{Deserialize, Deserializer};
-use serde_core::{Serialize, Serializer};
+use serde::de::{Error, Visitor};
+use serde::{Deserialize, Deserializer};
+use serde::{Serialize, Serializer};
 
 use vc_reflect::derive::Reflect;
 use vc_utils::hash::FixedHashState;

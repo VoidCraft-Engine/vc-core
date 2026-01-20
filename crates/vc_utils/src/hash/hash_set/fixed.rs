@@ -11,7 +11,6 @@ use core::hash::{BuildHasher, Hash};
 use core::ops::{BitAnd, BitAndAssign};
 use core::ops::{BitOr, BitOrAssign};
 use core::ops::{BitXor, BitXorAssign};
-use core::ops::{Deref, DerefMut};
 use core::ops::{Sub, SubAssign};
 
 use hashbrown::{Equivalent, TryReserveError, hash_set as hb};
@@ -106,6 +105,47 @@ impl<T> HashSet<T> {
         ))
     }
 }
+
+// -----------------------------------------------------------------------------
+// Transmute
+
+impl<T, S> HashSet<T, S> {
+    /// Return inner [`hashbrown::HashSet`] .
+    #[inline(always)]
+    pub fn into_inner(self) -> hb::HashSet<T, S> {
+        self.0
+    }
+}
+
+impl<T, S> From<hb::HashSet<T, S>> for HashSet<T, S> {
+    #[inline(always)]
+    fn from(value: hb::HashSet<T, S>) -> Self {
+        Self(value)
+    }
+}
+
+impl<T, S> From<HashSet<T, S>> for hb::HashSet<T, S> {
+    #[inline(always)]
+    fn from(value: HashSet<T, S>) -> Self {
+        value.0
+    }
+}
+
+// impl<T, S> Deref for HashSet<T, S> {
+//     type Target = hb::HashSet<T, S>;
+//
+//     #[inline(always)]
+//     fn deref(&self) -> &Self::Target {
+//         &self.0
+//     }
+// }
+
+// impl<T, S> DerefMut for HashSet<T, S> {
+//     #[inline(always)]
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut self.0
+//     }
+// }
 
 // -----------------------------------------------------------------------------
 // Re-export the underlying method
@@ -223,36 +263,6 @@ impl<T, S> From<crate::hash::HashMap<T, (), S>> for HashSet<T, S> {
     #[inline(always)]
     fn from(value: crate::hash::HashMap<T, (), S>) -> Self {
         Self(hb::HashSet::from(::hashbrown::HashMap::from(value)))
-    }
-}
-
-impl<T, S> From<hb::HashSet<T, S>> for HashSet<T, S> {
-    #[inline(always)]
-    fn from(value: hb::HashSet<T, S>) -> Self {
-        Self(value)
-    }
-}
-
-impl<T, S> From<HashSet<T, S>> for hb::HashSet<T, S> {
-    #[inline(always)]
-    fn from(value: HashSet<T, S>) -> Self {
-        value.0
-    }
-}
-
-impl<T, S> Deref for HashSet<T, S> {
-    type Target = hb::HashSet<T, S>;
-
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<T, S> DerefMut for HashSet<T, S> {
-    #[inline(always)]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 
@@ -505,20 +515,6 @@ impl<T, S> HashSet<T, S> {
     pub fn hasher(&self) -> &S {
         self.0.hasher()
     }
-
-    /// Return inner [`hb::HashSet`]
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use vc_utils::hash::HashSet;
-    /// let map: HashSet<&'static str> = HashSet::new();
-    /// let map: hashbrown::HashSet<&'static str, _> = map.into_inner();
-    /// ```
-    #[inline(always)]
-    pub fn into_inner(self) -> hb::HashSet<T, S> {
-        self.0
-    }
 }
 
 impl<T, S> HashSet<T, S>
@@ -600,25 +596,25 @@ where
     /// Visits the values representing the difference
     #[inline(always)]
     pub fn difference<'a>(&'a self, other: &'a Self) -> Difference<'a, T, S> {
-        self.0.difference(other)
+        self.0.difference(&other.0)
     }
 
     /// Visits the values representing the symmetric difference
     #[inline(always)]
     pub fn symmetric_difference<'a>(&'a self, other: &'a Self) -> SymmetricDifference<'a, T, S> {
-        self.0.symmetric_difference(other)
+        self.0.symmetric_difference(&other.0)
     }
 
     /// Visits the values representing the intersection
     #[inline(always)]
     pub fn intersection<'a>(&'a self, other: &'a Self) -> Intersection<'a, T, S> {
-        self.0.intersection(other)
+        self.0.intersection(&other.0)
     }
 
     /// Visits the values representing the union
     #[inline(always)]
     pub fn union<'a>(&'a self, other: &'a Self) -> Union<'a, T, S> {
-        self.0.union(other)
+        self.0.union(&other.0)
     }
 
     /// Returns true if the set contains a value.
@@ -717,19 +713,19 @@ where
     /// Returns true if self has no elements in common with other.
     #[inline(always)]
     pub fn is_disjoint(&self, other: &Self) -> bool {
-        self.0.is_disjoint(other)
+        self.0.is_disjoint(&other.0)
     }
 
     /// Returns true if the set is a subset of another
     #[inline(always)]
     pub fn is_subset(&self, other: &Self) -> bool {
-        self.0.is_subset(other)
+        self.0.is_subset(&other.0)
     }
 
     /// Returns true if the set is a superset of another
     #[inline(always)]
     pub fn is_superset(&self, other: &Self) -> bool {
-        self.0.is_superset(other)
+        self.0.is_superset(&other.0)
     }
 
     /// Adds a value to the set.

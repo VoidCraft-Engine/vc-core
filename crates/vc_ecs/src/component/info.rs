@@ -83,6 +83,10 @@ impl ComponentInfo {
         self.descriptor.is_send_and_sync
     }
 
+    pub const fn type_id(&self) -> Option<TypeId> {
+        self.descriptor.type_id
+    }
+
     pub fn debug_name(&self) -> DebugName {
         self.descriptor.debug_name.clone()
     }
