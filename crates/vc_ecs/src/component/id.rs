@@ -14,10 +14,8 @@ pub struct ComponentId(NonZeroU32);
 impl ComponentId {
     const _STATIC_ASSERT_: () = const {
         const VAL: u32 = 2026;
-        #[allow(clippy::transmute_int_to_non_zero, reason = "static_assert")]
-        const NON_ZERO: NonZeroU32 = unsafe { core::mem::transmute(VAL) };
         const ID: ComponentId = unsafe { core::mem::transmute(VAL) };
-        assert!(VAL == NON_ZERO.get());
+        assert!(VAL == ID.0.get());
         assert!(VAL == ID.index_u32());
     };
 
@@ -86,7 +84,7 @@ impl Default for ComponentIdGenerator {
 
 impl ComponentIdGenerator {
     #[inline(always)]
-    const unsafe fn get_unchecked(id: u32) -> ComponentId {
+    const unsafe fn force_cast(id: u32) -> ComponentId {
         unsafe { core::mem::transmute(id) }
     }
 
@@ -99,15 +97,20 @@ impl ComponentIdGenerator {
     }
 
     #[inline(always)]
+    pub fn component_count(&self) -> usize {
+        self.next.load(Ordering::Relaxed) as usize - 1
+    }
+
+    #[inline(always)]
     pub fn peek_mut(&mut self) -> ComponentId {
-        unsafe { Self::get_unchecked(*self.next.get_mut()) }
+        unsafe { Self::force_cast(*self.next.get_mut()) }
     }
 
     #[inline]
     pub fn next_mut(&mut self) -> ComponentId {
         let next = self.next.get_mut();
         assert!(*next < u32::MAX, "too many components");
-        let result = unsafe { Self::get_unchecked(*next) };
+        let result = unsafe { Self::force_cast(*next) };
         *next += 1;
         result
     }
@@ -115,13 +118,13 @@ impl ComponentIdGenerator {
     #[inline]
     pub fn peek(&self) -> ComponentId {
         let next = self.next.fetch_add(1, Ordering::Relaxed);
-        unsafe { Self::get_unchecked(next) }
+        unsafe { Self::force_cast(next) }
     }
 
     #[inline]
     pub fn next(&self) -> ComponentId {
         let next = self.next.fetch_add(1, Ordering::Relaxed);
         assert!(next < u32::MAX, "too many components");
-        unsafe { Self::get_unchecked(next) }
+        unsafe { Self::force_cast(next) }
     }
 }

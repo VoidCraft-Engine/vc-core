@@ -6,8 +6,8 @@ use nonmax::NonMaxU32;
 
 use crate::cfg;
 
+use super::SparseArray;
 use super::SparseIndex;
-use super::SparseMap;
 
 // -----------------------------------------------------------------------------
 // SparseSet
@@ -16,7 +16,7 @@ use super::SparseMap;
 pub struct SparseSet<I, V> {
     dense: Vec<V>,
     indices: Vec<I>,
-    sparse: SparseMap<I, NonMaxU32>,
+    sparse: SparseArray<I, NonMaxU32>,
 }
 
 // -----------------------------------------------------------------------------
@@ -28,7 +28,7 @@ impl<I: SparseIndex, V> SparseSet<I, V> {
         Self {
             dense: Vec::new(),
             indices: Vec::new(),
-            sparse: SparseMap::empty(),
+            sparse: SparseArray::empty(),
         }
     }
 
@@ -36,7 +36,7 @@ impl<I: SparseIndex, V> SparseSet<I, V> {
         Self {
             dense: Vec::with_capacity(capacity),
             indices: Vec::with_capacity(capacity),
-            sparse: SparseMap::empty(),
+            sparse: SparseArray::empty(),
         }
     }
 
@@ -104,11 +104,11 @@ impl<I: SparseIndex, V> SparseSet<I, V> {
         self.dense.iter_mut()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&I, &V)> {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = (&I, &V)> {
         self.indices.iter().zip(self.dense.iter())
     }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&I, &mut V)> {
+    pub fn iter_mut(&mut self) -> impl ExactSizeIterator<Item = (&I, &mut V)> {
         self.indices.iter().zip(self.dense.iter_mut())
     }
 

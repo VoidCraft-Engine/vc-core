@@ -1,6 +1,6 @@
 mod accessor;
 
-pub use accessor::RelationshipAccessor;
+pub use accessor::{ComponentRelationshipAccessor, RelationshipAccessor};
 
 #[derive(Copy, Clone, Debug)]
 pub enum RelationshipHookMode {

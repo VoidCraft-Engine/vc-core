@@ -4,7 +4,7 @@
 mod match_reflect;
 
 mod enum_kind;
-mod opaque_trait;
+mod opaque_kind;
 mod struct_kind;
 mod tuple_struct_kind;
 mod unit_kind;
@@ -37,6 +37,6 @@ use trait_typed::impl_trait_typed;
 use tuple_struct_kind::impl_tuple_struct;
 use unit_kind::impl_unit;
 
-pub(crate) use opaque_trait::impl_opaque;
+pub(crate) use opaque_kind::impl_opaque;
 pub(crate) use reflect_trait::impl_reflect_trait;
 pub(crate) use trait_type_path::impl_trait_type_path;

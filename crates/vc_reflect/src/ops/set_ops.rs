@@ -73,6 +73,8 @@ pub struct DynamicSet {
     hash_table: HashTable<Box<dyn Reflect>>,
 }
 
+// Explicitly implemented here so that code readers do not need
+// to ponder the principles of proc-macros in advance.
 impl TypePath for DynamicSet {
     #[inline]
     fn type_path() -> &'static str {
@@ -676,5 +678,22 @@ impl dyn Set {
     #[inline]
     pub fn get_as<T: Reflect>(&self, key: &dyn Reflect) -> Option<&T> {
         self.get(key).and_then(<dyn Reflect>::downcast_ref)
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Tests
+
+#[cfg(test)]
+mod tests {
+    use super::DynamicSet;
+    use crate::info::TypePath;
+
+    #[test]
+    fn type_path() {
+        assert!(DynamicSet::type_path() == "vc_reflect::ops::DynamicSet");
+        assert!(DynamicSet::module_path() == Some("vc_reflect::ops"));
+        assert!(DynamicSet::type_ident() == "DynamicSet");
+        assert!(DynamicSet::type_name() == "DynamicSet");
     }
 }

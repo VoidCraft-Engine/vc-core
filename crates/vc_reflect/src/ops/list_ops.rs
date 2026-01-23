@@ -66,6 +66,8 @@ pub struct DynamicList {
     values: Vec<Box<dyn Reflect>>,
 }
 
+// Explicitly implemented here so that code readers do not need
+// to ponder the principles of proc-macros in advance.
 impl TypePath for DynamicList {
     #[inline]
     fn type_path() -> &'static str {
@@ -774,3 +776,20 @@ impl<'a> Iterator for ListItemIter<'a> {
 }
 
 impl ExactSizeIterator for ListItemIter<'_> {}
+
+// -----------------------------------------------------------------------------
+// Tests
+
+#[cfg(test)]
+mod tests {
+    use super::DynamicList;
+    use crate::info::TypePath;
+
+    #[test]
+    fn type_path() {
+        assert!(DynamicList::type_path() == "vc_reflect::ops::DynamicList");
+        assert!(DynamicList::module_path() == Some("vc_reflect::ops"));
+        assert!(DynamicList::type_ident() == "DynamicList");
+        assert!(DynamicList::type_name() == "DynamicList");
+    }
+}

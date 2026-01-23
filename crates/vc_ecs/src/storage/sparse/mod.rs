@@ -11,7 +11,7 @@ mod sparse_component;
 // Exports
 
 pub use index::SparseIndex;
-pub use map::{FixedSparseMap, SparseMap};
+pub use map::{FixedSparseArray, SparseArray};
 pub use set::SparseSet;
 pub use sets::SparseSets;
 pub use sparse_component::SparseComponent;

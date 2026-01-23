@@ -3,7 +3,6 @@
 use core::cell::UnsafeCell;
 use core::panic::Location;
 
-use vc_reflect::derive::Reflect;
 use vc_utils::UnsafeCellDeref;
 
 use crate::tick::Tick;
@@ -12,8 +11,7 @@ use crate::utils::DebugLocation;
 // -----------------------------------------------------------------------------
 // ComponentTicks
 
-#[derive(Reflect, Copy, Clone, Debug)]
-#[reflect(mini, debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct ComponentTicks {
     pub added: Tick,
     pub changed: Tick,

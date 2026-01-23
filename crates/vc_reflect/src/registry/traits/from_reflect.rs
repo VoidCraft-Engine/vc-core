@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use crate::info::Typed;
+use crate::info::{TypePath, Typed};
 use crate::registry::FromType;
 use crate::{FromReflect, Reflect};
 
@@ -49,4 +49,43 @@ impl<T: Typed + FromReflect> FromType<T> for TypeTraitFromReflect {
     }
 }
 
-crate::derive::impl_type_path!(::vc_reflect::registry::TypeTraitFromReflect);
+// Explicitly implemented here so that code readers do not need
+// to ponder the principles of proc-macros in advance.
+impl TypePath for TypeTraitFromReflect {
+    #[inline(always)]
+    fn type_path() -> &'static str {
+        "vc_reflect::registry::TypeTraitFromReflect"
+    }
+
+    #[inline(always)]
+    fn type_name() -> &'static str {
+        "TypeTraitFromReflect"
+    }
+
+    #[inline(always)]
+    fn type_ident() -> &'static str {
+        "TypeTraitFromReflect"
+    }
+
+    #[inline(always)]
+    fn module_path() -> Option<&'static str> {
+        Some("vc_reflect::registry")
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Tests
+
+#[cfg(test)]
+mod tests {
+    use super::TypeTraitFromReflect;
+    use crate::info::TypePath;
+
+    #[test]
+    fn type_path() {
+        assert!(TypeTraitFromReflect::type_path() == "vc_reflect::registry::TypeTraitFromReflect");
+        assert!(TypeTraitFromReflect::module_path() == Some("vc_reflect::registry"));
+        assert!(TypeTraitFromReflect::type_ident() == "TypeTraitFromReflect");
+        assert!(TypeTraitFromReflect::type_name() == "TypeTraitFromReflect");
+    }
+}

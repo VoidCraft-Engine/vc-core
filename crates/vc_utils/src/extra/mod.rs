@@ -5,7 +5,7 @@
 
 mod array_deque;
 mod block_list;
-mod short_name;
+mod page_pool;
 mod typeid_map;
 
 // -----------------------------------------------------------------------------
@@ -13,5 +13,5 @@ mod typeid_map;
 
 pub use array_deque::ArrayDeque;
 pub use block_list::BlockList;
-pub use short_name::ShortName;
+pub use page_pool::PagePool;
 pub use typeid_map::TypeIdMap;

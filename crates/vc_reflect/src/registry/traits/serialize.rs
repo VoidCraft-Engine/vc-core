@@ -1,7 +1,7 @@
 use serde_core::{Serialize, Serializer};
 
 use crate::Reflect;
-use crate::info::Typed;
+use crate::info::{TypePath, Typed};
 use crate::registry::FromType;
 
 /// A container providing `serde` serialization support for reflected types.
@@ -47,7 +47,7 @@ pub struct TypeTraitSerialize {
     fun: fn(value: &dyn Reflect) -> &dyn erased_serde::Serialize,
 }
 
-impl<T: erased_serde::Serialize + Typed + Reflect> FromType<T> for TypeTraitSerialize {
+impl<T: Serialize + Typed + Reflect> FromType<T> for TypeTraitSerialize {
     fn from_type() -> Self {
         Self {
             fun: |value| match value.downcast_ref::<T>() {
@@ -65,12 +65,12 @@ impl<T: erased_serde::Serialize + Typed + Reflect> FromType<T> for TypeTraitSeri
 }
 
 impl TypeTraitSerialize {
-    /// Call T's [`Serialize`]
+    /// Serializes a reflected value.
     ///
-    /// [`TypeTraitSerialize`] does not have a type flag,
-    /// but the functions used internally are type specific.
+    /// See [`TypeTraitSerialize`] for examples.
     ///
     /// # Panic
+    ///
     /// - Mismatched Type
     #[inline(always)]
     pub fn serialize<S: Serializer>(
@@ -82,4 +82,43 @@ impl TypeTraitSerialize {
     }
 }
 
-crate::derive::impl_type_path!(::vc_reflect::registry::TypeTraitSerialize);
+// Explicitly implemented here so that code readers do not need
+// to ponder the principles of proc-macros in advance.
+impl TypePath for TypeTraitSerialize {
+    #[inline(always)]
+    fn type_path() -> &'static str {
+        "vc_reflect::registry::TypeTraitSerialize"
+    }
+
+    #[inline(always)]
+    fn type_name() -> &'static str {
+        "TypeTraitSerialize"
+    }
+
+    #[inline(always)]
+    fn type_ident() -> &'static str {
+        "TypeTraitSerialize"
+    }
+
+    #[inline(always)]
+    fn module_path() -> Option<&'static str> {
+        Some("vc_reflect::registry")
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Tests
+
+#[cfg(test)]
+mod tests {
+    use super::TypeTraitSerialize;
+    use crate::info::TypePath;
+
+    #[test]
+    fn type_path() {
+        assert!(TypeTraitSerialize::type_path() == "vc_reflect::registry::TypeTraitSerialize");
+        assert!(TypeTraitSerialize::module_path() == Some("vc_reflect::registry"));
+        assert!(TypeTraitSerialize::type_ident() == "TypeTraitSerialize");
+        assert!(TypeTraitSerialize::type_name() == "TypeTraitSerialize");
+    }
+}

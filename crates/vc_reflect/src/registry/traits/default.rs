@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 
 use crate::Reflect;
-use crate::info::Typed;
+use crate::info::{TypePath, Typed};
 use crate::registry::FromType;
 
 /// A container providing [`Default`] support for reflected types.
@@ -51,4 +51,43 @@ impl<T: Default + Typed + Reflect> FromType<T> for TypeTraitDefault {
     }
 }
 
-crate::derive::impl_type_path!(::vc_reflect::registry::TypeTraitDefault);
+// Explicitly implemented here so that code readers do not need
+// to ponder the principles of proc-macros in advance.
+impl TypePath for TypeTraitDefault {
+    #[inline(always)]
+    fn type_path() -> &'static str {
+        "vc_reflect::registry::TypeTraitDefault"
+    }
+
+    #[inline(always)]
+    fn type_name() -> &'static str {
+        "TypeTraitDefault"
+    }
+
+    #[inline(always)]
+    fn type_ident() -> &'static str {
+        "TypeTraitDefault"
+    }
+
+    #[inline(always)]
+    fn module_path() -> Option<&'static str> {
+        Some("vc_reflect::registry")
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Tests
+
+#[cfg(test)]
+mod tests {
+    use super::TypeTraitDefault;
+    use crate::info::TypePath;
+
+    #[test]
+    fn type_path() {
+        assert!(TypeTraitDefault::type_path() == "vc_reflect::registry::TypeTraitDefault");
+        assert!(TypeTraitDefault::module_path() == Some("vc_reflect::registry"));
+        assert!(TypeTraitDefault::type_ident() == "TypeTraitDefault");
+        assert!(TypeTraitDefault::type_name() == "TypeTraitDefault");
+    }
+}

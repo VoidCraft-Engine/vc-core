@@ -1,6 +1,7 @@
 //! TODO
 #![cfg_attr(docsrs, expect(internal_features, reason = "needed for fake_variadic"))]
 #![cfg_attr(docsrs, feature(doc_cfg, rustdoc_internals))]
+#![expect(unsafe_code, reason = "ECS need many unsafe operation")]
 #![allow(clippy::missing_safety_doc)]
 #![no_std]
 
@@ -41,15 +42,15 @@ pub mod utils;
 
 pub mod change_detection;
 
+pub mod archetype;
 pub mod batching;
 pub mod bundle;
 pub mod intern;
 pub mod label;
 pub mod name;
+pub mod reflect;
 pub mod resource;
 pub mod system;
-
-pub mod archetype;
 
 pub mod component;
 pub mod entity;

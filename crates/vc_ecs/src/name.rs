@@ -118,12 +118,14 @@ impl fmt::Debug for Name {
 }
 
 impl Serialize for Name {
+    #[inline]
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
     }
 }
 
 impl<'de> Deserialize<'de> for Name {
+    #[inline]
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         struct NameVisitor;
 
@@ -134,12 +136,12 @@ impl<'de> Deserialize<'de> for Name {
                 formatter.write_str(core::any::type_name::<Name>())
             }
 
-            #[inline(always)]
+            #[inline]
             fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
                 Ok(Name::new(v.to_owned()))
             }
 
-            #[inline(always)]
+            #[inline]
             fn visit_string<E: Error>(self, v: String) -> Result<Self::Value, E> {
                 Ok(Name::new(v))
             }

@@ -1,25 +1,19 @@
 #![expect(unsafe_code)]
 
+// -----------------------------------------------------------------------------
+// Modes
+
+mod bundle;
 mod id;
+mod info;
+mod status;
+
+// -----------------------------------------------------------------------------
+// Exports
 
 pub use id::BundleId;
+pub use info::{BundleInfo, InsertMode};
+pub use status::{BundleComponentStatus, ComponentStatus, SpawnBundleStatus};
 
-#[derive(Copy, Clone, PartialEq, Eq)]
-pub enum ComponentStatus {
-    Added,
-    Existing,
-}
-
-pub trait BundleComponentStatus {
-    unsafe fn get_status(&self, index: usize) -> ComponentStatus;
-}
-
-pub struct SpawnBundleStatus;
-
-impl BundleComponentStatus for SpawnBundleStatus {
-    #[inline(always)]
-    unsafe fn get_status(&self, _index: usize) -> ComponentStatus {
-        // Components inserted during a spawn call are always treated as added.
-        ComponentStatus::Added
-    }
-}
+// -----------------------------------------------------------------------------
+// Bundle

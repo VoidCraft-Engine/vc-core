@@ -1,9 +1,13 @@
 use core::fmt;
 use core::hash::Hash;
 use core::ops::{Deref, DerefMut};
-use core::panic::Location;
 
 use crate::cfg;
+
+cfg::debug! {
+    if { use core::panic::Location; }
+    else { use core::marker::PhantomData; }
+}
 
 // -----------------------------------------------------------------------------
 // DebugLocation
@@ -19,8 +23,8 @@ pub struct DebugLocation<T: ?Sized = &'static Location<'static>>(
 
 vc_reflect::derive::impl_reflect_opaque! {
     (in vc_ecs::utils as DebugLocation)
-    DebugLocation<T: Clone + PartialEq  + Hash + fmt::Debug>
-    (clone, hash, debug, partial_eq)
+    DebugLocation<T: Clone + PartialEq + PartialOrd  + Hash + fmt::Debug>
+    (clone, hash, debug, partial_eq, partial_cmp)
 }
 
 impl<T: fmt::Display> fmt::Display for DebugLocation<T> {

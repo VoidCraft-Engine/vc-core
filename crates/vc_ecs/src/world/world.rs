@@ -9,7 +9,7 @@ use crate::entity::{Entities, EntityAllocator};
 use crate::storage::Storages;
 use crate::tick::Tick;
 
-#[allow(unused)]
+#[allow(unused, reason = "todo")]
 pub struct World {
     id: WorldId,
     pub(crate) archetypes: Archetypes,
@@ -26,13 +26,16 @@ pub struct World {
 
 impl fmt::Debug for World {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // SAFETY: `UnsafeWorldCell` requires that this must only access metadata.
-        // Accessing any data stored in the world would be unsound.
         f.debug_struct("World")
             .field("id", &self.id)
             .field("entity_count", &self.entities.count_spawned())
             .field("archetype_count", &self.archetypes.len())
+            .field("component_count", &self.generator.component_count())
             .field("resource_count", &self.storages.resources.len())
+            .field(
+                "no_send_resource_count",
+                &self.storages.non_send_resources.len(),
+            )
             .finish()
     }
 }

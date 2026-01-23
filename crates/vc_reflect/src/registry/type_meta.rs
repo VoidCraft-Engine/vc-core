@@ -202,7 +202,7 @@ impl TypeMeta {
 
     /// Return the number of [`TypeTrait`].
     #[inline]
-    pub fn trait_len(&self) -> usize {
+    pub fn trait_count(&self) -> usize {
         self.trait_table.len()
     }
 
@@ -225,7 +225,7 @@ impl TypeMeta {
 
 impl Clone for TypeMeta {
     fn clone(&self) -> Self {
-        let mut new_map = TypeIdMap::with_capacity(self.trait_len());
+        let mut new_map = TypeIdMap::with_capacity(self.trait_count());
         for (id, type_trait) in self.trait_table.iter() {
             new_map.insert(*id, (**type_trait).clone_type_trait());
         }

@@ -10,7 +10,7 @@
 pub mod cfg {
     vc_cfg::define_alias! {
         #[cfg(feature = "std")] => std,
-        #[cfg(any(feature = "debug", all(debug_assertions, feature = "std")))] => debug,
+        #[cfg(all(feature = "std", any(debug_assertions, feature = "debug")))] => debug,
         #[cfg(feature = "auto_register")] => auto_register,
         #[cfg(feature = "reflect_docs")] => reflect_docs,
     }

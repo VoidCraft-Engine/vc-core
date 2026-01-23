@@ -3,7 +3,7 @@ use crate::derive_data::ReflectMeta;
 /// Generate `auto_register` implementation
 #[cfg(feature = "auto_register")]
 pub(crate) fn get_auto_register_impl(meta: &ReflectMeta) -> proc_macro2::TokenStream {
-    use quote::quote_spanned;
+    use quote::quote;
 
     if let Some(span) = meta.attrs().auto_register {
         // Invalid for generic types.
@@ -12,10 +12,12 @@ pub(crate) fn get_auto_register_impl(meta: &ReflectMeta) -> proc_macro2::TokenSt
         }
 
         let vc_reflect_path = meta.vc_reflect_path();
-        let auto_register_ = crate::path::auto_register_(vc_reflect_path);
+
+        let auto_register_ = crate::path::auto_register_(vc_reflect_path, span);
+
         let real_ident = meta.real_ident();
 
-        quote_spanned! { span =>
+        quote! {
             #auto_register_::inventory::submit!{
                 #auto_register_::__AutoRegisterFunc(
                     <#real_ident as #auto_register_::__RegisterType>::__register

@@ -16,6 +16,7 @@ mod required;
 // -----------------------------------------------------------------------------
 // Internal API
 
+use crate::relationship::RelationshipAccessor;
 use crate::storage::StorageType;
 
 pub(crate) use tick::{ComponentTicksMut, ComponentTicksRef};
@@ -32,7 +33,9 @@ pub use components::Components;
 pub use info::{ComponentDescriptor, ComponentInfo};
 pub use mutable::{ComponentMutability, Immutable, Mutable};
 pub use register::{ComponentsRegistrator, QueuedComponents, QueuedRegistration};
-pub use required::{RequiredComponent, RequiredComponents, RequiredComponentsRegistrator};
+pub use required::{
+    RequiredComponent, RequiredComponents, RequiredComponentsError, RequiredComponentsRegistrator,
+};
 pub use tick::{ComponentTickCells, ComponentTicks};
 
 // -----------------------------------------------------------------------------
@@ -69,17 +72,23 @@ pub trait Component: Send + Sync + 'static {
         None
     }
 
-    #[inline(always)]
+    #[inline]
     fn register_required_components(
-        _component_id: ComponentId,
-        _required_components: &mut RequiredComponentsRegistrator,
+        _id: ComponentId,
+        _registrator: &mut RequiredComponentsRegistrator,
     ) {
     }
 
-    #[inline(always)]
+    #[inline]
     fn clone_behavior() -> ComponentCloneBehavior {
         ComponentCloneBehavior::Default
     }
 
-    // TODO
+    #[inline]
+    fn relationship_accessor() -> Option<RelationshipAccessor> {
+        None
+    }
+
+    #[inline]
+    fn map_entities<E: crate::entity::EntityMapper>(_this: &mut Self, _mapper: &mut E) {}
 }

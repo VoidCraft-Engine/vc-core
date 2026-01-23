@@ -81,6 +81,8 @@ pub struct DynamicArray {
     values: Vec<Box<dyn Reflect>>,
 }
 
+// Explicitly implemented here so that code readers do not need
+// to ponder the principles of proc-macros in advance.
 impl TypePath for DynamicArray {
     #[inline]
     fn type_path() -> &'static str {
@@ -632,3 +634,20 @@ impl<'a> Iterator for ArrayItemIter<'a> {
 }
 
 impl<'a> ExactSizeIterator for ArrayItemIter<'a> {}
+
+// -----------------------------------------------------------------------------
+// Tests
+
+#[cfg(test)]
+mod tests {
+    use super::DynamicArray;
+    use crate::info::TypePath;
+
+    #[test]
+    fn type_path() {
+        assert!(DynamicArray::type_path() == "vc_reflect::ops::DynamicArray");
+        assert!(DynamicArray::module_path() == Some("vc_reflect::ops"));
+        assert!(DynamicArray::type_ident() == "DynamicArray");
+        assert!(DynamicArray::type_name() == "DynamicArray");
+    }
+}

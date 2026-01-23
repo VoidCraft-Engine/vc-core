@@ -4,6 +4,7 @@
 mod id;
 
 mod allocator;
+mod clone;
 mod entities;
 mod entity;
 mod location;
@@ -17,6 +18,7 @@ pub mod error;
 pub use utils::*;
 
 pub use allocator::EntityAllocator;
+pub use clone::ComponentCloneCtx;
 pub use entities::Entities;
 pub use entity::Entity;
 pub use id::{EntityGeneration, EntityId};

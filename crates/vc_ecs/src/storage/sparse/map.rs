@@ -7,15 +7,15 @@ use core::marker::PhantomData;
 use super::SparseIndex;
 
 // -----------------------------------------------------------------------------
-// FixedSparseMap
+// FixedSparseArray
 
 #[derive(Debug)]
-pub struct FixedSparseMap<I, V> {
+pub struct FixedSparseArray<I, V> {
     values: Box<[Option<V>]>,
     _marker: PhantomData<I>,
 }
 
-impl<I: SparseIndex, V> FixedSparseMap<I, V> {
+impl<I: SparseIndex, V> FixedSparseArray<I, V> {
     #[inline]
     pub fn contains(&self, index: I) -> bool {
         let index = index.sparse_index();
@@ -33,18 +33,18 @@ impl<I: SparseIndex, V> FixedSparseMap<I, V> {
 }
 
 // -----------------------------------------------------------------------------
-// SparseMap
+// SparseArray
 
 #[derive(Debug)]
-pub struct SparseMap<I, V = I> {
+pub struct SparseArray<I, V = I> {
     values: Vec<Option<V>>,
     _marker: PhantomData<I>,
 }
 
-impl<I: SparseIndex, V> SparseMap<I, V> {
+impl<I: SparseIndex, V> SparseArray<I, V> {
     #[inline]
-    pub fn into_fixed(self) -> FixedSparseMap<I, V> {
-        FixedSparseMap {
+    pub fn into_fixed(self) -> FixedSparseArray<I, V> {
+        FixedSparseArray {
             values: self.values.into_boxed_slice(),
             _marker: PhantomData,
         }

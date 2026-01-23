@@ -1,3 +1,5 @@
+//! Re-exports *[indexmap]*, provide newtypes based on fixed hash state.
+
 pub use indexmap::{Equivalent, GetDisjointMutError, TryReserveError};
 
 pub mod map;

@@ -16,11 +16,19 @@ pub struct EntityAllocator {
     next_index: AtomicU32,
 }
 
+impl Default for EntityAllocator {
+    #[inline(always)]
+    fn default() -> Self {
+        const { Self::new() }
+    }
+}
+
 impl EntityAllocator {
     pub const fn new() -> Self {
         Self {
             free: Vec::new(),
             free_len: AtomicUsize::new(0),
+            // SAFETY: start from `1`, instead of `0`.
             next_index: AtomicU32::new(1),
         }
     }
@@ -29,6 +37,7 @@ impl EntityAllocator {
     pub fn restart(&mut self) {
         self.free.clear();
         *self.free_len.get_mut() = 0;
+        // SAFETY: start from `1`, instead of `0`.
         *self.next_index.get_mut() = 1;
     }
 

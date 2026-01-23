@@ -45,6 +45,18 @@ pub(crate) use info::*;
 pub(crate) use ops::*;
 pub(crate) use registry::*;
 
+#[cfg(feature = "auto_register")]
+#[inline(always)]
+pub(crate) fn auto_register_(
+    vc_reflect_path: &syn::Path,
+    span: ::proc_macro2::Span,
+) -> TokenStream {
+    let auto_register = ::syn::Ident::new("auto_register", span);
+    quote! {
+        #vc_reflect_path::__macro_exports::#auto_register
+    }
+}
+
 // mod access;
 // `vc_reflect::access` does not require additional content.
 
@@ -52,14 +64,6 @@ pub(crate) use registry::*;
 pub(crate) fn macro_utils_(vc_reflect_path: &syn::Path) -> TokenStream {
     quote! {
         #vc_reflect_path::__macro_exports::macro_utils
-    }
-}
-
-#[cfg(feature = "auto_register")]
-#[inline(always)]
-pub(crate) fn auto_register_(vc_reflect_path: &syn::Path) -> TokenStream {
-    quote! {
-        #vc_reflect_path::__macro_exports::auto_register
     }
 }
 

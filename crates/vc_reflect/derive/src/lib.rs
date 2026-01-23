@@ -461,7 +461,7 @@ pub fn impl_type_path(input: TokenStream) -> TokenStream {
 /// impl_auto_register!(Vec<T: Clone>); // Error
 /// ```
 ///
-/// This will not conflict with `reflect(auto_register)` attribute.
+/// This is not conflict with `reflect(auto_register)` attribute.
 ///
 /// See: [`derive Reflect`](derive_full_reflect)
 #[proc_macro]
@@ -474,7 +474,8 @@ pub fn impl_auto_register(_input: TokenStream) -> TokenStream {
         let type_path = syn::parse_macro_input!(_input as syn::Type);
 
         let vc_reflect_path = path::vc_reflect();
-        let auto_register_ = path::auto_register_(&vc_reflect_path);
+        let auto_register_ =
+            path::auto_register_(&vc_reflect_path, ::proc_macro2::Span::call_site());
 
         TokenStream::from(quote! {
             const _: () = {

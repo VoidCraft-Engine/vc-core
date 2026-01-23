@@ -2,6 +2,7 @@
 // Modules
 
 mod deferred;
+mod entity_access;
 mod id;
 mod world;
 mod world_cell;

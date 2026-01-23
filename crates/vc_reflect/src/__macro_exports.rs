@@ -40,6 +40,10 @@ pub mod macro_utils {
 // auto_register support
 
 /// A internal module provided for auto_register implementation.
+///
+/// See more infomation in [`TypeRegistry::auto_register`];
+///
+/// [`TypeRegistry::auto_register`]: crate::registry::TypeRegistry::auto_register
 #[cfg(feature = "auto_register")]
 pub mod auto_register {
     use crate::derive::Reflect;

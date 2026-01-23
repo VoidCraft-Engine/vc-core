@@ -1,5 +1,5 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned};
+use quote::quote;
 use syn::Ident;
 
 use super::{get_auto_register_impl, get_common_try_apply_tokens};
@@ -104,8 +104,8 @@ fn impl_trait_enum(info: &ReflectEnum) -> TokenStream {
     let variant_field_iter_ = crate::path::variant_field_iter_(vc_reflect_path);
     let variant_kind_ = crate::path::variant_kind_(vc_reflect_path);
 
-    let ref_name = Ident::new("__name_param", Span::call_site());
-    let ref_index = Ident::new("__index_param", Span::call_site());
+    let ref_name = Ident::new("__name__", Span::call_site());
+    let ref_index = Ident::new("__index__", Span::call_site());
 
     let real_ident = meta.real_ident();
     let (impl_generics, ty_generics, where_clause) = meta.split_generics(true, false, true);
@@ -189,16 +189,16 @@ fn impl_trait_enum(info: &ReflectEnum) -> TokenStream {
                     let reflection_index = field.reflection_index.unwrap();
 
                     enum_field.push(quote! {
-                        #variant_path_{ #field_ident: __value, .. } if #ref_name == #field_name => #OptionFP::Some(__value)
+                        #variant_path_{ #field_ident: __value__, .. } if #ref_name == #field_name => #OptionFP::Some(__value__)
                     });
                     enum_field_mut.push(quote! {
-                        #variant_path_{ #field_ident: __value, .. } if #ref_name == #field_name => #OptionFP::Some(__value)
+                        #variant_path_{ #field_ident: __value__, .. } if #ref_name == #field_name => #OptionFP::Some(__value__)
                     });
                     enum_field_at.push(quote! {
-                        #variant_path_{ #field_ident: __value, .. } if #ref_index == #reflection_index => #OptionFP::Some(__value)
+                        #variant_path_{ #field_ident: __value__, .. } if #ref_index == #reflection_index => #OptionFP::Some(__value__)
                     });
                     enum_field_at_mut.push(quote! {
-                        #variant_path_{ #field_ident: __value, .. } if #ref_index == #reflection_index => #OptionFP::Some(__value)
+                        #variant_path_{ #field_ident: __value__, .. } if #ref_index == #reflection_index => #OptionFP::Some(__value__)
                     });
                     // enum_index_of.push(quote! {
                     //     #variant_path_{ .. } if #ref_name == #field_name => #OptionFP::Some(#reflection_index)
@@ -312,7 +312,7 @@ fn get_enum_try_apply_impl(info: &ReflectEnum) -> TokenStream {
     let from_reflect_ = crate::path::from_reflect_(vc_reflect_path);
     let enum_try_apply_ = crate::path::enum_try_apply_(vc_reflect_path);
 
-    let input_ = Ident::new("__input", Span::call_site());
+    let input_ = Ident::new("__input__", Span::call_site());
 
     let clone_tokens = get_common_try_apply_tokens(meta, &input_);
 
@@ -324,8 +324,8 @@ fn get_enum_try_apply_impl(info: &ReflectEnum) -> TokenStream {
         // Therefore, a full apply is chosen here, and it is required to use the default `FromReflect` implementation.
         // (Non-default impl may result in a dead loop caused by the interdependence between the two.)
         quote! {
-            if let Some(__val) = <Self as #from_reflect_>::from_reflect(#input_) {
-                *self = __val;
+            if let Some(__val__) = <Self as #from_reflect_>::from_reflect(#input_) {
+                *self = __val__;
                 return #ResultFP::Ok(());
             }
         }
@@ -380,11 +380,13 @@ fn get_enum_clone_impl(info: &ReflectEnum) -> TokenStream {
     let type_path_ = crate::path::type_path_(vc_reflect_path);
 
     if let Some(span) = meta.attrs().avail_traits.clone {
+        let reflect_clone = Ident::new("reflect_clone", span);
+
         // use `Clone::clone` directly.
-        quote_spanned! { span =>
+        quote! {
             #[inline]
-            fn reflect_clone(&self) -> #ResultFP<#macro_utils_::Box<dyn #reflect_>, #reflect_clone_error_> {
-                #ResultFP::Ok(#macro_utils_::Box::new(<Self as #CloneFP>::clone(self)) as #macro_utils_::Box<dyn #reflect_>)
+            fn #reflect_clone(&self) -> #ResultFP<#macro_utils_::Box<dyn #reflect_>, #reflect_clone_error_> {
+                #ResultFP::Ok(#macro_utils_::Box::new(<Self as #CloneFP>::clone(self)))
             }
         }
     } else {
@@ -408,8 +410,11 @@ fn get_enum_clone_impl(info: &ReflectEnum) -> TokenStream {
                     {
                         let span = ignored_field.attrs.ignore.unwrap();
                         let field_id = ignored_field.field_id(vc_reflect_path);
-                        match_tokens.extend(quote_spanned! { span =>
-                            #variant_path_ => #ResultFP::Err(#reflect_clone_error_::FieldNotCloneable {
+
+                        let field_not_cloneable = Ident::new("FieldNotCloneable", span);
+
+                        match_tokens.extend(quote! {
+                            #variant_path_ => #ResultFP::Err(#reflect_clone_error_::#field_not_cloneable {
                                 type_path:  #macro_utils_::Cow::Borrowed(<Self as #type_path_>::type_path())
                                 field: #field_id,
                                 variant: #OptionFP::Some(#macro_utils_::Cow::Borrowed(#variant_name_)),
@@ -458,11 +463,13 @@ fn get_enum_partial_eq_impl(meta: &ReflectMeta) -> TokenStream {
     let reflect_ = crate::path::reflect_(vc_reflect_path);
 
     if let Some(span) = meta.attrs().avail_traits.partial_eq {
-        quote_spanned! { span =>
+        let reflect_partial_eq = Ident::new("reflect_partial_eq", span);
+
+        quote! {
             #[inline]
-            fn reflect_partial_eq(&self, other: &dyn #reflect_) -> #OptionFP<bool> {
-                if let #OptionFP::Some(value) = other.downcast_ref::<Self>() {
-                    return #OptionFP::Some( #PartialEqFP::eq(self, value) );
+            fn #reflect_partial_eq(&self, __other__: &dyn #reflect_) -> #OptionFP<bool> {
+                if let #OptionFP::Some(__value__) = <dyn #reflect_>::downcast_ref::<Self>(__other__) {
+                    return #OptionFP::Some( #PartialEqFP::eq(self, __value__) );
                 }
                 #OptionFP::Some( false )
             }
@@ -471,8 +478,8 @@ fn get_enum_partial_eq_impl(meta: &ReflectMeta) -> TokenStream {
         let enum_partial_eq_ = crate::path::enum_partial_eq_(vc_reflect_path);
         quote! {
             #[inline]
-            fn reflect_partial_eq(&self, other: &dyn #reflect_) -> #OptionFP<bool> {
-                #enum_partial_eq_(self, other)
+            fn reflect_partial_eq(&self, __other__: &dyn #reflect_) -> #OptionFP<bool> {
+                #enum_partial_eq_(self, __other__)
             }
         }
     }
@@ -485,11 +492,13 @@ fn get_enum_partial_cmp_impl(meta: &ReflectMeta) -> TokenStream {
     let reflect_ = crate::path::reflect_(vc_reflect_path);
 
     if let Some(span) = meta.attrs().avail_traits.partial_cmp {
-        quote_spanned! { span =>
+        let reflect_partial_cmp = Ident::new("reflect_partial_cmp", span);
+
+        quote! {
             #[inline]
-            fn reflect_partial_cmp(&self, __input: &dyn #reflect_) -> #OptionFP<::core::cmp::Ordering> {
-                if let #OptionFP::Some(__input) = <dyn #reflect_>::downcast_ref::<Self>(__input) {
-                    return #PartialOrdFP::partial_cmp(self, __input);
+            fn #reflect_partial_cmp(&self, __other__: &dyn #reflect_) -> #OptionFP<::core::cmp::Ordering> {
+                if let #OptionFP::Some(__value__) = <dyn #reflect_>::downcast_ref::<Self>(__other__) {
+                    return #PartialOrdFP::partial_cmp(self, __value__);
                 }
                 #OptionFP::None
             }
@@ -498,8 +507,8 @@ fn get_enum_partial_cmp_impl(meta: &ReflectMeta) -> TokenStream {
         let enum_partial_cmp_ = crate::path::enum_partial_cmp_(vc_reflect_path);
         quote! {
             #[inline]
-            fn reflect_partial_cmp(&self, other: &dyn #reflect_) -> #OptionFP<::core::cmp::Ordering> {
-                #enum_partial_cmp_(self, other)
+            fn reflect_partial_cmp(&self, __other__: &dyn #reflect_) -> #OptionFP<::core::cmp::Ordering> {
+                #enum_partial_cmp_(self, __other__)
             }
         }
     }
@@ -512,9 +521,11 @@ fn get_enum_hash_impl(meta: &ReflectMeta) -> TokenStream {
     let reflect_hasher = crate::path::reflect_hasher_(vc_reflect_path);
 
     if let Some(span) = meta.attrs().avail_traits.hash {
-        quote_spanned! { span =>
+        let reflect_hash = Ident::new("reflect_hash", span);
+
+        quote! {
             #[inline]
-            fn reflect_hash(&self) -> #OptionFP<u64> {
+            fn #reflect_hash(&self) -> #OptionFP<u64> {
                 let mut hasher = #reflect_hasher();
                 <Self as #HashFP>::hash(self, &mut hasher);
                 #OptionFP::Some(#HasherFP::finish(&hasher))
@@ -536,9 +547,11 @@ fn get_enum_debug_impl(meta: &ReflectMeta) -> TokenStream {
     use crate::path::fp::DebugFP;
 
     if let Some(span) = meta.attrs().avail_traits.debug {
-        quote_spanned! { span =>
+        let reflect_debug = Ident::new("reflect_debug", span);
+
+        quote! {
             #[inline]
-            fn reflect_debug(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+            fn #reflect_debug(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                 <Self as #DebugFP>::fmt(self, f)
             }
         }
@@ -561,8 +574,8 @@ fn get_registry_dependencies(info: &ReflectEnum) -> TokenStream {
     let field_types = info.active_fields().map(|x| &x.data.ty);
 
     quote! {
-        fn register_dependencies(__registry: &mut #type_registry_) {
-            #(#type_registry_::register::<#field_types>(__registry);)*
+        fn register_dependencies(__registry__: &mut #type_registry_) {
+            #(#type_registry_::register::<#field_types>(__registry__);)*
         }
     }
 }
@@ -578,7 +591,7 @@ fn impl_enum_from_reflect(info: &ReflectEnum) -> TokenStream {
     let reflect_ref_ = crate::path::reflect_ref_(vc_reflect_path);
     let enum_ = crate::path::enum_(vc_reflect_path);
 
-    let input_ = Ident::new("__input", Span::call_site());
+    let input_ = Ident::new("__input__", Span::call_site());
 
     let clone_tokens = get_common_from_reflect_tokens(meta, &input_);
 
@@ -628,8 +641,8 @@ fn impl_enum_from_reflect(info: &ReflectEnum) -> TokenStream {
 
                 match_tokens.extend(quote! {
                     #variant_name_ => {
-                        let __result = #variant_path_{ #clone_tokens };
-                        return #OptionFP::Some(__result);
+                        let __result__ = #variant_path_{ #clone_tokens };
+                        return #OptionFP::Some(__result__);
                     },
                 });
             }
@@ -647,7 +660,7 @@ fn impl_enum_from_reflect(info: &ReflectEnum) -> TokenStream {
                 if let #reflect_ref_::Enum(#input_) = #reflect_::reflect_ref(#input_) {
                     match #enum_::variant_name(#input_) {
                         #match_tokens
-                        __name => {
+                        _ => {
                             return #OptionFP::None;
                         }
                     }

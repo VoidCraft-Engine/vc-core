@@ -10,10 +10,11 @@ repository.workspace = true
 default = [ "std", "auto_register", "debug" ]
 
 # Enable Type Tracing in serialization and deserialization.
+# Only effect when `std` feature is enabled.
 # 
 # The `bebug` of different modules are independent, and it is possible
 # to turn off the overall `debug` and only enable specific crate's `debug`.
-debug = [ "std" ]
+debug = []
 
 std = [
     "vc_os/std",

@@ -38,7 +38,7 @@ impl ResourceData {
     const INDEX: usize = 0;
 
     #[inline(always)]
-    pub fn debug_name(&self) -> &str {
+    pub fn debug_name(&self) -> &DebugName {
         &self.name
     }
 
@@ -270,7 +270,7 @@ impl NoSendResourceData {
     }
 
     #[inline(always)]
-    pub fn debug_name(&self) -> &str {
+    pub fn debug_name(&self) -> &DebugName {
         &self.name
     }
 

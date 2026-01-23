@@ -25,6 +25,11 @@ pub struct Entity {
 }
 
 impl Entity {
+    const _STATIC_ASSERT_: () = const {
+        const ENTITY: Entity = Entity::from_bits(11);
+        assert!(ENTITY.index_u32() == 11);
+    };
+
     pub const PLACEHOLDER: Self = Self::from_id(EntityId::PLACEHOLDER);
 
     #[inline(always)]

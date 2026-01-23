@@ -19,29 +19,9 @@ impl SparseSets {
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
+    pub fn component_count(&self) -> usize {
         self.sets.len()
     }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.sets.is_empty()
-    }
-
-    #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = (ComponentId, &SparseComponent)> {
-        self.sets.iter().map(|(&id, data)| (id, data))
-    }
-
-    #[inline]
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (ComponentId, &mut SparseComponent)> {
-        self.sets.iter_mut().map(|(&id, data)| (id, data))
-    }
-
-    // #[inline]
-    // pub fn get(&self, id: ComponentId) -> Option<&SparseComponent> {
-    //     self.sets.get(id)
-    // }
 
     #[inline]
     pub fn get_raw_index(&self, id: ComponentId) -> Option<u32> {
@@ -56,6 +36,18 @@ impl SparseSets {
     #[inline(always)]
     pub unsafe fn get_mut(&mut self, raw_index: u32) -> &mut SparseComponent {
         unsafe { self.sets.get_mut_raw(raw_index) }
+    }
+
+    #[inline]
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = (ComponentId, &SparseComponent)> {
+        self.sets.iter().map(|(&id, data)| (id, data))
+    }
+
+    #[inline]
+    pub fn iter_mut(
+        &mut self,
+    ) -> impl ExactSizeIterator<Item = (ComponentId, &mut SparseComponent)> {
+        self.sets.iter_mut().map(|(&id, data)| (id, data))
     }
 
     #[inline]

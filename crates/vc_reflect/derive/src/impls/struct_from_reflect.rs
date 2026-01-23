@@ -33,7 +33,7 @@ pub(crate) fn impl_struct_from_reflect(
         Ident::new("Struct", Span::call_site())
     };
 
-    let input_ = Ident::new("__input", Span::call_site());
+    let input_ = Ident::new("__input__", Span::call_site());
 
     let clone_tokens = get_common_from_reflect_tokens(meta, &input_);
 

@@ -92,6 +92,8 @@ pub struct DynamicStruct {
     field_indices: HashMap<Cow<'static, str>, usize>,
 }
 
+// Explicitly implemented here so that code readers do not need
+// to ponder the principles of proc-macros in advance.
 impl TypePath for DynamicStruct {
     #[inline]
     fn type_path() -> &'static str {
@@ -737,3 +739,20 @@ impl<'a> Iterator for StructFieldIter<'a> {
 }
 
 impl<'a> ExactSizeIterator for StructFieldIter<'a> {}
+
+// -----------------------------------------------------------------------------
+// Tests
+
+#[cfg(test)]
+mod tests {
+    use super::DynamicStruct;
+    use crate::info::TypePath;
+
+    #[test]
+    fn type_path() {
+        assert!(DynamicStruct::type_path() == "vc_reflect::ops::DynamicStruct");
+        assert!(DynamicStruct::module_path() == Some("vc_reflect::ops"));
+        assert!(DynamicStruct::type_ident() == "DynamicStruct");
+        assert!(DynamicStruct::type_name() == "DynamicStruct");
+    }
+}

@@ -59,6 +59,8 @@ pub struct DynamicEnum {
     variant: DynamicVariant,
 }
 
+// Explicitly implemented here so that code readers do not need
+// to ponder the principles of proc-macros in advance.
 impl TypePath for DynamicEnum {
     #[inline]
     fn type_path() -> &'static str {
@@ -812,5 +814,22 @@ impl dyn Enum {
     pub fn field_at_mut_as<T: Reflect>(&mut self, index: usize) -> Option<&mut T> {
         self.field_at_mut(index)
             .and_then(<dyn Reflect>::downcast_mut)
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Tests
+
+#[cfg(test)]
+mod tests {
+    use super::DynamicEnum;
+    use crate::info::TypePath;
+
+    #[test]
+    fn type_path() {
+        assert!(DynamicEnum::type_path() == "vc_reflect::ops::DynamicEnum");
+        assert!(DynamicEnum::module_path() == Some("vc_reflect::ops"));
+        assert!(DynamicEnum::type_ident() == "DynamicEnum");
+        assert!(DynamicEnum::type_name() == "DynamicEnum");
     }
 }

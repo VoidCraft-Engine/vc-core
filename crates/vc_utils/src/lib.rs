@@ -25,3 +25,9 @@ pub use fastvec as vec;
 
 pub use default::default;
 pub use unsafe_deref::UnsafeCellDeref;
+
+// An alternative to `core::hint::cold_path`,
+// used for optimizing branch prediction.
+#[cold]
+#[inline(always)]
+pub const fn cold_path() {}

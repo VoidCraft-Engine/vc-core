@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned};
+use quote::quote;
 
 use crate::derive_data::ReflectStruct;
 
@@ -15,9 +15,11 @@ pub(crate) fn get_struct_clone_impl(info: &ReflectStruct) -> TokenStream {
     let type_path_ = crate::path::type_path_(vc_reflect_path);
 
     if let Some(span) = meta.attrs().avail_traits.clone {
-        quote_spanned! { span =>
+        let reflect_clone = syn::Ident::new("reflect_clone", span);
+
+        quote! {
             #[inline]
-            fn reflect_clone(&self) -> #ResultFP<#macro_utils_::Box<dyn #reflect_>, #reflect_clone_error_> {
+            fn #reflect_clone(&self) -> #ResultFP<#macro_utils_::Box<dyn #reflect_>, #reflect_clone_error_> {
                 #ResultFP::Ok(#macro_utils_::Box::new(<Self as #CloneFP>::clone(self)))
             }
         }
@@ -29,28 +31,30 @@ pub(crate) fn get_struct_clone_impl(info: &ReflectStruct) -> TokenStream {
             let member = field.to_member();
 
             tokens.extend(quote! {
-                __new_value.#member = #macro_utils_::__reflect_clone_field::<#field_ty>(&self.#member)?;
+                __new_value__.#member = #macro_utils_::__reflect_clone_field::<#field_ty>(&self.#member)?;
             });
         }
 
         quote! {
             fn reflect_clone(&self) -> #ResultFP<#macro_utils_::Box<dyn #reflect_>, #reflect_clone_error_> {
-                let mut __new_value = <Self as #DefaultFP>::default();
+                let mut __new_value__ = <Self as #DefaultFP>::default();
 
                 #tokens
 
-                #ResultFP::Ok(#macro_utils_::Box::new(__new_value))
+                #ResultFP::Ok(#macro_utils_::Box::new(__new_value__))
             }
         }
     } else {
         for field in info.fields().iter() {
             if let Some(span) = field.attrs.ignore {
+                let field_not_cloneable = syn::Ident::new("FieldNotCloneable", span);
                 let field_id = field.field_id(vc_reflect_path);
-                return quote_spanned! { span =>
+
+                return quote! {
                     #[inline]
                     fn reflect_clone(&self) -> #ResultFP<#macro_utils_::Box<dyn #reflect_>, #reflect_clone_error_> {
-                        #ResultFP::Err(#reflect_clone_error_::FieldNotCloneable {
-                            type_path:  #macro_utils_::Cow::Borrowed(<Self as #type_path_>::type_path())
+                        #ResultFP::Err(#reflect_clone_error_::#field_not_cloneable {
+                            type_path:  #macro_utils_::Cow::Borrowed(<Self as #type_path_>::type_path()),
                             field: #field_id,
                             variant: #OptionFP::None,
                         })
@@ -76,7 +80,7 @@ pub(crate) fn get_struct_clone_impl(info: &ReflectStruct) -> TokenStream {
                     Self {
                         #tokens
                     }
-                ) as #macro_utils_::Box<dyn #reflect_>)
+                ))
             }
         }
     }

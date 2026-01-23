@@ -3,7 +3,7 @@ use alloc::boxed::Box;
 use serde_core::{Deserialize, Deserializer};
 
 use crate::Reflect;
-use crate::info::Typed;
+use crate::info::{TypePath, Typed};
 use crate::registry::FromType;
 
 /// A container providing `serde` deserialization support for reflected types.
@@ -50,9 +50,7 @@ pub struct TypeTraitDeserialize {
 impl TypeTraitDeserialize {
     /// Deserializes a reflected value.
     ///
-    /// The underlying type of the reflected value, and thus the expected
-    /// structure of the serialized data, is determined by the type used to
-    /// construct this `ReflectDeserialize` value.
+    /// See [`TypeTraitDeserialize`] for examples.
     #[inline(always)]
     pub fn deserialize<'de, D: Deserializer<'de>>(
         &self,
@@ -71,4 +69,43 @@ impl<T: for<'a> Deserialize<'a> + Typed + Reflect> FromType<T> for TypeTraitDese
     }
 }
 
-crate::derive::impl_type_path!(::vc_reflect::registry::TypeTraitDeserialize);
+// Explicitly implemented here so that code readers do not need
+// to ponder the principles of proc-macros in advance.
+impl TypePath for TypeTraitDeserialize {
+    #[inline(always)]
+    fn type_path() -> &'static str {
+        "vc_reflect::registry::TypeTraitDeserialize"
+    }
+
+    #[inline(always)]
+    fn type_name() -> &'static str {
+        "TypeTraitDeserialize"
+    }
+
+    #[inline(always)]
+    fn type_ident() -> &'static str {
+        "TypeTraitDeserialize"
+    }
+
+    #[inline(always)]
+    fn module_path() -> Option<&'static str> {
+        Some("vc_reflect::registry")
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Tests
+
+#[cfg(test)]
+mod tests {
+    use super::TypeTraitDeserialize;
+    use crate::info::TypePath;
+
+    #[test]
+    fn type_path() {
+        assert!(TypeTraitDeserialize::type_path() == "vc_reflect::registry::TypeTraitDeserialize");
+        assert!(TypeTraitDeserialize::module_path() == Some("vc_reflect::registry"));
+        assert!(TypeTraitDeserialize::type_ident() == "TypeTraitDeserialize");
+        assert!(TypeTraitDeserialize::type_name() == "TypeTraitDeserialize");
+    }
+}

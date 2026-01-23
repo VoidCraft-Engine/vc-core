@@ -285,6 +285,8 @@ impl<T> BlockList<T> {
         // SAFETY: valid index and pointer
         let value = unsafe { ptr::read(block.data.as_ptr().add(index) as *mut T) };
 
+        // SAFETY: `Block::drop` based on head and tail.
+        // Must change `head` before `idle_block`.
         block.head = index + 1;
 
         if block.head == BLOCK_SIZE {

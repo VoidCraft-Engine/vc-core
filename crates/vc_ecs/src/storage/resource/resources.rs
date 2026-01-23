@@ -124,7 +124,7 @@ impl Resources {
                 info.debug_name(),
             );
 
-            ResourceData::new(info.debug_name(), info.layout(), info.drop_fn())
+            ResourceData::new(info.debug_name().clone(), info.layout(), info.drop_fn())
         })
     }
 }
@@ -144,7 +144,7 @@ impl NoSendResources {
                     .debug_checked_unwrap()
             };
 
-            NoSendResourceData::new(info.debug_name(), info.layout(), info.drop_fn())
+            NoSendResourceData::new(info.debug_name().clone(), info.layout(), info.drop_fn())
         })
     }
 }

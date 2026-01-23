@@ -17,9 +17,15 @@ macro_rules! impl_ptr {
 
         impl $ptr<'_> {
             /// Check if the pointer is aligned to type `T`.
+            ///
+            /// This function is not const because the address of pointer
+            /// cannot be read in compile-time.
             #[inline]
             pub fn is_aligned<T>(&self) -> bool {
-                self.0.as_ptr().cast::<T>().is_aligned()
+                // We do not use `ptr::is_align` because `align_of` ensure that
+                // result is power of two, we can reduce one judgement.
+                let align: usize = ::core::mem::align_of::<T>();
+                self.0.as_ptr().addr() & (align - 1) == 0
             }
 
             /// A function that only checks alignment in debug mode.
@@ -28,12 +34,13 @@ macro_rules! impl_ptr {
             #[cfg_attr(debug_assertions, track_caller)]
             #[cfg_attr(not(debug_assertions), inline(always))]
             pub fn debug_assert_aligned<T>(&self) {
-                debug_assert!(
+                #[cfg(debug_assertions)]
+                assert!(
                     self.is_aligned::<T>(),
                     "pointer is not aligned. Address {:p} does not have alignment {} for type {}",
                     self.0,
-                    align_of::<T>(),
-                    core::any::type_name::<T>(),
+                    ::core::mem::align_of::<T>(),
+                    ::core::any::type_name::<T>(),
                 );
             }
 

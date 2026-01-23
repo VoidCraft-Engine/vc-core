@@ -1,11 +1,15 @@
-use alloc::borrow::Cow;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use core::fmt;
-use core::ops::Deref;
-
-use vc_utils::extra::ShortName;
 
 use crate::cfg;
+
+cfg::debug! {
+    if { use alloc::borrow::Cow; }
+    else { const DISABLED_NAME: &str = "_"; }
+}
+
+// -----------------------------------------------------------------------------
+// DebugName
 
 /// Wrapper to help debugging ECS issues.
 ///
@@ -17,93 +21,7 @@ pub struct DebugName {
     name: Cow<'static, str>,
 }
 
-cfg::debug! {
-    else { const FEATURE_DISABLED: &str = "_"; }
-}
-
-impl Deref for DebugName {
-    type Target = str;
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        cfg::debug! {
-            if { &self.name } else { FEATURE_DISABLED }
-        }
-    }
-}
-
-impl fmt::Display for DebugName {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Deref to `str`, which will use `FEATURE_DISABLED` if necessary
-        write!(f, "{}", &**self)
-    }
-}
-
-impl fmt::Debug for DebugName {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Deref to `str`, which will use `FEATURE_DISABLED` if necessary
-        write!(f, "{:?}", &**self)
-    }
-}
-
-impl From<Cow<'static, str>> for DebugName {
-    #[inline(always)]
-    fn from(_value: Cow<'static, str>) -> Self {
-        cfg::debug! {
-            if { Self{ name: _value } }
-            else { Self{} }
-        }
-    }
-}
-
-impl From<DebugName> for Cow<'static, str> {
-    #[inline(always)]
-    fn from(_value: DebugName) -> Self {
-        cfg::debug! {
-            if { _value.name }
-            else { Cow::Borrowed(FEATURE_DISABLED) }
-        }
-    }
-}
-
-impl From<String> for DebugName {
-    #[inline(always)]
-    fn from(value: String) -> Self {
-        Self::owned(value)
-    }
-}
-
-impl From<&'static str> for DebugName {
-    #[inline(always)]
-    fn from(value: &'static str) -> Self {
-        Self::borrowed(value)
-    }
-}
-
 impl DebugName {
-    /// Create a new `DebugName` from a `&str`
-    ///
-    /// The value will be ignored if the `debug` feature is not enabled
-    #[inline(always)]
-    pub const fn borrowed(_value: &'static str) -> Self {
-        cfg::debug! {
-            if { Self { name: Cow::Borrowed(_value) } }
-            else { Self {} }
-        }
-    }
-
-    /// Create a new `DebugName` from a `String`
-    ///
-    /// The value will be ignored if the `debug` feature is not enabled
-    #[inline(always)]
-    pub fn owned(_value: String) -> Self {
-        cfg::debug! {
-            if { Self { name: Cow::Owned(_value) } }
-            else { Self {} }
-        }
-    }
-
     /// Create a new `DebugName` from a type by using its [`core::any::type_name`]
     ///
     /// The value will be ignored if the `debug` feature is not enabled
@@ -111,8 +29,9 @@ impl DebugName {
     pub fn type_name<T>() -> Self {
         cfg::debug! {
             if {
+                let type_name = ::core::any::type_name::<T>();
                 Self {
-                    name: Cow::Borrowed(::core::any::type_name::<T>())
+                    name: Cow::Borrowed(type_name)
                 }
             }
             else {
@@ -121,14 +40,89 @@ impl DebugName {
         }
     }
 
-    /// Get the [`ShortName`] corresponding to this debug name
-    ///
-    /// The value will be a static string if the `debug` feature is not enabled
+    #[inline]
+    pub fn parse(&self) -> String {
+        ToString::to_string(&self)
+    }
+}
+
+impl From<Option<DebugName>> for DebugName {
     #[inline(always)]
-    pub fn shortname(&self) -> ShortName<'_> {
+    fn from(value: Option<DebugName>) -> Self {
+        if let Some(name) = value {
+            name
+        } else {
+            cfg::debug! {
+                if {
+                    Self { name: Cow::Borrowed("_unknown_") }
+                }
+                else {
+                    Self {}
+                }
+            }
+        }
+    }
+}
+
+#[inline(never)]
+#[cfg(any(debug_assertions, feature = "debug"))]
+fn debug_fmt(full_name: &str, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn collapse_type_name(name: &str) -> &str {
+        let mut segments = name.rsplit("::");
+        let last = segments.next().unwrap();
+
+        // Enums types are retained.
+        // As heuristic, we assume the enum type to be uppercase.
+        if let Some(second_last) = segments.next()
+            && second_last.starts_with(char::is_uppercase)
+        {
+            let index = name.len() - last.len() - second_last.len() - 2;
+            &name[index..]
+        } else {
+            last
+        }
+    }
+
+    const SPECIAL_CHARS: [char; 9] = [' ', '<', '>', '(', ')', '[', ']', ',', ';'];
+
+    let mut rest = full_name;
+
+    while !rest.is_empty() {
+        let index = rest.find(|c| SPECIAL_CHARS.contains(&c));
+
+        if let Some(index) = index {
+            f.write_str(collapse_type_name(&rest[0..index]))?;
+
+            let special = &rest[index..=index];
+            f.write_str(special)?;
+
+            rest = &rest[(index + 1)..];
+        } else {
+            // If there are no special characters left, we're done!
+            f.write_str(collapse_type_name(rest))?;
+            return Ok(());
+        }
+    }
+
+    Ok(())
+}
+
+impl fmt::Display for DebugName {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         cfg::debug! {
-            if { ShortName(self.name.as_ref()) }
-            else { ShortName(FEATURE_DISABLED) }
+            if { debug_fmt(self.name.as_ref(), f) }
+            else { f.write_str(DISABLED_NAME) }
+        }
+    }
+}
+
+impl fmt::Debug for DebugName {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        cfg::debug! {
+            if { debug_fmt(self.name.as_ref(), f) }
+            else { f.write_str(DISABLED_NAME) }
         }
     }
 }

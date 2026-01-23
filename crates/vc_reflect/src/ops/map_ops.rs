@@ -71,6 +71,8 @@ pub struct DynamicMap {
     hash_table: HashTable<(Box<dyn Reflect>, Box<dyn Reflect>)>,
 }
 
+// Explicitly implemented here so that code readers do not need
+// to ponder the principles of proc-macros in advance.
 impl TypePath for DynamicMap {
     #[inline]
     fn type_path() -> &'static str {
@@ -745,5 +747,22 @@ impl dyn Map {
     #[inline]
     pub fn get_mut_as<T: Reflect>(&mut self, key: &dyn Reflect) -> Option<&mut T> {
         self.get_mut(key).and_then(<dyn Reflect>::downcast_mut)
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Tests
+
+#[cfg(test)]
+mod tests {
+    use super::DynamicMap;
+    use crate::info::TypePath;
+
+    #[test]
+    fn type_path() {
+        assert!(DynamicMap::type_path() == "vc_reflect::ops::DynamicMap");
+        assert!(DynamicMap::module_path() == Some("vc_reflect::ops"));
+        assert!(DynamicMap::type_ident() == "DynamicMap");
+        assert!(DynamicMap::type_name() == "DynamicMap");
     }
 }

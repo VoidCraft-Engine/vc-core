@@ -86,6 +86,8 @@ pub struct DynamicTuple {
     fields: Vec<Box<dyn Reflect>>,
 }
 
+// Explicitly implemented here so that code readers do not need
+// to ponder the principles of proc-macros in advance.
 impl TypePath for DynamicTuple {
     #[inline]
     fn type_path() -> &'static str {
@@ -605,3 +607,20 @@ impl<'a> Iterator for TupleFieldIter<'a> {
 }
 
 impl<'a> ExactSizeIterator for TupleFieldIter<'a> {}
+
+// -----------------------------------------------------------------------------
+// Tests
+
+#[cfg(test)]
+mod tests {
+    use super::DynamicTuple;
+    use crate::info::TypePath;
+
+    #[test]
+    fn type_path() {
+        assert!(DynamicTuple::type_path() == "vc_reflect::ops::DynamicTuple");
+        assert!(DynamicTuple::module_path() == Some("vc_reflect::ops"));
+        assert!(DynamicTuple::type_ident() == "DynamicTuple");
+        assert!(DynamicTuple::type_name() == "DynamicTuple");
+    }
+}

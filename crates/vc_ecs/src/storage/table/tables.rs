@@ -38,9 +38,10 @@ impl IndexMut<TableId> for Tables {
 
 impl Tables {
     #[inline]
-    pub fn new() -> Self {
+    pub fn empty() -> Self {
         let mut tables: Vec<Table> = Vec::new();
         let mut table_ids: HashMap<Box<[ComponentId]>, TableId> = HashMap::new();
+
         tables.push(TableBuilder::new(0).build());
         table_ids.insert(Box::new([]), TableId::EMPTY);
 
@@ -48,49 +49,41 @@ impl Tables {
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
+    pub fn table_count(&self) -> usize {
         self.tables.len()
     }
 
-    #[inline]
-    pub fn get(&self, id: TableId) -> Option<&Table> {
-        self.tables.get(id.index())
-    }
-
-    #[inline]
-    pub fn get_mut(&mut self, id: TableId) -> Option<&mut Table> {
-        self.tables.get_mut(id.index())
-    }
-
     #[inline(always)]
-    pub fn get_unchecked(&self, id: TableId) -> &Table {
+    pub unsafe fn get(&self, id: TableId) -> &Table {
         unsafe { self.tables.get_unchecked(id.index()) }
     }
 
     #[inline(always)]
-    pub fn get_mut_unchecked(&mut self, id: TableId) -> &mut Table {
+    pub unsafe fn get_mut(&mut self, id: TableId) -> &mut Table {
         unsafe { self.tables.get_unchecked_mut(id.index()) }
     }
 
-    #[inline]
-    pub fn get_2_mut(&mut self, a: TableId, b: TableId) -> (&mut Table, &mut Table) {
-        if a.index() > b.index() {
-            let (b_slice, a_slice) = self.tables.split_at_mut(a.index());
-            (&mut a_slice[0], &mut b_slice[b.index()])
-        } else {
-            let (a_slice, b_slice) = self.tables.split_at_mut(b.index());
-            (&mut a_slice[a.index()], &mut b_slice[0])
-        }
+    #[inline(always)]
+    pub unsafe fn get_mut_2(&mut self, a: TableId, b: TableId) -> (&mut Table, &mut Table) {
+        // A manually implementation of `get_disjoint_unchecked_mut`.
+        let base_ptr = self.tables.as_mut_ptr();
+        unsafe { (&mut *base_ptr.add(a.index()), &mut *base_ptr.add(b.index())) }
     }
 
     #[inline]
-    pub fn iter(&self) -> core::slice::Iter<'_, Table> {
-        self.tables.iter()
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = (TableId, &Table)> {
+        self.tables
+            .iter()
+            .enumerate()
+            .map(|(id, table)| (TableId::new(id as u32), table))
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> core::slice::IterMut<'_, Table> {
-        self.tables.iter_mut()
+    pub fn iter_mut(&mut self) -> impl ExactSizeIterator<Item = (TableId, &mut Table)> {
+        self.tables
+            .iter_mut()
+            .enumerate()
+            .map(|(id, table)| (TableId::new(id as u32), table))
     }
 
     #[inline]
@@ -131,38 +124,31 @@ impl Tables {
                 let table_id = *entry.into_key_value().1;
                 let table = &mut tables[table_id.index()];
 
-                let mut vec = Vec::<u32>::with_capacity(ids.len());
+                let mut raw_indecies = Vec::<u32>::with_capacity(ids.len());
                 for &id in ids {
-                    vec.push(unsafe { table.get_raw_index(id).debug_checked_unwrap() });
+                    raw_indecies.push(unsafe { table.get_raw_index(id).debug_checked_unwrap() });
                 }
 
-                let boxed = vec.into_boxed_slice();
-                (table_id, boxed)
+                (table_id, raw_indecies.into_boxed_slice())
             }
             RawEntryMut::Vacant(entry) => {
                 assert!(tables.len() <= u32::MAX as usize, "too many tables");
+
                 let table_id = TableId::new(tables.len() as u32);
 
                 let mut table = TableBuilder::new(ids.len());
 
-                let mut vec = Vec::<u32>::with_capacity(ids.len());
+                let mut raw_indecies = Vec::<u32>::with_capacity(ids.len());
 
                 for &id in ids {
-                    let info = unsafe {
-                        components
-                            .infos
-                            .get_unchecked(id.index())
-                            .as_ref()
-                            .debug_checked_unwrap()
-                    };
-                    vec.push(table.insert(id, info.layout(), info.drop_fn()));
+                    let info = unsafe { components.get_info_unchecked(id) };
+                    raw_indecies.push(table.insert(id, info.layout(), info.drop_fn()));
                 }
+
                 tables.push(table.build());
                 entry.insert(ids.into(), table_id);
 
-                let boxed = vec.into_boxed_slice();
-
-                (table_id, boxed)
+                (table_id, raw_indecies.into_boxed_slice())
             }
         }
     }

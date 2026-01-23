@@ -121,6 +121,13 @@ impl<V> TypeIdMap<V> {
         self.insert(TypeId::of::<T>(), v)
     }
 
+    /// Remove a pair if present, the order is random.
+    #[inline]
+    pub fn remove_one(&mut self) -> Option<(TypeId, V)> {
+        let type_id = *self.0.keys().next()?;
+        self.0.remove_entry(&type_id)
+    }
+
     /// Removes a key from the map, returning the value at the key if the key was previously in the map.
     ///
     /// Keeps the allocated memory for reuse.
